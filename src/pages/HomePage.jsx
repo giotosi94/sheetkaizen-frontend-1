@@ -1,44 +1,36 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '../context/AuthContext'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { FileText, ClipboardList, AlertTriangle, CheckCircle } from 'lucide-react'
 
 export default function HomePage() {
-  const { user } = useAuth()
   const [stats, setStats] = useState({ kaizens: 0, actionPlans: 0, overdue: 0, completed: 0 })
   const [recentKaizens, setRecentKaizens] = useState([])
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  useEffect(() => { loadData() }, [])
 
   const loadData = async () => {
     try {
-      const [kaizensRes, plansRes, overdueRes] = await Promise.all([
-        api.get('/kaizens'),
-        api.get('/action-plans'),
-        api.get('/action-plans/overdue'),
+      const [kaizensRes, plansRes] = await Promise.all([
+        api.get('/kaizens').catch(() => ({ data: [] })),
+        api.get('/action-plans').catch(() => ({ data: [] })),
       ])
       setStats({
         kaizens: kaizensRes.data.length,
         actionPlans: plansRes.data.length,
-        overdue: overdueRes.data.length,
+        overdue: plansRes.data.filter(p => p.stato !== 'Completato' && new Date(p.data_scadenza) < new Date()).length,
         completed: plansRes.data.filter(p => p.stato === 'Completato').length,
       })
       setRecentKaizens(kaizensRes.data.slice(0, 5))
-    } catch (err) {
-      console.error(err)
-    }
+    } catch (err) { console.error(err) }
   }
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-800 mb-6">
-        Benvenuto, {user?.full_name} 👋
+        Benvenuto in SheetKaizen 👋
       </h1>
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-xl shadow p-5 flex items-center gap-4">
           <div className="bg-blue-100 p-3 rounded-lg"><FileText className="text-blue-600" /></div>
@@ -70,7 +62,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Recent Kaizens */}
       <div className="bg-white rounded-xl shadow p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold text-gray-800">Kaizen Recenti</h2>
@@ -91,17 +82,11 @@ export default function HomePage() {
             </thead>
             <tbody>
               {recentKaizens.map((k) => (
-                <tr key={k._id} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => window.location.href = `/kaizen/${k._id}`}>
+                <tr key={k._id} className="border-b hover:bg-gray-50">
                   <td className="py-3 font-mono text-primary">{k.numero}</td>
                   <td className="py-3">{k.titolo}</td>
                   <td className="py-3">{k.tipo}</td>
-                  <td className="py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      k.stato === 'Aperto' ? 'bg-blue-100 text-blue-700' :
-                      k.stato === 'In Corso' ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-green-100 text-green-700'
-                    }`}>{k.stato}</span>
-                  </td>
+                  <td className="py-3">{k.stato}</td>
                   <td className="py-3">{k.reparto}</td>
                 </tr>
               ))}
