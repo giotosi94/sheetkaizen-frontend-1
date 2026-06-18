@@ -15,6 +15,7 @@
     "axios": "^1.7.7",
     "lucide-react": "^0.447.0",
     "date-fns": "^4.1.0"
+    "react-grid-layout": "^1.4.4",
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.2",
