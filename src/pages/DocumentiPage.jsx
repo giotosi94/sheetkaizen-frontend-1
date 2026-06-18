@@ -333,28 +333,38 @@ function UploadModal({ onClose, onSaved }) {
   })
   const [file, setFile] = useState(null)
   const [uploading, setUploading] = useState(false)
+  const [compress, setCompress] = useState(true)
   const fileRef = useRef(null)
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!file) return alert('Seleziona un file')
-    setUploading(true)
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      Object.entries(form).forEach(([k, v]) => v && formData.append(k, v))
-      const res = await api.post('/documenti/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      alert(`Documento ${res.data.numero} creato!`)
-      onSaved()
-      onClose()
-    } catch (err) {
-      console.error(err)
-      alert('Errore upload: ' + (err.response?.data?.detail || err.message))
+  e.preventDefault()
+  if (!file) return alert('Seleziona un file')
+  setUploading(true)
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('compress', compress ? 'true' : 'false')
+    Object.entries(form).forEach(([k, v]) => v && formData.append(k, v))
+    const res = await api.post('/documenti/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    
+    const c = res.data.compressione
+    let msg = `✅ Documento ${res.data.numero} creato!`
+    if (c && c.compressed) {
+      const origMB = (c.original_size / 1024 / 1024).toFixed(2)
+      const finalMB = (c.final_size / 1024 / 1024).toFixed(2)
+      msg += `\n\n🗜️ Compressione: ${origMB} MB → ${finalMB} MB (-${c.saved_pct}%)`
     }
-    setUploading(false)
+    alert(msg)
+    onSaved()
+    onClose()
+  } catch (err) {
+    console.error(err)
+    alert('Errore upload: ' + (err.response?.data?.detail || err.message))
   }
+  setUploading(false)
+}
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -447,7 +457,19 @@ function UploadModal({ onClose, onSaved }) {
             <input value={form.tag} onChange={(e) => setForm({...form, tag: e.target.value})}
               className="w-full border rounded-lg px-3 py-2" placeholder="filtro, pulizia, manutenzione" />
           </div>
-
+          <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+  <input
+    type="checkbox"
+    id="compress"
+    checked={compress}
+    onChange={(e) => setCompress(e.target.checked)}
+    className="w-4 h-4"
+  />
+  <label htmlFor="compress" className="text-sm cursor-pointer flex-1">
+    🗜️ <strong>Comprimi automaticamente</strong> — Riduce dimensioni di immagini, PDF e file Office (consigliato)
+  </label>
+</div>
+          
           <div className="flex justify-end gap-2 pt-4 border-t">
             <button type="button" onClick={onClose} className="px-4 py-2 border rounded-lg">Annulla</button>
             <button type="submit" disabled={uploading || !file} className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-light disabled:opacity-50">
