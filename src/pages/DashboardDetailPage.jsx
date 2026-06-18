@@ -104,7 +104,13 @@ export default function DashboardDetailPage() {
       case 'bi_embed':
         return <BIEmbed config={widget.config} />
       case 'table':
-        return <TableWidget config={widget.config} />
+  return (
+    <TableWidget
+      config={widget.config}
+      editMode={editMode}
+      onChange={(newConfig) => updateWidgetConfig(widget.widget_id, newConfig)}
+    />
+  )
       case 'excel_link':
         return <ExcelLink config={widget.config} />
       default:
