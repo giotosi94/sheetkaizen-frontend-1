@@ -598,24 +598,34 @@ function BulkUploadModal({ onClose, onSaved }) {
   const [dragOver, setDragOver] = useState(false)
   const fileRef = useRef(null)
 
-  const namePattern = /^(OPL|SOP|PROC|IST)-(\d{4})-(\d+)_(.+?)\.(pdf|docx|xlsx|pptx|png|jpg|jpeg|doc|xls|ppt)$/i
+  const namePattern = /\b(OPL|SOP|PROC|IST)\b[\s_\-]*(\d{1,5})/i
 
   function analyzeFile(file) {
-    const match = file.name.match(namePattern)
-    if (match) {
-      return {
-        valid: true,
-        tipo: match[1].toUpperCase(),
-        numero: `${match[1].toUpperCase()}-${match[2]}-${match[3]}`,
-        titolo: match[4].replace(/_/g, ' '),
-        ext: match[5],
-      }
-    }
+  const filenameNoExt = file.name.replace(/\.[^.]+$/, '')
+  const match = filenameNoExt.match(namePattern)
+  
+  if (match) {
+    const tipoRaw = match[1].toUpperCase()
+    const numero = match[2].padStart(3, '0')
+    // Estrai titolo rimuovendo il match
+    let titoloRaw = filenameNoExt.replace(namePattern, '').trim()
+    titoloRaw = titoloRaw.replace(/^[\s_\-]+/, '')  // rimuovi caratteri iniziali
+    let titolo = titoloRaw.replace(/_/g, ' ').replace(/\s+/g, ' ').trim()
+    
+    if (!titolo) titolo = filenameNoExt.replace(/_/g, ' ').trim()
+    
     return {
-      valid: false,
-      titolo: file.name.replace(/\.[^.]+$/, '').replace(/_/g, ' ').replace(/-/g, ' '),
+      valid: true,
+      tipo: tipoRaw,
+      numero: `${tipoRaw}-${numero}`,
+      titolo: titolo,
     }
   }
+  return {
+    valid: false,
+    titolo: filenameNoExt.replace(/_/g, ' ').replace(/-/g, ' ').trim(),
+  }
+}
 
   function handleFiles(selectedFiles) {
     const arr = Array.from(selectedFiles)
