@@ -935,3 +935,308 @@ function renderWithMentionsTags(text) {
     return p
   })
 }
+// ──────────────────────────────────────────────────────────
+// LIST VIEW (tabella estratta)
+// ──────────────────────────────────────────────────────────
+function ListView({ plans, onSelect, onEdit, onDelete, onQuickStateChange }) {
+  return (
+    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50 border-b text-xs uppercase text-gray-500">
+          <tr>
+            <th className="px-3 py-2 text-left w-24">Numero</th>
+            <th className="px-3 py-2 text-left">Titolo</th>
+            <th className="px-3 py-2 text-left w-20">Tipo</th>
+            <th className="px-3 py-2 text-left w-24">Priorità</th>
+            <th className="px-3 py-2 text-left w-32">Responsabile</th>
+            <th className="px-3 py-2 text-left w-32">Stato</th>
+            <th className="px-3 py-2 text-left w-28">Scadenza</th>
+            <th className="px-3 py-2 text-left w-20">Health</th>
+            <th className="px-3 py-2 text-center w-32">Azioni</th>
+          </tr>
+        </thead>
+        <tbody>
+          {plans.map(p => {
+            const TipoIcon = TIPO_ICONS[p.tipo] || CheckSquare
+            return (
+              <tr key={p._id} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => onSelect(p)}>
+                <td className="px-3 py-2 font-mono text-primary text-xs">{p.numero}</td>
+                <td className="px-3 py-2">
+                  <div className="font-medium truncate max-w-md">{p.titolo}</div>
+                  {(p.tags?.length > 0 || p.mentions?.length > 0 || p.links?.length > 0 || p.commenti?.length > 0) && (
+                    <div className="flex gap-1 mt-1 flex-wrap">
+                      {p.tags?.slice(0, 3).map(t => (
+                        <span key={t} className="text-xs bg-purple-50 text-purple-700 px-1.5 rounded">#{t}</span>
+                      ))}
+                      {p.mentions?.slice(0, 2).map(m => (
+                        <span key={m} className="text-xs bg-blue-50 text-blue-700 px-1.5 rounded">@{m}</span>
+                      ))}
+                      {p.links?.length > 0 && (
+                        <span className="text-xs bg-gray-100 text-gray-600 px-1.5 rounded flex items-center gap-0.5">
+                          <Link2 size={10} /> {p.links.length}
+                        </span>
+                      )}
+                      {p.commenti?.length > 0 && (
+                        <span className="text-xs bg-gray-100 text-gray-600 px-1.5 rounded flex items-center gap-0.5">
+                          <MessageSquare size={10} /> {p.commenti.length}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </td>
+                <td className="px-3 py-2">
+                  <div className={`flex items-center gap-1 text-xs ${TIPO_COLORS[p.tipo]}`}>
+                    <TipoIcon size={14} />
+                    <span>{p.tipo}</span>
+                  </div>
+                </td>
+                <td className="px-3 py-2">
+                  <span className={`px-2 py-0.5 rounded text-xs ${PRIORITA_BG[p.priorita]}`}>
+                    {p.priorita === 'Critical' && '🔥 '}
+                    {p.priorita}
+                  </span>
+                </td>
+                <td className="px-3 py-2">
+                  {p.responsabile ? (
+                    <div className="flex items-center gap-1">
+                      <Avatar name={p.responsabile} size={20} />
+                      <span className="text-xs truncate">{p.responsabile}</span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-400">— Non assegnato</span>
+                  )}
+                </td>
+                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                  <select
+                    value={p.stato}
+                    onChange={(e) => onQuickStateChange(p._id, e.target.value)}
+                    className={`text-xs px-1.5 py-1 rounded border ${STATO_COLORS[p.stato_visuale] || STATO_COLORS[p.stato]}`}
+                  >
+                    {STATI.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </td>
+                <td className="px-3 py-2 text-xs">
+                  {p.data_scadenza ? (
+                    <div className={p.stato_visuale === 'In Ritardo' ? 'text-red-600 font-bold' : ''}>
+                      {new Date(p.data_scadenza).toLocaleDateString('it-IT')}
+                    </div>
+                  ) : '—'}
+                </td>
+                <td className="px-3 py-2">
+                  <HealthBadge score={p.health_score || 0} />
+                </td>
+                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex justify-center gap-1">
+                    <button onClick={() => onSelect(p)} className="p-1 hover:bg-blue-100 rounded text-blue-600" title="Dettaglio">
+                      <Eye size={14} />
+                    </button>
+                    <button onClick={() => onEdit(p)} className="p-1 hover:bg-yellow-100 rounded text-yellow-600" title="Modifica">
+                      <Edit2 size={14} />
+                    </button>
+                    <button onClick={() => onDelete(p._id)} className="p-1 hover:bg-red-100 rounded text-red-600" title="Elimina">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────
+// KANBAN VIEW (drag&drop board)
+// ──────────────────────────────────────────────────────────
+const KANBAN_COLUMNS = [
+  { id: 'Da Valutare', label: '📋 Da Valutare', color: 'bg-gray-50 border-gray-300', headerColor: 'bg-gray-200 text-gray-700' },
+  { id: 'Aperto', label: '🆕 Aperto', color: 'bg-blue-50 border-blue-200', headerColor: 'bg-blue-200 text-blue-800' },
+  { id: 'In Corso', label: '🚧 In Corso', color: 'bg-indigo-50 border-indigo-200', headerColor: 'bg-indigo-200 text-indigo-800' },
+  { id: 'In Verifica', label: '🔍 In Verifica', color: 'bg-purple-50 border-purple-200', headerColor: 'bg-purple-200 text-purple-800' },
+  { id: 'Done', label: '✅ Done', color: 'bg-green-50 border-green-200', headerColor: 'bg-green-200 text-green-800' },
+  { id: 'Cancelled', label: '❌ Cancelled', color: 'bg-gray-50 border-gray-300', headerColor: 'bg-gray-300 text-gray-600' },
+]
+
+function KanbanView({ plans, onSelect, onStateChange, reload }) {
+  // Raggruppa i plans per stato
+  const grouped = KANBAN_COLUMNS.reduce((acc, col) => {
+    acc[col.id] = plans.filter(p => p.stato === col.id)
+    return acc
+  }, {})
+
+  async function onDragEnd(result) {
+    const { source, destination, draggableId } = result
+    if (!destination) return
+    if (source.droppableId === destination.droppableId) return
+    
+    // Cambio stato
+    await onStateChange(draggableId, destination.droppableId)
+  }
+
+  return (
+    <DragDropContext onDragEnd={onDragEnd}>
+      <div className="flex gap-3 overflow-x-auto pb-3" style={{ minHeight: '70vh' }}>
+        {KANBAN_COLUMNS.map(col => (
+          <div key={col.id} className={`flex-shrink-0 w-72 rounded-lg border-2 ${col.color} flex flex-col`}>
+            <div className={`${col.headerColor} px-3 py-2 rounded-t-md font-semibold text-sm flex justify-between items-center`}>
+              <span>{col.label}</span>
+              <span className="bg-white bg-opacity-50 px-2 py-0.5 rounded-full text-xs">
+                {grouped[col.id].length}
+              </span>
+            </div>
+            <Droppable droppableId={col.id}>
+              {(provided, snapshot) => (
+                <div
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  className={`flex-1 p-2 space-y-2 overflow-y-auto transition-colors ${
+                    snapshot.isDraggingOver ? 'bg-white bg-opacity-50' : ''
+                  }`}
+                  style={{ minHeight: '300px' }}
+                >
+                  {grouped[col.id].length === 0 && !snapshot.isDraggingOver && (
+                    <div className="text-center text-xs text-gray-400 py-8">
+                      Trascina qui
+                    </div>
+                  )}
+                  {grouped[col.id].map((plan, index) => (
+                    <Draggable key={plan._id} draggableId={plan._id} index={index}>
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                          onClick={() => !snapshot.isDragging && onSelect(plan)}
+                          className={`bg-white rounded-md p-3 shadow-sm border cursor-pointer hover:shadow-md transition-all ${
+                            snapshot.isDragging ? 'rotate-2 shadow-2xl ring-2 ring-primary' : ''
+                          }`}
+                        >
+                          <KanbanCard plan={plan} />
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </div>
+        ))}
+      </div>
+    </DragDropContext>
+  )
+}
+
+function KanbanCard({ plan }) {
+  const TipoIcon = TIPO_ICONS[plan.tipo] || CheckSquare
+  const checklistCompletati = plan.checklist?.filter(c => c.completato).length || 0
+  const checklistTotali = plan.checklist?.length || 0
+  const isOverdue = plan.stato_visuale === 'In Ritardo'
+  const isScadenza = plan.stato_visuale === 'In Scadenza'
+  
+  return (
+    <>
+      {/* Top row: numero + priorità */}
+      <div className="flex justify-between items-center mb-1">
+        <span className="font-mono text-xs text-primary font-bold">{plan.numero}</span>
+        <span className={`text-xs px-1.5 py-0.5 rounded ${PRIORITA_BG[plan.priorita]}`}>
+          {plan.priorita === 'Critical' && '🔥'}
+          {plan.priorita === 'High' && '⬆️'}
+          {plan.priorita === 'Medium' && '➖'}
+          {plan.priorita === 'Low' && '⬇️'}
+          {plan.priorita === 'Lowest' && '⏬'}
+        </span>
+      </div>
+
+      {/* Titolo */}
+      <div className="font-medium text-sm mb-2 line-clamp-2">{plan.titolo}</div>
+
+      {/* Tipo */}
+      <div className={`flex items-center gap-1 text-xs mb-2 ${TIPO_COLORS[plan.tipo]}`}>
+        <TipoIcon size={12} />
+        <span>{plan.tipo}</span>
+      </div>
+
+      {/* Tags */}
+      {plan.tags?.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-2">
+          {plan.tags.slice(0, 3).map(t => (
+            <span key={t} className="text-xs bg-purple-50 text-purple-700 px-1.5 rounded">#{t}</span>
+          ))}
+          {plan.tags.length > 3 && (
+            <span className="text-xs text-gray-400">+{plan.tags.length - 3}</span>
+          )}
+        </div>
+      )}
+
+      {/* Checklist progress */}
+      {checklistTotali > 0 && (
+        <div className="mb-2">
+          <div className="flex justify-between text-xs text-gray-500 mb-0.5">
+            <span>✓ {checklistCompletati}/{checklistTotali}</span>
+            <span>{Math.round((checklistCompletati / checklistTotali) * 100)}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-1">
+            <div
+              className="bg-green-500 h-1 rounded-full"
+              style={{ width: `${(checklistCompletati / checklistTotali) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Avanzamento */}
+      {plan.avanzamento > 0 && checklistTotali === 0 && (
+        <div className="mb-2">
+          <div className="flex justify-between text-xs text-gray-500 mb-0.5">
+            <span>Progresso</span>
+            <span>{plan.avanzamento}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-1">
+            <div className="bg-blue-500 h-1 rounded-full" style={{ width: `${plan.avanzamento}%` }} />
+          </div>
+        </div>
+      )}
+
+      {/* Footer: avatar + scadenza + counters */}
+      <div className="flex justify-between items-center pt-2 border-t mt-2">
+        <div className="flex items-center gap-1">
+          {plan.responsabile ? (
+            <Avatar name={plan.responsabile} size={20} />
+          ) : (
+            <span className="text-xs text-gray-400">—</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          {plan.commenti?.length > 0 && (
+            <span className="flex items-center gap-0.5">
+              <MessageSquare size={10} /> {plan.commenti.length}
+            </span>
+          )}
+          {plan.links?.length > 0 && (
+            <span className="flex items-center gap-0.5">
+              <Link2 size={10} /> {plan.links.length}
+            </span>
+          )}
+          {plan.data_scadenza && (
+            <span className={`flex items-center gap-0.5 ${
+              isOverdue ? 'text-red-600 font-bold' : isScadenza ? 'text-yellow-600' : ''
+            }`}>
+              <Calendar size={10} />
+              {new Date(plan.data_scadenza).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Health indicator (sottile) */}
+      {plan.health_score < 50 && (
+        <div className="mt-2 pt-2 border-t">
+          <HealthBadge score={plan.health_score} />
+        </div>
+      )}
+    </>
+  )
+}
