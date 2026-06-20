@@ -9,9 +9,6 @@ import {
 import api from '../services/api'
 import { useAllConfigurations } from '../hooks/useConfigurations'
 
-// ──────────────────────────────────────────────────────────
-// CONFIG
-// ──────────────────────────────────────────────────────────
 const STATI = ['Da Valutare', 'Aperto', 'In Corso', 'In Verifica', 'Done', 'Cancelled']
 const PRIORITA = ['Lowest', 'Low', 'Medium', 'High', 'Critical']
 const TIPI = ['Task', 'Bug', 'Improvement', 'Audit', 'Manutenzione', 'Sicurezza']
@@ -27,14 +24,6 @@ const STATO_COLORS = {
   'In Scadenza': 'bg-yellow-100 text-yellow-700 border-yellow-300',
 }
 
-const PRIORITA_COLORS = {
-  Lowest: 'text-gray-500',
-  Low: 'text-blue-500',
-  Medium: 'text-yellow-500',
-  High: 'text-orange-500',
-  Critical: 'text-red-600',
-}
-
 const PRIORITA_BG = {
   Lowest: 'bg-gray-100 text-gray-700',
   Low: 'bg-blue-100 text-blue-700',
@@ -44,26 +33,15 @@ const PRIORITA_BG = {
 }
 
 const TIPO_ICONS = {
-  Task: CheckSquare,
-  Bug: Bug,
-  Improvement: TrendingUp,
-  Audit: Shield,
-  Manutenzione: Wrench,
-  Sicurezza: AlertCircle,
+  Task: CheckSquare, Bug: Bug, Improvement: TrendingUp,
+  Audit: Shield, Manutenzione: Wrench, Sicurezza: AlertCircle,
 }
 
 const TIPO_COLORS = {
-  Task: 'text-blue-600',
-  Bug: 'text-red-600',
-  Improvement: 'text-green-600',
-  Audit: 'text-purple-600',
-  Manutenzione: 'text-orange-600',
-  Sicurezza: 'text-yellow-600',
+  Task: 'text-blue-600', Bug: 'text-red-600', Improvement: 'text-green-600',
+  Audit: 'text-purple-600', Manutenzione: 'text-orange-600', Sicurezza: 'text-yellow-600',
 }
 
-// ──────────────────────────────────────────────────────────
-// MAIN PAGE
-// ──────────────────────────────────────────────────────────
 export default function ActionPlanPage() {
   const [plans, setPlans] = useState([])
   const [stats, setStats] = useState({})
@@ -93,11 +71,8 @@ export default function ActionPlanPage() {
       ])
       setPlans(plansRes.data)
       setStats(statsRes.data)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
+    } catch (err) { console.error(err) }
+    finally { setLoading(false) }
   }
 
   async function handleDelete(id) {
@@ -113,191 +88,103 @@ export default function ActionPlanPage() {
 
   return (
     <div className="space-y-4">
-      {/* HEADER */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            🎯 Action Plan Management
-          </h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">🎯 Action Plan Management</h1>
           <p className="text-gray-500 text-sm">Gestione piani d'azione trasversali</p>
         </div>
         <div className="flex gap-2 items-center">
           <div className="bg-white border rounded-lg p-1 flex gap-1 shadow-sm">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`px-3 py-1.5 rounded text-sm flex items-center gap-1 transition-all ${
-                viewMode === 'list' ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              📋 Lista
-            </button>
-            <button
-              onClick={() => setViewMode('kanban')}
-              className={`px-3 py-1.5 rounded text-sm flex items-center gap-1 transition-all ${
-                viewMode === 'kanban' ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              🎯 Kanban
-            </button>
+            <button onClick={() => setViewMode('list')}
+              className={`px-3 py-1.5 rounded text-sm flex items-center gap-1 transition-all ${viewMode === 'list' ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-100'}`}>📋 Lista</button>
+            <button onClick={() => setViewMode('kanban')}
+              className={`px-3 py-1.5 rounded text-sm flex items-center gap-1 transition-all ${viewMode === 'kanban' ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-100'}`}>🎯 Kanban</button>
           </div>
-          <button
-            onClick={() => { setEditingPlan(null); setShowForm(true) }}
-            className="bg-primary text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-primary-light shadow-sm"
-          >
+          <button onClick={() => { setEditingPlan(null); setShowForm(true) }}
+            className="bg-primary text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-primary-light shadow-sm">
             <Plus size={20} /> Nuovo Action Plan
           </button>
         </div>
       </div>
 
-      {/* STATS CARDS */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-        <StatCard 
-          label="Totale" 
-          value={stats.totale || 0} 
-          color="gray" 
-          icon={Activity}
+        <StatCard label="Totale" value={stats.totale || 0} color="gray" icon={Activity}
           onClick={() => setFilters({...filters, stato: '', overdue: false})}
-          active={!filters.stato && !filters.overdue}
-        />
-        <StatCard 
-          label="Da Valutare" 
-          value={stats.per_stato?.['Da Valutare'] || 0} 
-          color="gray" 
-          icon={Clock}
+          active={!filters.stato && !filters.overdue} />
+        <StatCard label="Da Valutare" value={stats.per_stato?.['Da Valutare'] || 0} color="gray" icon={Clock}
           onClick={() => setFilters({...filters, stato: 'Da Valutare', overdue: false})}
-          active={filters.stato === 'Da Valutare'}
-        />
-        <StatCard 
-          label="In Corso" 
-          value={stats.per_stato?.['In Corso'] || 0} 
-          color="indigo" 
-          icon={TrendingUp}
+          active={filters.stato === 'Da Valutare'} />
+        <StatCard label="In Corso" value={stats.per_stato?.['In Corso'] || 0} color="indigo" icon={TrendingUp}
           onClick={() => setFilters({...filters, stato: 'In Corso', overdue: false})}
-          active={filters.stato === 'In Corso'}
-        />
-        <StatCard 
-          label="In Verifica" 
-          value={stats.per_stato?.['In Verifica'] || 0} 
-          color="purple" 
-          icon={Eye}
+          active={filters.stato === 'In Corso'} />
+        <StatCard label="In Verifica" value={stats.per_stato?.['In Verifica'] || 0} color="purple" icon={Eye}
           onClick={() => setFilters({...filters, stato: 'In Verifica', overdue: false})}
-          active={filters.stato === 'In Verifica'}
-        />
-        <StatCard 
-          label="Done" 
-          value={stats.per_stato?.Done || 0} 
-          color="green" 
-          icon={CheckCircle2}
+          active={filters.stato === 'In Verifica'} />
+        <StatCard label="Done" value={stats.per_stato?.Done || 0} color="green" icon={CheckCircle2}
           onClick={() => setFilters({...filters, stato: 'Done', overdue: false})}
-          active={filters.stato === 'Done'}
-        />
-        <StatCard 
-          label="Overdue" 
-          value={stats.overdue || 0} 
-          color="red" 
-          icon={AlertCircle}
+          active={filters.stato === 'Done'} />
+        <StatCard label="Overdue" value={stats.overdue || 0} color="red" icon={AlertCircle}
           onClick={() => setFilters({...filters, stato: '', overdue: !filters.overdue})}
-          active={filters.overdue}
-        />
+          active={filters.overdue} />
       </div>
 
-      {/* FILTERS BAR */}
       <div className="bg-white p-3 rounded-lg shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
           <div className="relative md:col-span-2">
             <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Cerca titolo, numero, tag, descrizione..."
-              value={filters.search}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm"
-            />
+            <input type="text" placeholder="Cerca titolo, numero, tag, descrizione..."
+              value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm" />
           </div>
-          <select
-            value={filters.tipo}
-            onChange={(e) => setFilters({ ...filters, tipo: e.target.value })}
-            className="border rounded-lg px-3 py-2 text-sm"
-          >
+          <select value={filters.tipo} onChange={(e) => setFilters({ ...filters, tipo: e.target.value })}
+            className="border rounded-lg px-3 py-2 text-sm">
             <option value="">Tutti i tipi</option>
             {TIPI.map(t => <option key={t}>{t}</option>)}
           </select>
-          <select
-            value={filters.priorita}
-            onChange={(e) => setFilters({ ...filters, priorita: e.target.value })}
-            className="border rounded-lg px-3 py-2 text-sm"
-          >
+          <select value={filters.priorita} onChange={(e) => setFilters({ ...filters, priorita: e.target.value })}
+            className="border rounded-lg px-3 py-2 text-sm">
             <option value="">Tutte le priorità</option>
             {PRIORITA.map(p => <option key={p}>{p}</option>)}
           </select>
-          <input
-            type="text"
-            placeholder="Responsabile"
-            value={filters.responsabile}
+          <input type="text" placeholder="Responsabile" value={filters.responsabile}
             onChange={(e) => setFilters({ ...filters, responsabile: e.target.value })}
-            className="border rounded-lg px-3 py-2 text-sm"
-          />
-          <input
-            type="text"
-            placeholder="Reparto"
-            value={filters.reparto}
+            className="border rounded-lg px-3 py-2 text-sm" />
+          <input type="text" placeholder="Reparto" value={filters.reparto}
             onChange={(e) => setFilters({ ...filters, reparto: e.target.value })}
-            className="border rounded-lg px-3 py-2 text-sm"
-          />
+            className="border rounded-lg px-3 py-2 text-sm" />
         </div>
       </div>
 
-      {/* VISTA: Lista o Kanban */}
       {loading ? (
         <div className="bg-white rounded-lg shadow-sm p-12 text-center text-gray-400">⏳ Caricamento...</div>
       ) : plans.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm p-12 text-center text-gray-400">
           <div className="text-5xl mb-2">📋</div>
           <p>Nessun Action Plan trovato</p>
-          <button onClick={() => setShowForm(true)} className="text-primary hover:underline mt-2">
-            Creane uno nuovo →
-          </button>
+          <button onClick={() => setShowForm(true)} className="text-primary hover:underline mt-2">Creane uno nuovo →</button>
         </div>
       ) : viewMode === 'list' ? (
-        <ListView 
-          plans={plans} 
-          onSelect={setSelectedPlan} 
-          onEdit={(p) => { setEditingPlan(p); setShowForm(true) }} 
-          onDelete={handleDelete}
-          onQuickStateChange={quickStateChange}
-        />
+        <ListView plans={plans} onSelect={setSelectedPlan}
+          onEdit={(p) => { setEditingPlan(p); setShowForm(true) }}
+          onDelete={handleDelete} onQuickStateChange={quickStateChange} />
       ) : (
-        <KanbanView 
-          plans={plans} 
-          onSelect={setSelectedPlan}
-          onStateChange={quickStateChange}
-          reload={loadData}
-        />
+        <KanbanView plans={plans} onSelect={setSelectedPlan} onStateChange={quickStateChange} reload={loadData} />
       )}
 
-      {/* MODALS */}
       {showForm && (
-        <ActionPlanForm
-          plan={editingPlan}
+        <ActionPlanForm plan={editingPlan}
           onClose={() => { setShowForm(false); setEditingPlan(null) }}
-          onSaved={(saved) => { setShowForm(false); setEditingPlan(null); loadData(); if (saved) setSelectedPlan(saved) }}
-        />
+          onSaved={(saved) => { setShowForm(false); setEditingPlan(null); loadData(); if (saved) setSelectedPlan(saved) }} />
       )}
       {selectedPlan && (
-        <ActionPlanDetail
-          plan={selectedPlan}
+        <ActionPlanDetail plan={selectedPlan}
           onClose={() => setSelectedPlan(null)}
           onUpdated={() => loadData()}
-          onEdit={(p) => { setSelectedPlan(null); setEditingPlan(p); setShowForm(true) }}
-        />
+          onEdit={(p) => { setSelectedPlan(null); setEditingPlan(p); setShowForm(true) }} />
       )}
     </div>
   )
 }
-
-// ──────────────────────────────────────────────────────────
-// COMPONENTS (mini)
-// ──────────────────────────────────────────────────────────
 
 function Avatar({ name, size = 24 }) {
   if (!name) return null
@@ -305,32 +192,21 @@ function Avatar({ name, size = 24 }) {
   const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-yellow-500']
   const color = colors[name.charCodeAt(0) % colors.length]
   return (
-    <div
-      style={{ width: size, height: size, fontSize: size * 0.45 }}
+    <div style={{ width: size, height: size, fontSize: size * 0.45 }}
       className={`${color} text-white rounded-full flex items-center justify-center font-bold flex-shrink-0`}
-      title={name}
-    >
-      {initials}
-    </div>
+      title={name}>{initials}</div>
   )
 }
 
 function StatCard({ label, value, color, icon: Icon, onClick, active }) {
   const colors = {
-    gray: 'border-gray-200 text-gray-700',
-    blue: 'border-blue-200 text-blue-700',
-    indigo: 'border-indigo-200 text-indigo-700',
-    purple: 'border-purple-200 text-purple-700',
-    green: 'border-green-200 text-green-700',
-    red: 'border-red-200 text-red-700',
+    gray: 'border-gray-200 text-gray-700', blue: 'border-blue-200 text-blue-700',
+    indigo: 'border-indigo-200 text-indigo-700', purple: 'border-purple-200 text-purple-700',
+    green: 'border-green-200 text-green-700', red: 'border-red-200 text-red-700',
   }
   return (
-    <button
-      onClick={onClick}
-      className={`p-3 rounded-lg border-2 bg-white hover:shadow-md transition-all text-left ${
-        active ? `${colors[color]} shadow-md scale-105` : 'border-gray-100'
-      }`}
-    >
+    <button onClick={onClick}
+      className={`p-3 rounded-lg border-2 bg-white hover:shadow-md transition-all text-left ${active ? `${colors[color]} shadow-md scale-105` : 'border-gray-100'}`}>
       <div className="flex justify-between items-center mb-1">
         <span className="text-xs uppercase text-gray-500">{label}</span>
         <Icon size={16} className="opacity-50" />
@@ -345,7 +221,6 @@ function HealthBadge({ score }) {
   if (score >= 75) color = 'bg-green-500'
   else if (score >= 50) color = 'bg-yellow-500'
   else if (score >= 25) color = 'bg-orange-500'
-  
   return (
     <div className="flex items-center gap-1" title={`Health: ${score}/100`}>
       <div className="w-12 bg-gray-200 rounded-full h-1.5 overflow-hidden">
@@ -355,23 +230,14 @@ function HealthBadge({ score }) {
     </div>
   )
 }
-// ──────────────────────────────────────────────────────────
-// FORM (Create / Edit)
-// ──────────────────────────────────────────────────────────
+
 function ActionPlanForm({ plan, onClose, onSaved }) {
   const [form, setForm] = useState({
-    titolo: plan?.titolo || '',
-    descrizione: plan?.descrizione || '',
-    tipo: plan?.tipo || 'Task',
-    priorita: plan?.priorita || 'Medium',
-    stato: plan?.stato || 'Da Valutare',
-    categoria: plan?.categoria || '',
-    tipo_perdita: plan?.tipo_perdita || '',
-    responsabile: plan?.responsabile || '',
-    responsabile_email: plan?.responsabile_email || '',
-    reparto: plan?.reparto || '',
-    linea: plan?.linea || '',
-    macchina: plan?.macchina || '',
+    titolo: plan?.titolo || '', descrizione: plan?.descrizione || '',
+    tipo: plan?.tipo || '', priorita: plan?.priorita || 'Medium',
+    stato: plan?.stato || 'Da Valutare', categoria: plan?.categoria || '',
+    tipo_perdita: plan?.tipo_perdita || '', responsabile: plan?.responsabile || '',
+    reparto: plan?.reparto || '', linea: plan?.linea || '', macchina: plan?.macchina || '',
     data_scadenza: plan?.data_scadenza ? plan.data_scadenza.slice(0, 10) : '',
     tags: plan?.tags?.join(', ') || '',
   })
@@ -388,18 +254,13 @@ function ActionPlanForm({ plan, onClose, onSaved }) {
         data_scadenza: form.data_scadenza ? new Date(form.data_scadenza).toISOString() : null,
       }
       let res
-      if (plan?._id) {
-        res = await api.put(`/action-plans/${plan._id}`, payload)
-      } else {
-        res = await api.post('/action-plans/', payload)
-      }
+      if (plan?._id) res = await api.put(`/action-plans/${plan._id}`, payload)
+      else res = await api.post('/action-plans/', payload)
       onSaved(res.data)
     } catch (err) {
       console.error(err)
       alert('Errore: ' + (err.response?.data?.detail || err.message))
-    } finally {
-      setSaving(false)
-    }
+    } finally { setSaving(false) }
   }
 
   return (
@@ -421,8 +282,12 @@ function ActionPlanForm({ plan, onClose, onSaved }) {
 
         <div className="grid grid-cols-3 gap-3">
           <Field label="Tipo">
-            <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })} className="w-full border rounded-lg px-3 py-2">
-              {TIPI.map(t => <option key={t}>{t}</option>)}
+            <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}
+              className="w-full border rounded-lg px-3 py-2">
+              <option value="">— Seleziona —</option>
+              {(configs.tipi_action_plan || []).map(t => (
+                <option key={t._id} value={t.label}>{t.icon ? `${t.icon} ` : ''}{t.label}</option>
+              ))}
             </select>
           </Field>
           <Field label="Priorità">
@@ -443,9 +308,7 @@ function ActionPlanForm({ plan, onClose, onSaved }) {
               className="w-full border rounded-lg px-3 py-2">
               <option value="">— Seleziona —</option>
               {(configs.categorie_action_plan || []).map(c => (
-                <option key={c._id} value={c.label}>
-                  {c.icon ? `${c.icon} ` : ''}{c.label}
-                </option>
+                <option key={c._id} value={c.label}>{c.icon ? `${c.icon} ` : ''}{c.label}</option>
               ))}
             </select>
           </Field>
@@ -454,24 +317,16 @@ function ActionPlanForm({ plan, onClose, onSaved }) {
               className="w-full border rounded-lg px-3 py-2">
               <option value="">— Nessuna —</option>
               {(configs.tipi_perdita || []).map(p => (
-                <option key={p._id} value={p.label}>
-                  {p.icon ? `${p.icon} ` : ''}{p.label}
-                </option>
+                <option key={p._id} value={p.label}>{p.icon ? `${p.icon} ` : ''}{p.label}</option>
               ))}
             </select>
           </Field>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Responsabile">
-            <input value={form.responsabile} onChange={(e) => setForm({ ...form, responsabile: e.target.value })}
-              placeholder="Es: Mario Rossi" className="w-full border rounded-lg px-3 py-2" />
-          </Field>
-          <Field label="Email Responsabile">
-            <input type="email" value={form.responsabile_email} onChange={(e) => setForm({ ...form, responsabile_email: e.target.value })}
-              placeholder="mario.rossi@lindt.it" className="w-full border rounded-lg px-3 py-2" />
-          </Field>
-        </div>
+        <Field label="Responsabile">
+          <input value={form.responsabile} onChange={(e) => setForm({ ...form, responsabile: e.target.value })}
+            placeholder="Es: Mario Rossi" className="w-full border rounded-lg px-3 py-2" />
+        </Field>
 
         <div className="grid grid-cols-3 gap-3">
           <Field label="Reparto">
@@ -479,9 +334,7 @@ function ActionPlanForm({ plan, onClose, onSaved }) {
               className="w-full border rounded-lg px-3 py-2">
               <option value="">— Seleziona —</option>
               {(configs.reparti || []).map(r => (
-                <option key={r._id} value={r.label}>
-                  {r.icon ? `${r.icon} ` : ''}{r.label}
-                </option>
+                <option key={r._id} value={r.label}>{r.icon ? `${r.icon} ` : ''}{r.label}</option>
               ))}
             </select>
           </Field>
@@ -490,9 +343,7 @@ function ActionPlanForm({ plan, onClose, onSaved }) {
               className="w-full border rounded-lg px-3 py-2">
               <option value="">— Seleziona —</option>
               {(configs.linee || []).map(l => (
-                <option key={l._id} value={l.label}>
-                  {l.icon ? `${l.icon} ` : ''}{l.label}
-                </option>
+                <option key={l._id} value={l.label}>{l.icon ? `${l.icon} ` : ''}{l.label}</option>
               ))}
             </select>
           </Field>
@@ -501,9 +352,7 @@ function ActionPlanForm({ plan, onClose, onSaved }) {
               className="w-full border rounded-lg px-3 py-2">
               <option value="">— Seleziona —</option>
               {(configs.macchine || []).map(m => (
-                <option key={m._id} value={m.label}>
-                  {m.icon ? `${m.icon} ` : ''}{m.label}
-                </option>
+                <option key={m._id} value={m.label}>{m.icon ? `${m.icon} ` : ''}{m.label}</option>
               ))}
             </select>
           </Field>
@@ -529,10 +378,6 @@ function ActionPlanForm({ plan, onClose, onSaved }) {
     </Modal>
   )
 }
-
-// ──────────────────────────────────────────────────────────
-// DETAIL (Linear/Jira-style modal)
-// ──────────────────────────────────────────────────────────
 function ActionPlanDetail({ plan, onClose, onUpdated, onEdit }) {
   const [detail, setDetail] = useState(plan)
   const [nuovoCommento, setNuovoCommento] = useState('')
@@ -638,9 +483,7 @@ function ActionPlanDetail({ plan, onClose, onUpdated, onEdit }) {
                     <button onClick={() => toggleChecklist(item.id, !item.completato)}>
                       {item.completato ? <CheckSquare size={18} className="text-green-600" /> : <Square size={18} className="text-gray-400" />}
                     </button>
-                    <span className={`flex-1 text-sm ${item.completato ? 'line-through text-gray-400' : ''}`}>
-                      {item.testo}
-                    </span>
+                    <span className={`flex-1 text-sm ${item.completato ? 'line-through text-gray-400' : ''}`}>{item.testo}</span>
                     <button onClick={() => removeChecklist(item.id)} className="opacity-0 group-hover:opacity-100 text-red-500">
                       <Trash2 size={14} />
                     </button>
@@ -648,13 +491,9 @@ function ActionPlanDetail({ plan, onClose, onUpdated, onEdit }) {
                 ))}
               </div>
               <div className="flex gap-2 mt-2">
-                <input
-                  value={nuovoChecklistItem}
-                  onChange={(e) => setNuovoChecklistItem(e.target.value)}
+                <input value={nuovoChecklistItem} onChange={(e) => setNuovoChecklistItem(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addChecklistItem())}
-                  placeholder="Aggiungi item..."
-                  className="flex-1 border rounded px-3 py-1.5 text-sm"
-                />
+                  placeholder="Aggiungi item..." className="flex-1 border rounded px-3 py-1.5 text-sm" />
                 <button onClick={addChecklistItem} className="px-3 py-1.5 bg-gray-200 rounded text-sm hover:bg-gray-300">+ Item</button>
               </div>
             </Section>
@@ -693,12 +532,8 @@ function ActionPlanDetail({ plan, onClose, onUpdated, onEdit }) {
           <div className="flex justify-between items-center pb-2 border-b">
             <span className="text-sm font-medium">Dettagli</span>
             <div className="flex gap-1">
-              <button onClick={() => onEdit(detail)} className="p-1.5 hover:bg-gray-200 rounded">
-                <Edit2 size={14} />
-              </button>
-              <button onClick={onClose} className="p-1.5 hover:bg-gray-200 rounded">
-                <X size={14} />
-              </button>
+              <button onClick={() => onEdit(detail)} className="p-1.5 hover:bg-gray-200 rounded"><Edit2 size={14} /></button>
+              <button onClick={onClose} className="p-1.5 hover:bg-gray-200 rounded"><X size={14} /></button>
             </div>
           </div>
 
@@ -744,6 +579,12 @@ function ActionPlanDetail({ plan, onClose, onUpdated, onEdit }) {
             <span className="text-xs">{detail.categoria || '—'}</span>
           </SidebarRow>
 
+          {detail.tipo_perdita && (
+            <SidebarRow label="Tipo Perdita">
+              <span className="text-xs">{detail.tipo_perdita}</span>
+            </SidebarRow>
+          )}
+
           {(detail.reparto || detail.linea || detail.macchina) && (
             <SidebarRow label="Location">
               <div className="text-xs text-right">
@@ -783,9 +624,6 @@ function ActionPlanDetail({ plan, onClose, onUpdated, onEdit }) {
   )
 }
 
-// ──────────────────────────────────────────────────────────
-// LIST VIEW
-// ──────────────────────────────────────────────────────────
 function ListView({ plans, onSelect, onEdit, onDelete, onQuickStateChange }) {
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden">
@@ -880,9 +718,6 @@ function ListView({ plans, onSelect, onEdit, onDelete, onQuickStateChange }) {
   )
 }
 
-// ──────────────────────────────────────────────────────────
-// KANBAN VIEW
-// ──────────────────────────────────────────────────────────
 const KANBAN_COLUMNS = [
   { id: 'Da Valutare', label: '📋 Da Valutare', color: 'bg-gray-50 border-gray-300', headerColor: 'bg-gray-200 text-gray-700' },
   { id: 'Aperto', label: '🆕 Aperto', color: 'bg-blue-50 border-blue-200', headerColor: 'bg-blue-200 text-blue-800' },
@@ -927,9 +762,7 @@ function KanbanView({ plans, onSelect, onStateChange, reload }) {
                       {(provided, snapshot) => (
                         <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}
                           onClick={() => !snapshot.isDragging && onSelect(plan)}
-                          className={`bg-white rounded-md p-3 shadow-sm border cursor-pointer hover:shadow-md transition-all ${
-                            snapshot.isDragging ? 'rotate-2 shadow-2xl ring-2 ring-primary' : ''
-                          }`}>
+                          className={`bg-white rounded-md p-3 shadow-sm border cursor-pointer hover:shadow-md transition-all ${snapshot.isDragging ? 'rotate-2 shadow-2xl ring-2 ring-primary' : ''}`}>
                           <KanbanCard plan={plan} />
                         </div>
                       )}
@@ -1011,9 +844,6 @@ function KanbanCard({ plan }) {
   )
 }
 
-// ──────────────────────────────────────────────────────────
-// UTILS
-// ──────────────────────────────────────────────────────────
 function Modal({ title, children, onClose, wide = false, noPadding = false }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
