@@ -215,12 +215,13 @@ const KPI_STEPS = [
   { id: 'step3_target_definition', num: 3, title: 'Project Planning & Assignment', icon: '🎯', desc: 'Pianifica progetti per chiudere il gap' },
   { id: 'step4_implementation', num: 4, title: 'Project Implementation', icon: '🚧', desc: 'Esegui e monitora i progetti' },
   { id: 'step5_close_the_loop', num: 5, title: 'Gap Analysis & Close the Loop', icon: '🏁', desc: 'Bridge chart target vs actual' },
+]
+
 const PROGETTO_STATUS = [
   { value: 'planned', label: 'Planned', icon: '⚪', color: 'bg-gray-100 text-gray-700 border-gray-300' },
   { value: 'in_progress', label: 'In Progress', icon: '🟡', color: 'bg-yellow-100 text-yellow-700 border-yellow-400' },
   { value: 'done', label: 'Done', icon: '🟢', color: 'bg-green-100 text-green-700 border-green-400' },
   { value: 'cancelled', label: 'Cancelled', icon: '🔴', color: 'bg-red-100 text-red-700 border-red-300' },
-]
 ]
 
 function KpiManagementTab({ pillar, color, onSaved }) {
