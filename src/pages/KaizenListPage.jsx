@@ -175,16 +175,16 @@ export default function KaizenListPage() {
                   <td className="p-4 text-xs">{k.reparto || '—'}</td>
                   <td className="p-4 text-xs">{k.linea || '—'}</td>
                   <td className="p-4 text-gray-500 text-xs">{k.data_apertura?.slice(0, 10)}</td>
-<td className="p-4 text-center">
-  <button
-    onClick={(e) => deleteKaizen(k, e)}
-    className="text-red-600 hover:bg-red-50 p-2 rounded-full transition-colors"
-    title="Elimina Kaizen"
-  >
-    <Trash2 size={16} />
-  </button>
-</td>
-</tr>
+                  <td className="p-4 text-center">
+                    <button
+                      onClick={(e) => deleteKaizen(k, e)}
+                      className="text-red-600 hover:bg-red-50 p-2 rounded-full transition-colors"
+                      title="Elimina Kaizen"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </td>
+                  </tr>
                 </tr>
               )
             })}
