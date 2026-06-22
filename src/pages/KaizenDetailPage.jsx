@@ -31,9 +31,10 @@ function buildTabsForLivello(livello) {
     label: livello === 'Quick' ? 'Quick Kaizen' : '🔍 Problem Solving',
   })
   base.push({ id: 'azioni', label: '📋 Azioni' })
+  // 🆕 8 Standard Elements anche per Quick (è la valutazione ufficiale Lindt)
+  base.push({ id: 'stdelements', label: '📊 8 Standard Elements' })
   if (livello !== 'Quick') {
     base.push({ id: 'figli', label: '⚡ Quick Kaizen' })
-    base.push({ id: 'stdelements', label: '📊 8 Standard Elements' })
     base.push({ id: 'cmladder', label: '🏔️ Countermeasure Ladder' })
     base.push({ id: 'gantt', label: '📅 Gantt' })
   }
