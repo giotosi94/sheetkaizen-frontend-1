@@ -1268,6 +1268,253 @@ function Step5Content({ data, color, onUpdate, allStepsData }) {
   )
 }
 
+// 📊 BRIDGE WATERFALL CHART (SVG)
+function BridgeWaterfallChart({ baseline, step3Progetti, step4Actual, color, unit = '€' }) {
+  // Costruisco i "passi" del waterfall
+  const baselineVal = parseFloat(baseline) || 0
+
+  // Step 3: progetti non-cancelled con planned saving
+  const plannedSteps = step3Progetti
+    .filter(p => p.status !== 'cancelled' && parseFloat(p.saving_planned) > 0)
+    .map(p => ({
+      label: p.label || 'Senza nome',
+      kaizen: p.kaizen_numero || '',
+      value: parseFloat(p.saving_planned) || 0,
+      type: 'planned',
+    }))
+
+  // Step 4: progetti done con actual saving
+  const actualSteps = step4Actual
+    .filter(p => p.actual_status === 'done' && parseFloat(p.actual_saving) > 0)
+    .map(p => ({
+      label: p.label || 'Senza nome',
+      kaizen: p.kaizen_numero || '',
+      value: parseFloat(p.actual_saving) || 0,
+      type: 'actual',
+    }))
+
+  const totalPlanned = plannedSteps.reduce((s, p) => s + p.value, 0)
+  const totalActual = actualSteps.reduce((s, p) => s + p.value, 0)
+  const targetAtteso = baselineVal + totalPlanned
+  const risultatoReale = baselineVal + totalActual
+  const gap = totalActual - totalPlanned
+
+  // Costruisco l'array di barre
+  const bars = [
+    { label: 'Baseline', value: baselineVal, cumulative: baselineVal, type: 'total', sublabel: '' },
+    ...plannedSteps.map((p, i) => {
+      const prevCum = baselineVal + plannedSteps.slice(0, i).reduce((s, x) => s + x.value, 0)
+      return { label: p.label, sublabel: p.kaizen, value: p.value, cumulative: prevCum + p.value, prevCumulative: prevCum, type: 'planned' }
+    }),
+    { label: 'Target Atteso', value: targetAtteso, cumulative: targetAtteso, type: 'subtotal', sublabel: 'Baseline + Σ Planned' },
+    ...actualSteps.map((p, i) => {
+      // Per gli actual, riparto da baseline e accumulo
+      const prevCum = baselineVal + actualSteps.slice(0, i).reduce((s, x) => s + x.value, 0)
+      return { label: p.label, sublabel: p.kaizen, value: p.value, cumulative: prevCum + p.value, prevCumulative: prevCum, type: 'actual' }
+    }),
+    { label: 'Risultato Reale', value: risultatoReale, cumulative: risultatoReale, type: 'total', sublabel: gap >= 0 ? `✅ ${gap >= 0 ? '+' : ''}${gap.toLocaleString('it-IT')} vs target` : `🔴 ${gap.toLocaleString('it-IT')} vs target` },
+  ]
+
+  // Calcolo scala
+  const maxValue = Math.max(targetAtteso, risultatoReale, baselineVal) * 1.15
+  const minValue = 0
+  const chartHeight = 280
+  const barWidth = 60
+  const barGap = 18
+  const leftPadding = 50
+  const bottomPadding = 80
+  const topPadding = 30
+  const chartWidth = leftPadding + bars.length * (barWidth + barGap) + 30
+
+  function yScale(val) {
+    return topPadding + chartHeight - ((val - minValue) / (maxValue - minValue)) * chartHeight
+  }
+
+  function getBarColor(type) {
+    if (type === 'total') return '#6b7280'    // grigio scuro - totali iniziali/finali
+    if (type === 'subtotal') return color || '#6366f1' // colore pillar - target
+    if (type === 'planned') return '#3b82f6'  // blu - planned
+    if (type === 'actual') return '#10b981'   // verde - actual done
+    return '#9ca3af'
+  }
+
+  if (bars.length <= 2) {
+    return (
+      <div className="bg-white p-6 rounded-lg text-center text-sm text-gray-400 italic">
+        📊 Bridge Chart vuoto. Aggiungi progetti con saving in Step 3 e completane qualcuno in Step 4 per popolare il waterfall.
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-white p-4 rounded-lg border-2 overflow-x-auto" style={{ borderColor: color }}>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="font-bold text-sm" style={{ color }}>📊 Bridge Waterfall — Baseline → Target → Reale</h4>
+        <div className="flex gap-3 text-[10px] items-center">
+          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded" style={{ backgroundColor: '#6b7280' }} /> Totale</span>
+          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded" style={{ backgroundColor: '#3b82f6' }} /> Planned</span>
+          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded" style={{ backgroundColor: '#10b981' }} /> Actual (done)</span>
+          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded" style={{ backgroundColor: color }} /> Target</span>
+        </div>
+      </div>
+
+      <svg width={chartWidth} height={chartHeight + topPadding + bottomPadding} style={{ minWidth: '100%' }}>
+        {/* Griglia orizzontale */}
+        {[0, 0.25, 0.5, 0.75, 1].map(p => {
+          const y = topPadding + chartHeight - p * chartHeight
+          const val = minValue + p * (maxValue - minValue)
+          return (
+            <g key={p}>
+              <line x1={leftPadding} y1={y} x2={chartWidth - 20} y2={y} stroke="#e5e7eb" strokeDasharray="2,2" />
+              <text x={leftPadding - 5} y={y + 3} textAnchor="end" fontSize="9" fill="#9ca3af">
+                {Math.round(val).toLocaleString('it-IT')}
+              </text>
+            </g>
+          )
+        })}
+
+        {/* Barre */}
+        {bars.map((bar, idx) => {
+          const x = leftPadding + idx * (barWidth + barGap)
+          const isStep = bar.type === 'planned' || bar.type === 'actual'
+          const yTop = yScale(bar.cumulative)
+          const yBottom = isStep ? yScale(bar.prevCumulative) : yScale(0)
+          const barHeight = Math.abs(yBottom - yTop)
+          const barY = Math.min(yTop, yBottom)
+          const fillColor = getBarColor(bar.type)
+
+          return (
+            <g key={idx}>
+              {/* Linea di connessione tra step (tratteggiata) */}
+              {idx > 0 && isStep && (
+                <line
+                  x1={x - barGap}
+                  y1={yScale(bar.prevCumulative)}
+                  x2={x}
+                  y2={yScale(bar.prevCumulative)}
+                  stroke="#9ca3af"
+                  strokeDasharray="3,3"
+                  strokeWidth="1"
+                />
+              )}
+              {/* Linea di connessione per totali */}
+              {idx > 0 && !isStep && bars[idx - 1] && (
+                <line
+                  x1={x - barGap}
+                  y1={yScale(bars[idx - 1].cumulative)}
+                  x2={x}
+                  y2={yScale(bars[idx - 1].cumulative)}
+                  stroke="#d1d5db"
+                  strokeDasharray="2,4"
+                  strokeWidth="1"
+                />
+              )}
+
+              {/* Barra */}
+              <rect
+                x={x}
+                y={barY}
+                width={barWidth}
+                height={Math.max(barHeight, 2)}
+                fill={fillColor}
+                opacity={isStep ? 0.85 : 1}
+                rx="2"
+              >
+                <title>{`${bar.label}: ${bar.value.toLocaleString('it-IT')} ${unit}${isStep ? ` (cumulato: ${bar.cumulative.toLocaleString('it-IT')})` : ''}`}</title>
+              </rect>
+
+              {/* Valore sopra la barra */}
+              <text
+                x={x + barWidth / 2}
+                y={barY - 5}
+                textAnchor="middle"
+                fontSize="10"
+                fontWeight="bold"
+                fill={fillColor}
+              >
+                {isStep ? '+' : ''}{Math.round(bar.value).toLocaleString('it-IT')}
+              </text>
+
+              {/* Label sotto la barra (ruotata se lunga) */}
+              <text
+                x={x + barWidth / 2}
+                y={topPadding + chartHeight + 15}
+                textAnchor="middle"
+                fontSize="9"
+                fill="#374151"
+                fontWeight={!isStep ? 'bold' : 'normal'}
+              >
+                {bar.label.length > 12 ? bar.label.substring(0, 12) + '…' : bar.label}
+              </text>
+              {bar.sublabel && (
+                <text
+                  x={x + barWidth / 2}
+                  y={topPadding + chartHeight + 28}
+                  textAnchor="middle"
+                  fontSize="8"
+                  fill="#9ca3af"
+                >
+                  {bar.sublabel.length > 18 ? bar.sublabel.substring(0, 18) + '…' : bar.sublabel}
+                </text>
+              )}
+            </g>
+          )
+        })}
+
+        {/* Linea baseline orizzontale di riferimento */}
+        <line
+          x1={leftPadding}
+          y1={yScale(baselineVal)}
+          x2={chartWidth - 20}
+          y2={yScale(baselineVal)}
+          stroke="#6b7280"
+          strokeDasharray="4,4"
+          strokeWidth="1"
+          opacity="0.5"
+        />
+        <text
+          x={chartWidth - 22}
+          y={yScale(baselineVal) - 3}
+          textAnchor="end"
+          fontSize="9"
+          fill="#6b7280"
+          fontStyle="italic"
+        >
+          baseline
+        </text>
+
+        {/* Linea target orizzontale di riferimento */}
+        <line
+          x1={leftPadding}
+          y1={yScale(targetAtteso)}
+          x2={chartWidth - 20}
+          y2={yScale(targetAtteso)}
+          stroke={color}
+          strokeDasharray="4,4"
+          strokeWidth="1"
+          opacity="0.5"
+        />
+        <text
+          x={chartWidth - 22}
+          y={yScale(targetAtteso) - 3}
+          textAnchor="end"
+          fontSize="9"
+          fill={color}
+          fontStyle="italic"
+        >
+          target atteso
+        </text>
+      </svg>
+
+      <div className="text-[10px] text-gray-500 italic mt-2 flex items-center gap-3 flex-wrap">
+        <span>💡 Hover sulle barre per il dettaglio</span>
+        <span>📊 Barre blu = saving pianificato per progetto (Step 3)</span>
+        <span>✅ Barre verdi = saving realizzato da progetti "done" (Step 4)</span>
+      </div>
+    </div>
+  )
+}
+
 // 🧩 Helper component per le celle del bridge con auto/override
 function BridgeCell({ label, value, autoValue, isOverridden, onChange, onReset, colSpan = 'col-span-3', suffix = '' }) {
   return (
