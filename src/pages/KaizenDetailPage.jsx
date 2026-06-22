@@ -858,7 +858,7 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
                 </div>
               </div>
               <div className="flex gap-2 pt-2 border-t mt-2">
-                {`/kaizen/${child._id}`}lass="text-xs px-3 py-1.5 bg-blue-50 hover:bg-blue-100 rounded text-blue-700 flex-1 text-center">
+                <a href={`/kaizen/${child._id}`} className="text-xs px-3 py-1.5 bg-blue-50 hover:bg-blue-100 rounded text-blue-700 flex-1 text-center">
                   👁 Apri Kaizen
                 </a>
                 <button onClick={() => scollegaFiglio(child._id, child.numero)} className="text-xs px-3 py-1.5 bg-red-50 hover:bg-red-100 rounded text-red-600" title="Scollega dal progetto">
