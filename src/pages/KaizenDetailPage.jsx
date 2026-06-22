@@ -396,8 +396,8 @@ export default function KaizenDetailPage() {
               className="w-full border rounded-lg px-3 py-2 text-sm" rows={4} placeholder="Osservazioni" />
           </div>
         </div>
-      )}
-      {activeTab === 'azioni' && (
+      )} 
+{activeTab === 'azioni' && (
         <AzioniTab kaizenId={id} kaizenNumero={kaizen.numero} onUpdate={loadKaizen} />
       )}
 
