@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import api from '../services/api'
 import { Save, ChevronDown, X, History, RefreshCw } from 'lucide-react'
@@ -925,7 +925,16 @@ function StandardElementsTab({ kaizen, onSaved }) {
   const [notes, setNotes] = useState(kaizen.standard_elements?.notes || {})
   const [saving, setSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
-
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  
+  // Refs per tenere lo stato aggiornato in cleanup
+  const scoresRef = useRef(scores)
+  const notesRef = useRef(notes)
+  const kaizenIdRef = useRef(kaizen._id)
+  
+  useEffect(() => { scoresRef.current = scores }, [scores])
+  useEffect(() => { notesRef.current = notes }, [notes])
+  
   // Calcolo score totale
   const totalScore = Object.values(scores).reduce((sum, v) => sum + (parseFloat(v) || 0), 0)
   const percent = (totalScore / MAX_SCORE) * 100
@@ -940,35 +949,106 @@ function StandardElementsTab({ kaizen, onSaved }) {
     else passStatus = { label: 'FAIL', color: 'bg-red-500 text-white', emoji: '❌' }
   }
 
-  // Auto-save con debounce
+  // Funzione di salvataggio (riusabile)
+  const doSave = async (silent = false) => {
+    if (!silent) setSaving(true)
+    try {
+      const currentScores = scoresRef.current
+      const currentNotes = notesRef.current
+      const currentTotal = Object.values(currentScores).reduce((sum, v) => sum + (parseFloat(v) || 0), 0)
+      const currentCount = Object.keys(currentScores).length
+      
+      let currentStatus = 'Da Completare'
+      if (currentCount === totalElements) {
+        if (currentTotal >= 8) currentStatus = 'PASS'
+        else if (currentTotal >= 5) currentStatus = 'PARTIAL PASS'
+        else currentStatus = 'FAIL'
+      }
+      
+      await api.put(`/kaizens/${kaizenIdRef.current}`, {
+        standard_elements: {
+          scores: currentScores,
+          notes: currentNotes,
+          total_score: currentTotal,
+          max_score: MAX_SCORE,
+          percent: (currentTotal / MAX_SCORE) * 100,
+          pass_status: currentStatus,
+          last_evaluated_at: new Date().toISOString(),
+        },
+      })
+      if (!silent) {
+        setLastSaved(new Date())
+        setHasUnsavedChanges(false)
+        onSaved?.()
+      }
+      return true
+    } catch (err) {
+      console.error('Errore salvataggio Standard Elements:', err)
+      if (!silent) {
+        alert('❌ Errore salvataggio: ' + (err.response?.data?.detail || err.message))
+      }
+      return false
+    } finally {
+      if (!silent) setSaving(false)
+    }
+  }
+
+  // Auto-save con debounce 400ms
   useEffect(() => {
     if (Object.keys(scores).length === 0 && Object.keys(notes).length === 0) return
     
-    const timer = setTimeout(async () => {
-      setSaving(true)
-      try {
-        await api.put(`/kaizens/${kaizen._id}`, {
-          standard_elements: {
-            scores,
-            notes,
-            total_score: totalScore,
-            max_score: MAX_SCORE,
-            percent: percent,
-            pass_status: passStatus.label,
-            last_evaluated_at: new Date().toISOString(),
-          },
-        })
-        setLastSaved(new Date())
-      } catch (err) {
-        console.error('Errore auto-save:', err)
-      } finally {
-        setSaving(false)
-      }
-    }, 800) // debounce 800ms
-
+    setHasUnsavedChanges(true)
+    const timer = setTimeout(() => doSave(false), 400)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scores, notes])
+
+  // Force-save su unmount (cambio tab/pagina)
+  useEffect(() => {
+    return () => {
+      // Se ci sono modifiche pending, prova a salvare in background
+      if (Object.keys(scoresRef.current).length > 0 || Object.keys(notesRef.current).length > 0) {
+        // Usa fetch nativo per essere sicuro che parte anche su unmount
+        const currentScores = scoresRef.current
+        const currentNotes = notesRef.current
+        const currentTotal = Object.values(currentScores).reduce((sum, v) => sum + (parseFloat(v) || 0), 0)
+        const currentCount = Object.keys(currentScores).length
+        
+        let currentStatus = 'Da Completare'
+        if (currentCount === totalElements) {
+          if (currentTotal >= 8) currentStatus = 'PASS'
+          else if (currentTotal >= 5) currentStatus = 'PARTIAL PASS'
+          else currentStatus = 'FAIL'
+        }
+        
+        // Save sincrono in background
+        api.put(`/kaizens/${kaizenIdRef.current}`, {
+          standard_elements: {
+            scores: currentScores,
+            notes: currentNotes,
+            total_score: currentTotal,
+            max_score: MAX_SCORE,
+            percent: (currentTotal / MAX_SCORE) * 100,
+            pass_status: currentStatus,
+            last_evaluated_at: new Date().toISOString(),
+          },
+        }).catch(err => console.error('Errore save su unmount:', err))
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Warning se chiudi browser con modifiche pendenti
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [hasUnsavedChanges])
 
   const setScore = (itemId, value) => {
     setScores(prev => ({ ...prev, [itemId]: value }))
@@ -976,6 +1056,10 @@ function StandardElementsTab({ kaizen, onSaved }) {
 
   const setNote = (itemId, value) => {
     setNotes(prev => ({ ...prev, [itemId]: value }))
+  }
+
+  const manualSave = async () => {
+    await doSave(false)
   }
 
   return (
@@ -991,8 +1075,24 @@ function StandardElementsTab({ kaizen, onSaved }) {
             <div className={`inline-block px-3 py-1.5 rounded-lg font-bold text-sm ${passStatus.color}`}>
               {passStatus.emoji} {passStatus.label}
             </div>
-            <div className="text-xs text-gray-500 mt-1">
-              {saving ? '⏳ Salvataggio...' : lastSaved ? `💾 Salvato ${lastSaved.toLocaleTimeString('it-IT')}` : ''}
+            <div className="text-xs mt-1 flex items-center justify-end gap-2">
+              {saving ? (
+                <span className="text-blue-600">⏳ Salvataggio...</span>
+              ) : hasUnsavedChanges ? (
+                <span className="text-orange-600 font-medium">⚠️ Modifiche non salvate</span>
+              ) : lastSaved ? (
+                <span className="text-green-600">💾 Salvato {lastSaved.toLocaleTimeString('it-IT')}</span>
+              ) : (
+                <span className="text-gray-400">In attesa</span>
+              )}
+              <button
+                onClick={manualSave}
+                disabled={saving}
+                className="bg-primary text-white px-3 py-1 rounded text-xs hover:bg-primary-light disabled:opacity-50"
+                title="Salva ora"
+              >
+                💾 Salva ora
+              </button>
             </div>
           </div>
         </div>
@@ -1081,6 +1181,21 @@ function StandardElementsTab({ kaizen, onSaved }) {
         </div>
       ))}
 
+      {/* Footer info */}
+      <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-4 text-sm text-blue-700">
+        <div className="font-semibold mb-1">ℹ️ Come compilare</div>
+        <div className="text-xs space-y-1">
+          <div>• <strong>✓ OK (1)</strong> → Elemento pienamente soddisfatto</div>
+          <div>• <strong>⚠️ Parziale (0.5)</strong> → Soddisfatto ma migliorabile</div>
+          <div>• <strong>❌ Non OK (0)</strong> → Elemento mancante o non sufficiente</div>
+          <div className="mt-2 pt-2 border-t border-blue-200">
+            <strong>Soglie Lindt:</strong> 🏆 PASS = 8 · ⚠️ PARTIAL = 5-7 · ❌ FAIL = &lt; 5
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
       {/* Footer info */}
       <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-4 text-sm text-blue-700">
         <div className="font-semibold mb-1">ℹ️ Come compilare</div>
