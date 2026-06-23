@@ -1,20 +1,26 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { X } from 'lucide-react'
 import api from '../services/api'
 import { useAllConfigurations } from '../hooks/useConfigurations'
 
-const STATI = ['Da Valutare', 'Aperto', 'In Corso', 'In Verifica', 'Done', 'Cancelled']
-const PRIORITA = ['Lowest', 'Low', 'Medium', 'High', 'Critical']
+// 🆕 5M hard-coded (Ishikawa) — non configurabile
+const QUINTA_M = [
+  { value: 'Machine', label: '⚙️ Machine' },
+  { value: 'Manodopera', label: '👷 Manodopera' },
+  { value: 'Metodo', label: '📋 Metodo' },
+  { value: 'Materiale', label: '📦 Materiale' },
+  { value: 'Misurazione', label: '📏 Misurazione' },
+]
 
 export default function ActionPlanFormShared({ plan, onClose, onSaved, prefilledKaizen = null }) {
   const [form, setForm] = useState({
     titolo: plan?.titolo || '',
     descrizione: plan?.descrizione || '',
     tipo: plan?.tipo || '',
-    priorita: plan?.priorita || 'Medium',
-    stato: plan?.stato || 'Da Valutare',
-    categoria: plan?.categoria || '',
-    tipo_perdita: plan?.tipo_perdita || '',
+    priorita: plan?.priorita || '',
+    stato: plan?.stato || '',
+    categoria_perdita: plan?.categoria_perdita || plan?.tipo_perdita || '',
+    quinta_m: plan?.quinta_m || '',
     responsabile: plan?.responsabile || '',
     reparto: plan?.reparto || '',
     linea: plan?.linea || '',
@@ -25,6 +31,45 @@ export default function ActionPlanFormShared({ plan, onClose, onSaved, prefilled
   const [saving, setSaving] = useState(false)
   const { configs } = useAllConfigurations()
 
+  // 🆕 Carico reparti dal nuovo endpoint /reparti (con linee e macchine annidate)
+  const [reparti, setReparti] = useState([])
+  useEffect(() => {
+    api.get('/reparti/').then(res => setReparti(res.data || [])).catch(() => setReparti([]))
+  }, [])
+
+  // 🆕 Linee/Macchine filtrate dinamicamente
+  const lineeDisponibili = useMemo(() => {
+    if (!form.reparto) return []
+    const rep = reparti.find(r => r.nome === form.reparto)
+    return rep?.linee?.filter(l => l.attivo !== false) || []
+  }, [form.reparto, reparti])
+
+  const macchineDisponibili = useMemo(() => {
+    if (!form.linea) return []
+    const linea = lineeDisponibili.find(l => l.nome === form.linea)
+    return linea?.macchine?.filter(m => m.attivo !== false) || []
+  }, [form.linea, lineeDisponibili])
+
+  // 🆕 Imposta defaults da Settings se è un nuovo AP (priorità/stato Medium/Da Valutare se non configurati)
+  useEffect(() => {
+    if (plan) return // se edit, non sovrascrivo
+    const stati = configs.stato_ap || []
+    const priorita = configs.priorita_ap || []
+    setForm(f => ({
+      ...f,
+      stato: f.stato || stati[0]?.label || '',
+      priorita: f.priorita || priorita.find(p => p.label.toLowerCase().includes('medium'))?.label || priorita[0]?.label || '',
+    }))
+  }, [configs.stato_ap, configs.priorita_ap, plan])
+
+  // Quando cambio reparto, resetto linea e macchina
+  function handleRepartoChange(nuovoReparto) {
+    setForm(f => ({ ...f, reparto: nuovoReparto, linea: '', macchina: '' }))
+  }
+  function handleLineaChange(nuovaLinea) {
+    setForm(f => ({ ...f, linea: nuovaLinea, macchina: '' }))
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setSaving(true)
@@ -33,9 +78,7 @@ export default function ActionPlanFormShared({ plan, onClose, onSaved, prefilled
 
       if (prefilledKaizen?.kaizen_numero) {
         const kaizenTag = `kaizen-${prefilledKaizen.kaizen_numero}`
-        if (!tagsArray.includes(kaizenTag)) {
-          tagsArray.push(kaizenTag)
-        }
+        if (!tagsArray.includes(kaizenTag)) tagsArray.push(kaizenTag)
       }
 
       const cleanForm = Object.fromEntries(
@@ -71,21 +114,23 @@ export default function ActionPlanFormShared({ plan, onClose, onSaved, prefilled
       console.error(err)
       let msg = 'Errore sconosciuto'
       const detail = err.response?.data?.detail
-      if (typeof detail === 'string') {
-        msg = detail
-      } else if (Array.isArray(detail)) {
+      if (typeof detail === 'string') msg = detail
+      else if (Array.isArray(detail)) {
         msg = detail.map(d => {
           const field = d.loc ? d.loc.slice(1).join('.') : 'campo'
           return `${field}: ${d.msg}`
         }).join('\n')
-      } else if (err.message) {
-        msg = err.message
-      }
+      } else if (err.message) msg = err.message
       alert('❌ Errore salvataggio:\n\n' + msg)
     } finally {
       setSaving(false)
     }
   }
+
+  const tipiConfig = configs.tipi_action_plan || []
+  const prioritaConfig = configs.priorita_ap || []
+  const statiConfig = configs.stato_ap || []
+  const categoriePerditaConfig = configs.categorie_perdita || []
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -122,7 +167,7 @@ export default function ActionPlanFormShared({ plan, onClose, onSaved, prefilled
               onChange={(e) => setForm({ ...form, descrizione: e.target.value })}
               rows={4}
               className="w-full border rounded-lg px-3 py-2 font-mono text-sm"
-              placeholder="Es: @mario.rossi devi sostituire il filtro #manutenzione #linea-2"
+              placeholder="Es: @mario.rossi devi sostituire il filtro #manutenzione"
             />
             <div className="text-xs text-gray-500 mt-1">
               💡 Usa <code className="bg-gray-100 px-1">@nome</code> per taggare persone e{' '}
@@ -130,67 +175,57 @@ export default function ActionPlanFormShared({ plan, onClose, onSaved, prefilled
             </div>
           </Field>
 
+          {/* Tipo / Priorità / Stato — TUTTI DA SETTINGS */}
           <div className="grid grid-cols-3 gap-3">
             <Field label="Tipo">
-              <select
+              <DynamicSelect
                 value={form.tipo}
-                onChange={(e) => setForm({ ...form, tipo: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2"
-              >
-                <option value="">— Seleziona —</option>
-                {(configs.tipi_action_plan || []).map(t => (
-                  <option key={t._id} value={t.label}>
-                    {t.icon ? `${t.icon} ` : ''}{t.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setForm({ ...form, tipo: v })}
+                options={tipiConfig}
+                placeholder="— Seleziona —"
+                emptyHint="Settings → Tipo"
+              />
             </Field>
             <Field label="Priorità">
-              <select
+              <DynamicSelect
                 value={form.priorita}
-                onChange={(e) => setForm({ ...form, priorita: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2"
-              >
-                {PRIORITA.map(p => <option key={p}>{p}</option>)}
-              </select>
+                onChange={(v) => setForm({ ...form, priorita: v })}
+                options={prioritaConfig}
+                placeholder="— Seleziona —"
+                emptyHint="Settings → Priorità"
+              />
             </Field>
             <Field label="Stato">
-              <select
+              <DynamicSelect
                 value={form.stato}
-                onChange={(e) => setForm({ ...form, stato: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2"
-              >
-                {STATI.map(s => <option key={s}>{s}</option>)}
-              </select>
+                onChange={(v) => setForm({ ...form, stato: v })}
+                options={statiConfig}
+                placeholder="— Seleziona —"
+                emptyHint="Settings → Stato"
+              />
             </Field>
           </div>
 
+          {/* Categoria Perdita + 5M */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Categoria">
-              <select
-                value={form.categoria}
-                onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2"
-              >
-                <option value="">— Seleziona —</option>
-                {(configs.categorie_action_plan || []).map(c => (
-                  <option key={c._id} value={c.label}>
-                    {c.icon ? `${c.icon} ` : ''}{c.label}
-                  </option>
-                ))}
-              </select>
+            <Field label="Categoria Perdita (TPM)">
+              <DynamicSelect
+                value={form.categoria_perdita}
+                onChange={(v) => setForm({ ...form, categoria_perdita: v })}
+                options={categoriePerditaConfig}
+                placeholder="— Nessuna —"
+                emptyHint="Settings → Categoria Perdita"
+              />
             </Field>
-            <Field label="Tipo Perdita (TPM)">
+            <Field label="5M (Ishikawa)">
               <select
-                value={form.tipo_perdita}
-                onChange={(e) => setForm({ ...form, tipo_perdita: e.target.value })}
+                value={form.quinta_m}
+                onChange={(e) => setForm({ ...form, quinta_m: e.target.value })}
                 className="w-full border rounded-lg px-3 py-2"
               >
                 <option value="">— Nessuna —</option>
-                {(configs.tipi_perdita || []).map(p => (
-                  <option key={p._id} value={p.label}>
-                    {p.icon ? `${p.icon} ` : ''}{p.label}
-                  </option>
+                {QUINTA_M.map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
                 ))}
               </select>
             </Field>
@@ -205,31 +240,39 @@ export default function ActionPlanFormShared({ plan, onClose, onSaved, prefilled
             />
           </Field>
 
+          {/* Reparto → Linea → Macchina (gerarchico dinamico) */}
           <div className="grid grid-cols-3 gap-3">
             <Field label="Reparto">
               <select
                 value={form.reparto}
-                onChange={(e) => setForm({ ...form, reparto: e.target.value })}
+                onChange={(e) => handleRepartoChange(e.target.value)}
                 className="w-full border rounded-lg px-3 py-2"
               >
                 <option value="">— Seleziona —</option>
-                {(configs.reparti || []).map(r => (
-                  <option key={r._id} value={r.label}>
-                    {r.icon ? `${r.icon} ` : ''}{r.label}
-                  </option>
-                ))}
+                {reparti.length === 0 ? (
+                  <option disabled>⚠️ Settings → Reparti</option>
+                ) : (
+                  reparti.filter(r => r.attivo !== false).map(r => (
+                    <option key={r._id} value={r.nome}>
+                      {r.nome}{r.codice ? ` [${r.codice}]` : ''}
+                    </option>
+                  ))
+                )}
               </select>
             </Field>
             <Field label="Linea">
               <select
                 value={form.linea}
-                onChange={(e) => setForm({ ...form, linea: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2"
+                onChange={(e) => handleLineaChange(e.target.value)}
+                disabled={!form.reparto}
+                className="w-full border rounded-lg px-3 py-2 disabled:bg-gray-100"
               >
-                <option value="">— Seleziona —</option>
-                {(configs.linee || []).map(l => (
-                  <option key={l._id} value={l.label}>
-                    {l.icon ? `${l.icon} ` : ''}{l.label}
+                <option value="">
+                  {!form.reparto ? '— Prima il reparto —' : '— Seleziona —'}
+                </option>
+                {lineeDisponibili.map(l => (
+                  <option key={l.id} value={l.nome}>
+                    {l.nome}{l.codice ? ` [${l.codice}]` : ''}
                   </option>
                 ))}
               </select>
@@ -238,12 +281,15 @@ export default function ActionPlanFormShared({ plan, onClose, onSaved, prefilled
               <select
                 value={form.macchina}
                 onChange={(e) => setForm({ ...form, macchina: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2"
+                disabled={!form.linea}
+                className="w-full border rounded-lg px-3 py-2 disabled:bg-gray-100"
               >
-                <option value="">— Seleziona —</option>
-                {(configs.macchine || []).map(m => (
-                  <option key={m._id} value={m.label}>
-                    {m.icon ? `${m.icon} ` : ''}{m.label}
+                <option value="">
+                  {!form.linea ? '— Prima la linea —' : '— Seleziona —'}
+                </option>
+                {macchineDisponibili.map(m => (
+                  <option key={m.id} value={m.nome}>
+                    {m.nome}{m.codice ? ` [${m.codice}]` : ''}
                   </option>
                 ))}
               </select>
@@ -263,7 +309,7 @@ export default function ActionPlanFormShared({ plan, onClose, onSaved, prefilled
               <input
                 value={form.tags}
                 onChange={(e) => setForm({ ...form, tags: e.target.value })}
-                placeholder="sicurezza, manutenzione, linea-2"
+                placeholder="sicurezza, manutenzione"
                 className="w-full border rounded-lg px-3 py-2"
               />
             </Field>
@@ -287,11 +333,35 @@ export default function ActionPlanFormShared({ plan, onClose, onSaved, prefilled
   )
 }
 
+// ──────────────────────────────────────────────────────────
+// Helper components
+// ──────────────────────────────────────────────────────────
 function Field({ label, children }) {
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
       {children}
     </div>
+  )
+}
+
+function DynamicSelect({ value, onChange, options, placeholder, emptyHint }) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full border rounded-lg px-3 py-2"
+    >
+      <option value="">{placeholder}</option>
+      {options.length === 0 ? (
+        <option disabled>⚠️ Configura in {emptyHint}</option>
+      ) : (
+        options.map(o => (
+          <option key={o._id} value={o.label}>
+            {o.icon ? `${o.icon} ` : ''}{o.label}
+          </option>
+        ))
+      )}
+    </select>
   )
 }
