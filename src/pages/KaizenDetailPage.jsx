@@ -26,20 +26,17 @@ function getLivelloFromKaizen(kaizen) {
 
 function buildTabsForLivello(livello) {
   const base = []
-  // 🆕 5 Step KPI Management → ora è dentro i Pillar, NON nel Kaizen
   base.push({
     id: 'quickkaizen',
-    label: livello === 'Quick' ? 'Quick Kaizen' : '🔍 Problem Solving',
+    label: livello === 'Quick' ? 'Quick Kaizen' : 'Problem Solving',
   })
-  base.push({ id: 'azioni', label: '📋 Azioni' })
-  base.push({ id: 'stdelements', label: '📊 8 Standard Elements' })
-  base.push({ id: 'cmladder', label: '🏔️ Countermeasure Ladder' })
+  base.push({ id: 'stdelements', label: '8 Standard Elements' })
+  base.push({ id: 'cmladder', label: 'Countermeasure Ladder' })
   if (livello !== 'Quick') {
-    base.push({ id: 'figli', label: '⚡ Quick Kaizen' })
-    base.push({ id: 'gantt', label: '📅 Gantt' })
+    base.push({ id: 'figli', label: 'Quick Kaizen' })
   }
   if (livello === 'Major') {
-    base.push({ id: 'costbenefit', label: '💰 Cost & Benefit' })
+    base.push({ id: 'costbenefit', label: 'Cost & Benefit' })
   }
   base.push({ id: 'lavagna', label: 'Lavagna' })
   base.push({ id: 'feed', label: 'Feed' })
@@ -377,6 +374,8 @@ export default function KaizenDetailPage() {
 
       {activeTab === 'quickkaizen' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          {/* PASSO 1 — Definizione del problema (1 colonna) */}
           <div className="bg-white rounded-xl shadow p-6">
             <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">PASSO 1 - DEFINIZIONE DEL PROBLEMA</h3>
             {['che_cosa', 'dove', 'quando', 'chi', 'quale', 'come'].map(field => (
@@ -384,12 +383,13 @@ export default function KaizenDetailPage() {
                 <label className="block text-sm font-bold text-gray-600 uppercase mb-1">{field.replace('_', ' ')}?</label>
                 <textarea value={kaizen.passo1_definizione?.[field] || ''}
                   onChange={(e) => updateField('passo1_definizione', field, e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} placeholder="Opzionale" />
+                  className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} />
               </div>
             ))}
           </div>
-          {/* PASSO 2 — Ishikawa interattivo (occupa 2 colonne) */}
-          <div className="lg:col-span-2 bg-white rounded-xl shadow p-6">
+
+          {/* PASSO 2 — Ishikawa (1 colonna a destra) */}
+          <div className="bg-white rounded-xl shadow p-6">
             <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">
               PASSO 2 - CAUSE PROBABILI (Ishikawa)
             </h3>
@@ -409,7 +409,7 @@ export default function KaizenDetailPage() {
             />
           </div>
 
-          {/* PASSO 3 — 5 Perché visualizzazione automatica (occupa 2 colonne) */}
+          {/* PASSO 3 — Catene 5 Perché (full width) */}
           <div className="lg:col-span-2 bg-white rounded-xl shadow p-6">
             <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">
               PASSO 3 - 5 PERCHÉ (Catene Root Cause)
@@ -420,49 +420,60 @@ export default function KaizenDetailPage() {
               onCreateActionPlan={handleCreateAPFromRootCause}
             />
           </div>
-          <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">VERIFICA DEL PROCESSO</h3>
-            {[
-              { key: 'condizioni_base_rispettate', label: 'Le condizioni di base sono rispettate (5S, Pulizia e lubrificazione)?' },
-              { key: 'conoscenza_macchina_processo', label: 'Le persone dimostrano conoscenza di macchina e processo?' },
-              { key: 'standard_esistenti', label: 'Esistono standard legati al problema (OPL, SOP)?' },
-              { key: 'standard_chiari', label: 'Gli standard sono chiari e comprensibili?' },
-              { key: 'standard_applicati', label: 'Gli standard sono applicati correttamente?' },
-              { key: 'persone_conoscono_standard', label: 'Le persone conoscono gli standard?' },
-            ].map(item => (
-              <div key={item.key} className="mb-3 pb-3 border-b last:border-0">
-                <p className="text-sm font-medium mb-1">{item.label}</p>
-                <div className="flex gap-2 mb-1">
-                  {['Si', 'No', 'N/A'].map(v => (
-                    <button key={v} onClick={() => updateField('verifica_processo', item.key, { ...kaizen.verifica_processo?.[item.key], valore: v })}
-                      className={`px-3 py-1 rounded text-xs font-medium border ${
-                        kaizen.verifica_processo?.[item.key]?.valore === v ? 'bg-primary text-white' : 'bg-white text-gray-600'
-                      }`}>{v}</button>
-                  ))}
+
+          {/* PASSO 4 — Verifica del processo (full width) */}
+          <div className="lg:col-span-2 bg-white rounded-xl shadow p-6">
+            <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">PASSO 4 - VERIFICA DEL PROCESSO</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-3">
+              {[
+                { key: 'condizioni_base_rispettate', label: 'Le condizioni di base sono rispettate (5S, Pulizia e lubrificazione)?' },
+                { key: 'conoscenza_macchina_processo', label: 'Le persone dimostrano conoscenza di macchina e processo?' },
+                { key: 'standard_esistenti', label: 'Esistono standard legati al problema (OPL, SOP)?' },
+                { key: 'standard_chiari', label: 'Gli standard sono chiari e comprensibili?' },
+                { key: 'standard_applicati', label: 'Gli standard sono applicati correttamente?' },
+                { key: 'persone_conoscono_standard', label: 'Le persone conoscono gli standard?' },
+              ].map(item => (
+                <div key={item.key} className="pb-3 border-b">
+                  <p className="text-sm font-medium mb-1">{item.label}</p>
+                  <div className="flex gap-2 mb-1">
+                    {['Si', 'No', 'N/A'].map(v => (
+                      <button key={v} onClick={() => updateField('verifica_processo', item.key, { ...kaizen.verifica_processo?.[item.key], valore: v })}
+                        className={`px-3 py-1 rounded text-xs font-medium border ${
+                          kaizen.verifica_processo?.[item.key]?.valore === v ? 'bg-primary text-white' : 'bg-white text-gray-600'
+                        }`}>{v}</button>
+                    ))}
+                  </div>
+                  <input placeholder="Osservazioni" value={kaizen.verifica_processo?.[item.key]?.osservazioni || ''}
+                    onChange={(e) => updateField('verifica_processo', item.key, { ...kaizen.verifica_processo?.[item.key], osservazioni: e.target.value })}
+                    className="w-full border rounded px-2 py-1 text-xs" />
                 </div>
-                <input placeholder="Osservazioni" value={kaizen.verifica_processo?.[item.key]?.osservazioni || ''}
-                  onChange={(e) => updateField('verifica_processo', item.key, { ...kaizen.verifica_processo?.[item.key], osservazioni: e.target.value })}
-                  className="w-full border rounded px-2 py-1 text-xs" />
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
+
+          {/* PASSO 5 — Piano Azioni (Gantt) — full width */}
+          <div className="lg:col-span-2 bg-white rounded-xl shadow p-6">
+            <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">PASSO 5 - PIANO AZIONI</h3>
+            <KaizenGantt kaizenId={id} kaizenNumero={kaizen.numero} />
+          </div>
+
+          {/* FASE 6 — Valutazione efficacia (compatta, 1 colonna) */}
           <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">FASE 5 - VALUTAZIONE EFFICACIA</h3>
+            <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">FASE 6 - VALUTAZIONE EFFICACIA</h3>
             <textarea value={kaizen.fase5_valutazione_efficacia?.osservazioni || ''}
               onChange={(e) => updateField('fase5_valutazione_efficacia', 'osservazioni', e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 text-sm" rows={4} placeholder="Osservazioni" />
+              className="w-full border rounded-lg px-3 py-2 text-sm" rows={4} />
           </div>
-          <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">FASE 6 - STANDARDIZZAZIONE E REPLICA</h3>
+
+          {/* FASE 7 — Standardizzazione (full width, sotto FASE 6) */}
+          <div className="lg:col-span-2 bg-white rounded-xl shadow p-6">
+            <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">FASE 7 - STANDARDIZZAZIONE E REPLICA</h3>
             <textarea value={kaizen.fase6_standardizzazione?.osservazioni || ''}
               onChange={(e) => updateField('fase6_standardizzazione', 'osservazioni', e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 text-sm" rows={4} placeholder="Osservazioni" />
+              className="w-full border rounded-lg px-3 py-2 text-sm" rows={4} />
           </div>
-        </div>
-      )}
 
-      {activeTab === 'azioni' && (
-        <AzioniTab kaizenId={id} kaizenNumero={kaizen.numero} onUpdate={loadKaizen} />
+        </div>
       )}
 
       {activeTab === 'figli' && (
