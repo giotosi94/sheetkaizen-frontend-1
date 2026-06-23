@@ -1183,5 +1183,33 @@ function MasterPlanTab({ pillar, color, onSaved }) {
                 )}
               </div>
               <div className="w-20 px-1 border-r flex items-center justify-center gap-0.5">
-                <button onClick={() => moveStep(step.id, 'up')} disabled={idx === 0} className="text-xs px-1 hover:bg-gray-200 rounded disabled:opacity-30" title="Sposta su">▲</button>
-                <button onClick={() => moveStep(step
+                <button onClick={() => moveStep(step.id, ' onClick={() => moveStep(step.id, 'down')} disabled={idx === data.steps.length - 1} className="text-xs px-1 hover:bg-gray-200 rounded disabled:opacity-30" title="Sposta giù">▼</button>                <button onClick={() => moveStep(step.id, 'up')} disabled={idx === 0} className="text-xs px-1 hover:bg-gray-200 rounded disabled:opacity-30" title="Sposta su">▲</button>
+                <button onClick={() => clearRow(step.id)} className="text-xs px-1 hover:bg-yellow-100 rounded text-yellow-600" title="Pulisci riga">⌫</button>
+                <button onClick={() => removeStep(step.id)} className="p-0.5 hover:bg-red-100 rounded text-red-600" title="Elimina step"><Trash2 size={11} /></button>
+              </div>
+              {years.map(year => (
+                <div key={year} className="flex-1 min-w-[80px] border-r last:border-r-0 flex">
+                  {quarters.map((q, qIdx) => {
+                    const val = getCellValue(step.id, year, qIdx + 1)
+                    const state = CELL_STATES[val]
+                    return (
+                      <button key={q} onClick={() => cycleCell(step.id, year, qIdx + 1)} className="flex-1 border-r last:border-r-0 hover:opacity-75 transition-opacity" style={{ backgroundColor: state.color || 'transparent', minHeight: '32px' }} title={`${year} ${q}: ${state.label}`} />
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
+          ))}
+          {data.steps.length === 0 && (
+            <div className="text-center py-12 text-gray-400">
+              <div className="text-4xl mb-2">📅</div>
+              <p>Nessuno step. Aggiungi il primo!</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
