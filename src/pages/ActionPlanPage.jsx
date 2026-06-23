@@ -262,8 +262,9 @@ export default function ActionPlanPage() {
           onSaved={(saved) => { setShowForm(false); setEditingPlan(null); loadData(); if (saved) setSelectedPlan(saved) }}
         />
       )}
-      {selectedPlan && (
-        <ActionPlanDetail plan={selectedPlan}
+   {selectedPlan && (
+        <ActionPlanDetail
+          plan={selectedPlan}
           onClose={() => setSelectedPlan(null)}
           onUpdated={() => loadData()}
           onEdit={(p) => { setSelectedPlan(null); setEditingPlan(p); setShowForm(true) }}
@@ -272,6 +273,11 @@ export default function ActionPlanPage() {
           onDelete={async (id) => { await handleDelete(id); setSelectedPlan(null) }}
         />
       )}
+    </div>
+  )
+}
+
+function Avatar({ name, size = 24 }) {
 
 function Avatar({ name, size = 24 }) {
   if (!name) return null
