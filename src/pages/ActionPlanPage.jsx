@@ -277,10 +277,6 @@ export default function ActionPlanPage() {
 }
 
 function Avatar({ name, size = 24 }) {
-
-function Avatar({ name, size = 24 }) {
-
-function Avatar({ name, size = 24 }) {
   if (!name) return null
   const initials = name.split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase()
   const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-yellow-500']
