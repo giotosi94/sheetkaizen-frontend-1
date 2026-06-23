@@ -916,7 +916,7 @@ function MacchinaFormModal({ reparto, linea, macchina, onClose, onSaved }) {
       </div>
     </div>
   )
-}}
+}
 
 // ──────────────────────────────────────────────────────────
 // CONFIG MANAGER (CRUD generico per tutti i tab)
