@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, X, ChevronRight, ChevronDown, Target } from 'lucide-react'
 
-// I 6 rami dell'Ishikawa (6M) — palette neutra
 const RAMI = [
   { id: 'people',      label: 'People' },
   { id: 'machine',     label: 'Machine' },
@@ -11,17 +10,17 @@ const RAMI = [
   { id: 'environment', label: 'Environment' },
 ]
 
-const NEUTRAL_COLOR = '#475569' // slate-600
-const PRIMARY_COLOR = '#1e3a8a' // primary
+const NEUTRAL_COLOR = '#475569'
+const PRIMARY_COLOR = '#1e3a8a'
 
-export default function IshikawaDiagram({ effetto = '', rami = {}, onChange, onExploraInFiveWhys }) {
+export default function IshikawaDiagram({ effetto = '', rami = {}, onChange }) {
   const [localEffetto, setLocalEffetto] = useState(effetto)
   const [localRami, setLocalRami] = useState(() => {
     const init = {}
     RAMI.forEach(r => { init[r.id] = rami[r.id] || [] })
     return init
   })
-  const [expandedCauses, setExpandedCauses] = useState(new Set())
+  const [expandedNodes, setExpandedNodes] = useState(new Set())
   
   const isFirstRender = useRef(true)
   
@@ -34,83 +33,59 @@ export default function IshikawaDiagram({ effetto = '', rami = {}, onChange, onE
   }, [localEffetto, localRami])
   
   function addCausa(ramoId) {
-    const newCausa = {
-      id: `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      label: '',
-      voti: 0,
-      subcauses: [],
-      promosso_a_5why: false,
-    }
+    const newCausa = createNewNode()
     setLocalRami(prev => ({
       ...prev,
-      [ramoId]: [...(prev[ramoId] || []), newCausa],
+      [...(prev[ramoId] || []), newCausa],
     }))
   }
   
-  function updateCausa(ramoId, causaId, updates) {
+  function updateNode(ramoId, nodeId, updates) {
     setLocalRami(prev => ({
       ...prev,
-      [ramoId]: prev[ramoId].map(c => c.id === causaId ? { ...c, ...updates } : c),
+      updateNodoRecursive(prev[ramoId], nodeId, updates),
     }))
   }
   
-  function removeCausa(ramoId, causaId) {
-    if (!confirm('Rimuovere questa causa e le sue sotto-cause?')) return
+  function addChild(ramoId, parentId) {
+    const newChild = createNewNode()
     setLocalRami(prev => ({
       ...prev,
-      [ramoId]: prev[ramoId].filter(c => c.id !== causaId),
+      addChildRecursive(prev[ramoId], parentId, newChild),
+    }))
+    setExpandedNodes(prev => new Set(prev).add(parentId))
+  }
+  
+  function removeNode(ramoId, nodeId) {
+    if (!confirm('Rimuovere questo nodo e tutti i suoi figli?')) return
+    setLocalRami(prev => ({
+      ...prev,
+      removeNodoRecursive(prev[ramoId], nodeId),
     }))
   }
   
-  function addSubcausa(ramoId, causaId) {
-    const newSub = {
-      id: `sc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      label: '',
-      voti: 0,
-    }
+  function toggleRootCause(ramoId, nodeId) {
     setLocalRami(prev => ({
       ...prev,
-      [ramoId]: prev[ramoId].map(c =>
-        c.id === causaId ? { ...c, subcauses: [...(c.subcauses || []), newSub] } : c
-      ),
-    }))
-    setExpandedCauses(prev => new Set(prev).add(causaId))
-  }
-  
-  function updateSubcausa(ramoId, causaId, subId, updates) {
-    setLocalRami(prev => ({
-      ...prev,
-      [ramoId]: prev[ramoId].map(c =>
-        c.id === causaId
-          ? { ...c, subcauses: c.subcauses.map(s => s.id === subId ? { ...s, ...updates } : s) }
-          : c
-      ),
+      setRootCauseRecursive(prev[ramoId], nodeId),
     }))
   }
   
-  function removeSubcausa(ramoId, causaId, subId) {
-    setLocalRami(prev => ({
-      ...prev,
-      [ramoId]: prev[ramoId].map(c =>
-        c.id === causaId ? { ...c, subcauses: c.subcauses.filter(s => s.id !== subId) } : c
-      ),
-    }))
-  }
-  
-  function toggleExpand(causaId) {
-    setExpandedCauses(prev => {
+  function toggleExpand(nodeId) {
+    setExpandedNodes(prev => {
       const next = new Set(prev)
-      if (next.has(causaId)) next.delete(causaId)
-      else next.add(causaId)
+      if (next.has(nodeId)) next.delete(nodeId)
+      else next.add(nodeId)
       return next
     })
   }
   
+  // Conta nodi totali ricorsivamente
+  function countNodes(nodes) {
+    return nodes.reduce((sum, n) => sum + 1 + countNodes(n.children || []), 0)
+  }
   const totalCauses = Object.values(localRami).reduce((sum, arr) => sum + arr.length, 0)
-  const totalSubcauses = Object.values(localRami).reduce(
-    (sum, arr) => sum + arr.reduce((s, c) => s + (c.subcauses?.length || 0), 0),
-    0
-  )
+  const totalNodes = Object.values(localRami).reduce((sum, arr) => sum + countNodes(arr), 0)
   
   return (
     <div className="space-y-4">
@@ -126,7 +101,7 @@ export default function IshikawaDiagram({ effetto = '', rami = {}, onChange, onE
         <div className="flex gap-3 mt-2 text-xs text-gray-500">
           <span>{totalCauses} cause</span>
           <span>·</span>
-          <span>{totalSubcauses} sotto-cause</span>
+          <span>{totalNodes - totalCauses} perché</span>
         </div>
       </div>
       
@@ -137,15 +112,13 @@ export default function IshikawaDiagram({ effetto = '', rami = {}, onChange, onE
               key={ramo.id}
               ramo={ramo}
               cause={localRami[ramo.id] || []}
-              expandedCauses={expandedCauses}
+              expandedNodes={expandedNodes}
               onAddCausa={() => addCausa(ramo.id)}
-              onUpdateCausa={(causaId, updates) => updateCausa(ramo.id, causaId, updates)}
-              onRemoveCausa={(causaId) => removeCausa(ramo.id, causaId)}
-              onAddSubcausa={(causaId) => addSubcausa(ramo.id, causaId)}
-              onUpdateSubcausa={(causaId, subId, updates) => updateSubcausa(ramo.id, causaId, subId, updates)}
-              onRemoveSubcausa={(causaId, subId) => removeSubcausa(ramo.id, causaId, subId)}
+              onUpdate={(nodeId, updates) => updateNode(ramo.id, nodeId, updates)}
+              onAddChild={(parentId) => addChild(ramo.id, parentId)}
+              onRemove={(nodeId) => removeNode(ramo.id, nodeId)}
+              onToggleRootCause={(nodeId) => toggleRootCause(ramo.id, nodeId)}
               onToggleExpand={toggleExpand}
-              onExplora={(causa) => onExploraInFiveWhys?.({ ...causa, ramo: ramo.label })}
             />
           ))}
         </div>
@@ -162,10 +135,8 @@ export default function IshikawaDiagram({ effetto = '', rami = {}, onChange, onE
 }
 
 function RamoCard({
-  ramo, cause, expandedCauses,
-  onAddCausa, onUpdateCausa, onRemoveCausa,
-  onAddSubcausa, onUpdateSubcausa, onRemoveSubcausa,
-  onToggleExpand, onExplora,
+  ramo, cause, expandedNodes,
+  onAddCausa, onUpdate, onAddChild, onRemove, onToggleRootCause, onToggleExpand,
 }) {
   return (
     <div className="bg-white rounded-lg shadow border-l-4 border-gray-300">
@@ -193,17 +164,17 @@ function RamoCard({
           </div>
         ) : (
           cause.map(causa => (
-            <CausaItem
+            <NodoView
               key={causa.id}
-              causa={causa}
-              expanded={expandedCauses.has(causa.id)}
-              onUpdate={(updates) => onUpdateCausa(causa.id, updates)}
-              onRemove={() => onRemoveCausa(causa.id)}
-              onAddSubcausa={() => onAddSubcausa(causa.id)}
-              onUpdateSubcausa={(subId, updates) => onUpdateSubcausa(causa.id, subId, updates)}
-              onRemoveSubcausa={(subId) => onRemoveSubcausa(causa.id, subId)}
-              onToggleExpand={() => onToggleExpand(causa.id)}
-              onExplora={() => onExplora(causa)}
+              nodo={causa}
+              depth={0}
+              isCausa={true}
+              expandedNodes={expandedNodes}
+              onUpdate={onUpdate}
+              onAddChild={onAddChild}
+              onRemove={onRemove}
+              onToggleRootCause={onToggleRootCause}
+              onToggleExpand={onToggleExpand}
             />
           ))
         )}
@@ -212,101 +183,100 @@ function RamoCard({
   )
 }
 
-function CausaItem({
-  causa, expanded,
-  onUpdate, onRemove,
-  onAddSubcausa, onUpdateSubcausa, onRemoveSubcausa,
-  onToggleExpand, onExplora,
-}) {
-  const hasSubs = causa.subcauses?.length > 0
+// Componente ricorsivo: rappresenta una causa o un perché
+function NodoView({ nodo, depth, isCausa, expandedNodes, onUpdate, onAddChild, onRemove, onToggleRootCause, onToggleExpand }) {
+  const hasChildren = nodo.children?.length > 0
+  const expanded = expandedNodes.has(nodo.id)
+  const tipoLabel = isCausa ? 'Causa' : `Perché`
   
   return (
     <div className="border rounded-lg overflow-hidden bg-gray-50">
       <div className="p-2 flex items-center gap-2">
         <button
-          onClick={onToggleExpand}
+          onClick={() => onToggleExpand(nodo.id)}
           className="text-gray-400 hover:text-gray-700 flex-shrink-0"
         >
           {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </button>
         
+        {!isCausa && (
+          <span className="text-[10px] font-bold uppercase text-gray-500 bg-gray-200 px-1.5 py-0.5 rounded flex-shrink-0">
+            {tipoLabel}
+          </span>
+        )}
+        
         <input
-          value={causa.label}
-          onChange={(e) => onUpdate({ label: e.target.value })}
-          className="flex-1 text-sm border-0 bg-transparent focus:outline-none focus:bg-white focus:border focus:rounded px-2 py-1"
+          value={nodo.label || ''}
+          onChange={(e) => onUpdate(nodo.id, { label: e.target.value })}
+          placeholder={isCausa ? 'Causa' : 'Perché?'}
+          className={`flex-1 text-sm border-0 bg-transparent focus:outline-none focus:bg-white focus:border focus:rounded px-2 py-1 ${
+            nodo.is_root_cause ? 'font-bold text-red-700' : ''
+          }`}
         />
         
         <VotingPallini
-          value={causa.voti || 0}
-          onChange={(v) => onUpdate({ voti: v })}
+          value={nodo.voti || 0}
+          onChange={(v) => onUpdate(nodo.id, { voti: v })}
         />
         
         <button
-          onClick={onExplora}
-          className={`p-1.5 rounded text-xs flex items-center gap-1 ${
-            causa.promosso_a_5why
-              ? 'bg-green-100 text-green-700'
-              : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+          onClick={() => onToggleRootCause(nodo.id)}
+          className={`p-1 rounded ${
+            nodo.is_root_cause
+              ? 'bg-red-500 text-white'
+              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
           }`}
-          title="Esplora con i 5 Perché"
+          title={nodo.is_root_cause ? 'Rimuovi ROOT CAUSE' : 'Segna come ROOT CAUSE'}
         >
           <Target size={12} />
         </button>
         
         <button
-          onClick={onRemove}
+          onClick={() => onAddChild(nodo.id)}
+          className="p-1 rounded bg-primary text-white hover:bg-primary-light"
+          title="Aggiungi un Perché figlio"
+        >
+          <Plus size={12} />
+        </button>
+        
+        <button
+          onClick={() => onRemove(nodo.id)}
           className="p-1 text-red-500 hover:bg-red-50 rounded"
         >
           <X size={14} />
         </button>
       </div>
       
-      {(expanded || hasSubs) && (
-        <div className="px-2 pb-2 pl-8 space-y-1">
-          {causa.subcauses?.map(sub => (
-            <div key={sub.id} className="flex items-center gap-2 bg-white border rounded p-1.5">
-              <span className="text-gray-300">└─</span>
-              <input
-                value={sub.label}
-                onChange={(e) => onUpdateSubcausa(sub.id, { label: e.target.value })}
-                className="flex-1 text-xs border-0 focus:outline-none px-1"
-              />
-              <VotingPallini
-                value={sub.voti || 0}
-                onChange={(v) => onUpdateSubcausa(sub.id, { voti: v })}
-                size="sm"
-              />
-              <button
-                onClick={() => onRemoveSubcausa(sub.id)}
-                className="p-0.5 text-red-500 hover:bg-red-50 rounded"
-              >
-                <X size={12} />
-              </button>
-            </div>
+      {(expanded || hasChildren) && hasChildren && (
+        <div className="px-2 pb-2 pl-6 space-y-1">
+          {nodo.children.map(child => (
+            <NodoView
+              key={child.id}
+              nodo={child}
+              depth={depth + 1}
+              isCausa={false}
+              expandedNodes={expandedNodes}
+              onUpdate={onUpdate}
+              onAddChild={onAddChild}
+              onRemove={onRemove}
+              onToggleRootCause={onToggleRootCause}
+              onToggleExpand={onToggleExpand}
+            />
           ))}
-          
-          <button
-            onClick={onAddSubcausa}
-            className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 pl-2"
-          >
-            <Plus size={11} /> Aggiungi sotto-causa
-          </button>
         </div>
       )}
     </div>
   )
 }
 
-function VotingPallini({ value, onChange, size = 'md' }) {
-  const dotSize = size === 'sm' ? 'w-2.5 h-2.5' : 'w-3 h-3'
-  
+function VotingPallini({ value, onChange }) {
   return (
     <div className="flex items-center gap-0.5">
       {[1, 2, 3, 4, 5].map(n => (
         <button
           key={n}
           onClick={() => onChange(value === n ? 0 : n)}
-          className={`${dotSize} rounded-full border transition-all`}
+          className="w-2.5 h-2.5 rounded-full border transition-all"
           style={{
             backgroundColor: n <= value ? PRIMARY_COLOR : 'transparent',
             borderColor: n <= value ? PRIMARY_COLOR : '#d1d5db',
@@ -318,6 +288,7 @@ function VotingPallini({ value, onChange, size = 'md' }) {
   )
 }
 
+// Fishbone SVG (invariato dalla versione precedente, mostra solo le cause primarie)
 function FishboneSVG({ effetto, rami, causeMap }) {
   const width = 600
   const height = 500
@@ -330,88 +301,29 @@ function FishboneSVG({ effetto, rami, causeMap }) {
   return (
     <div className="overflow-x-auto">
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="w-full">
-        <line
-          x1={spineStart}
-          y1={centerY}
-          x2={spineEnd}
-          y2={centerY}
-          stroke={NEUTRAL_COLOR}
-          strokeWidth="3"
-        />
-        <polygon
-          points={`${spineEnd},${centerY - 10} ${spineEnd + 25},${centerY} ${spineEnd},${centerY + 10}`}
-          fill={NEUTRAL_COLOR}
-        />
-        <rect
-          x={spineEnd + 30}
-          y={centerY - 25}
-          width="100"
-          height="50"
-          fill={PRIMARY_COLOR}
-          rx="6"
-        />
-        <foreignObject
-          x={spineEnd + 30}
-          y={centerY - 25}
-          width="100"
-          height="50"
-        >
-          <div style={{
-            color: 'white',
-            fontSize: '11px',
-            fontWeight: 'bold',
-            padding: '4px',
-            textAlign: 'center',
-            lineHeight: '1.2',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            wordBreak: 'break-word',
-          }}>
+        <line x1={spineStart} y1={centerY} x2={spineEnd} y2={centerY} stroke={NEUTRAL_COLOR} strokeWidth="3" />
+        <polygon points={`${spineEnd},${centerY - 10} ${spineEnd + 25},${centerY} ${spineEnd},${centerY + 10}`} fill={NEUTRAL_COLOR} />
+        <rect x={spineEnd + 30} y={centerY - 25} width="100" height="50" fill={PRIMARY_COLOR} rx="6" />
+        <foreignObject x={spineEnd + 30} y={centerY - 25} width="100" height="50">
+          <div style={{ color: 'white', fontSize: '11px', fontWeight: 'bold', padding: '4px', textAlign: 'center', lineHeight: '1.2', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', wordBreak: 'break-word' }}>
             {effetto || 'Effetto'}
           </div>
         </foreignObject>
         
         {ramiSopra.map((ramo, i) => {
           const ramoX = spineStart + 100 + i * 150
-          const ramoYStart = centerY
           const ramoYEnd = 60
           const ramoXEnd = ramoX - 80
           const cause = causeMap[ramo.id] || []
-          
           return (
             <g key={ramo.id}>
-              <line
-                x1={ramoX}
-                y1={ramoYStart}
-                x2={ramoXEnd}
-                y2={ramoYEnd}
-                stroke={NEUTRAL_COLOR}
-                strokeWidth="2"
-              />
-              <rect
-                x={ramoXEnd - 50}
-                y={ramoYEnd - 18}
-                width="100"
-                height="22"
-                fill={NEUTRAL_COLOR}
-                rx="4"
-              />
-              <text
-                x={ramoXEnd}
-                y={ramoYEnd - 3}
-                textAnchor="middle"
-                fill="white"
-                fontSize="11"
-                fontWeight="bold"
-              >
-                {ramo.label}
-              </text>
+              <line x1={ramoX} y1={centerY} x2={ramoXEnd} y2={ramoYEnd} stroke={NEUTRAL_COLOR} strokeWidth="2" />
+              <rect x={ramoXEnd - 50} y={ramoYEnd - 18} width="100" height="22" fill={NEUTRAL_COLOR} rx="4" />
+              <text x={ramoXEnd} y={ramoYEnd - 3} textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">{ramo.label}</text>
               {cause.slice(0, 4).map((causa, j) => {
                 const t = (j + 1) / 5
                 const cx1 = ramoX - (ramoX - ramoXEnd) * t
-                const cy1 = ramoYStart - (ramoYStart - ramoYEnd) * t
+                const cy1 = centerY - (centerY - ramoYEnd) * t
                 const cx2 = cx1 - 40
                 const cy2 = cy1 + 5
                 return (
@@ -423,54 +335,24 @@ function FishboneSVG({ effetto, rami, causeMap }) {
                   </g>
                 )
               })}
-              {cause.length > 4 && (
-                <text x={ramoXEnd} y={ramoYEnd + 14} textAnchor="middle" fontSize="9" fill="#6b7280">
-                  +{cause.length - 4}
-                </text>
-              )}
             </g>
           )
         })}
         
         {ramiSotto.map((ramo, i) => {
           const ramoX = spineStart + 100 + i * 150
-          const ramoYStart = centerY
           const ramoYEnd = height - 60
           const ramoXEnd = ramoX - 80
           const cause = causeMap[ramo.id] || []
-          
           return (
             <g key={ramo.id}>
-              <line
-                x1={ramoX}
-                y1={ramoYStart}
-                x2={ramoXEnd}
-                y2={ramoYEnd}
-                stroke={NEUTRAL_COLOR}
-                strokeWidth="2"
-              />
-              <rect
-                x={ramoXEnd - 50}
-                y={ramoYEnd}
-                width="100"
-                height="22"
-                fill={NEUTRAL_COLOR}
-                rx="4"
-              />
-              <text
-                x={ramoXEnd}
-                y={ramoYEnd + 15}
-                textAnchor="middle"
-                fill="white"
-                fontSize="11"
-                fontWeight="bold"
-              >
-                {ramo.label}
-              </text>
+              <line x1={ramoX} y1={centerY} x2={ramoXEnd} y2={ramoYEnd} stroke={NEUTRAL_COLOR} strokeWidth="2" />
+              <rect x={ramoXEnd - 50} y={ramoYEnd} width="100" height="22" fill={NEUTRAL_COLOR} rx="4" />
+              <text x={ramoXEnd} y={ramoYEnd + 15} textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">{ramo.label}</text>
               {cause.slice(0, 4).map((causa, j) => {
                 const t = (j + 1) / 5
                 const cx1 = ramoX - (ramoX - ramoXEnd) * t
-                const cy1 = ramoYStart + (ramoYEnd - ramoYStart) * t
+                const cy1 = centerY + (ramoYEnd - centerY) * t
                 const cx2 = cx1 - 40
                 const cy2 = cy1 - 5
                 return (
@@ -482,15 +364,56 @@ function FishboneSVG({ effetto, rami, causeMap }) {
                   </g>
                 )
               })}
-              {cause.length > 4 && (
-                <text x={ramoXEnd} y={ramoYEnd - 4} textAnchor="middle" fontSize="9" fill="#6b7280">
-                  +{cause.length - 4}
-                </text>
-              )}
             </g>
           )
         })}
       </svg>
     </div>
   )
+}
+
+// ──────────────────────────────────────────────────────────
+// HELPERS — manipolazione albero
+// ──────────────────────────────────────────────────────────
+function createNewNode() {
+  return {
+    id: `n_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    label: '',
+    voti: 0,
+    is_root_cause: false,
+    children: [],
+  }
+}
+
+function updateNodoRecursive(nodes, nodeId, updates) {
+  return nodes.map(n => {
+    if (n.id === nodeId) return { ...n, ...updates }
+    if (n.children?.length) return { ...n, children: updateNodoRecursive(n.children, nodeId, updates) }
+    return n
+  })
+}
+
+function addChildRecursive(nodes, parentId, newChild) {
+  return nodes.map(n => {
+    if (n.id === parentId) return { ...n, children: [...(n.children || []), newChild] }
+    if (n.children?.length) return { ...n, children: addChildRecursive(n.children, parentId, newChild) }
+    return n
+  })
+}
+
+function removeNodoRecursive(nodes, nodeId) {
+  return nodes
+    .filter(n => n.id !== nodeId)
+    .map(n => n.children?.length ? { ...n, children: removeNodoRecursive(n.children, nodeId) } : n)
+}
+
+function setRootCauseRecursive(nodes, nodeId) {
+  return nodes.map(n => {
+    const isTarget = n.id === nodeId
+    return {
+      ...n,
+      is_root_cause: isTarget ? !n.is_root_cause : false,
+      children: n.children?.length ? setRootCauseRecursive(n.children, nodeId) : [],
+    }
+  })
 }
