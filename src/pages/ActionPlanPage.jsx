@@ -449,6 +449,8 @@ function ActionPlanDetail({ plan, onClose, onUpdated, onEdit, onCancel, onRestor
   const [detail, setDetail] = useState(plan)
   const [nuovoCommento, setNuovoCommento] = useState('')
   const [nuovoChecklistItem, setNuovoChecklistItem] = useState('')
+  const { configs } = useAllConfigurations()
+  const statiConfig = configs.stato_ap || []
 
   useEffect(() => {
     api.get(`/action-plans/${plan._id}`).then(res => setDetail(res.data)).catch(() => {})
@@ -629,9 +631,15 @@ function ActionPlanDetail({ plan, onClose, onUpdated, onEdit, onCancel, onRestor
           )}
 
           <SidebarRow label="Stato">
-            <select value={detail.stato} onChange={(e) => changeStato(e.target.value)}
-              className={`text-xs px-2 py-1 rounded border ${STATO_COLORS[detail.stato_visuale] || STATO_COLORS[detail.stato] || 'bg-gray-100 text-gray-700 border-gray-300'}`}>
-              {STATI.map(s => <option key={s}>{s}</option>)}
+            <select value={detail.stato || ''} onChange={(e) => changeStato(e.target.value)}
+              className="text-xs px-2 py-1 rounded border bg-gray-100 text-gray-700 border-gray-300">
+              {statiConfig.length === 0 ? (
+                <option value={detail.stato || ''}>{detail.stato || 'Configura stati in Settings'}</option>
+              ) : (
+                statiConfig.map(s => (
+                  <option key={s._id} value={s.label}>{s.label}</option>
+                ))
+              )}
             </select>
           </SidebarRow>
 
