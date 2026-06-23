@@ -427,6 +427,7 @@ export default function KaizenDetailPage() {
             </h3>
             <FiveWhysMindMap
               alberi={kaizen.passo3_causa_radice?.alberi || []}
+              ishikawaRami={kaizen.passo2_cause_probabili?.rami || {}}
               onChange={(alberi) => {
                 setKaizen(prev => ({
                   ...prev,
