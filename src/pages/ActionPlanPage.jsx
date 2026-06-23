@@ -52,18 +52,65 @@ export default function ActionPlanPage() {
   const [selectedPlan, setSelectedPlan] = useState(null)
   const [viewMode, setViewMode] = useState('list')
   const [filters, setFilters] = useState({
-    search: '', stato: '', tipo: '', priorita: '', categoria: '',
-    responsabile: '', reparto: '', tag: '', overdue: false,
-    include_cancelled: false,  // 🆕 mostra anche gli annullati nella lista
-    only_cancelled: false,     // 🆕 vista "solo annullati"
+    search: '', stato: '', tipo: '', priorita: '',
+    categoria_perdita: '', quinta_m: '',
+    responsabile: '', reparto: '', linea: '', macchina: '',
+    pillar_id: '', dashboard_id: '',
+    tag: '', overdue: false,
+    include_cancelled: false,
+    only_cancelled: false,
   })
-  // 🆕 Configurazioni dinamiche da Settings
+  const [showFilters, setShowFilters] = useState(false)
+  const [reparti, setReparti] = useState([])
+  const [pillars, setPillars] = useState([])
+  const [dashboards, setDashboards] = useState([])
+
   const { configs } = useAllConfigurations()
   const statiConfig = configs.stato_ap || []
   const prioritaConfig = configs.priorita_ap || []
   const tipiConfig = configs.tipi_action_plan || []
 
   useEffect(() => { loadData() }, [filters])
+
+  useEffect(() => {
+    Promise.all([
+      api.get('/reparti/').then(r => r.data).catch(() => []),
+      api.get('/pillars/').then(r => r.data).catch(() => []),
+      api.get('/dashboards/').then(r => r.data).catch(() => []),
+    ]).then(([rep, pil, dsh]) => {
+      setReparti(rep || [])
+      setPillars(pil || [])
+      setDashboards(dsh || [])
+    })
+  }, [])
+
+  const activeFiltersCount = Object.entries(filters).filter(([k, v]) => {
+    if (['search'].includes(k)) return false
+    if (typeof v === 'boolean') return v === true
+    return v !== '' && v !== null && v !== undefined
+  }).length
+
+  const lineeFiltrate = filters.reparto
+    ? (reparti.find(r => r.nome === filters.reparto)?.linee || [])
+    : []
+  const macchineFiltrate = filters.linea
+    ? (lineeFiltrate.find(l => l.nome === filters.linea)?.macchine || [])
+    : []
+
+  const responsabiliUnici = [...new Set(plans.map(p => p.responsabile).filter(Boolean))].sort()
+
+  function resetFilters() {
+    setFilters({
+      search: filters.search,
+      stato: '', tipo: '', priorita: '',
+      categoria_perdita: '', quinta_m: '',
+      responsabile: '', reparto: '', linea: '', macchina: '',
+      pillar_id: '', dashboard_id: '',
+      tag: '', overdue: false,
+      include_cancelled: false,
+      only_cancelled: false,
+    })
+  }
 
   async function loadData() {
     setLoading(true)
@@ -89,7 +136,6 @@ export default function ActionPlanPage() {
     loadData()
   }
 
-  // 🆕 Annullamento con motivo obbligatorio
   async function handleCancel(plan) {
     const reason = prompt(
       `🚫 Annullare l'Action Plan "${plan.numero} - ${plan.titolo}"?\n\n` +
@@ -107,7 +153,6 @@ export default function ActionPlanPage() {
     }
   }
 
-  // 🆕 Ripristino di un AP annullato
   async function handleRestore(plan) {
     if (!confirm(`♻️ Ripristinare l'Action Plan "${plan.numero}"?\n\nTornerà tra gli attivi.`)) return
     try {
@@ -125,36 +170,13 @@ export default function ActionPlanPage() {
 
   return (
     <div className="space-y-4">
+      {/* HEADER */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">🎯 Action Plan Management</h1>
           <p className="text-gray-500 text-sm">Gestione piani d'azione trasversali</p>
         </div>
         <div className="flex gap-2 items-center">
-          {/* 🆕 Toggle vista annullati */}
-          <div className="bg-white border rounded-lg p-1 flex gap-1 shadow-sm">
-            <button
-              onClick={() => setFilters({ ...filters, only_cancelled: false, include_cancelled: false })}
-              className={`px-3 py-1.5 rounded text-xs flex items-center gap-1 ${!filters.only_cancelled && !filters.include_cancelled ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-              title="Solo Action Plan attivi"
-            >
-              ✅ Attivi
-            </button>
-            <button
-              onClick={() => setFilters({ ...filters, only_cancelled: false, include_cancelled: true })}
-              className={`px-3 py-1.5 rounded text-xs flex items-center gap-1 ${filters.include_cancelled && !filters.only_cancelled ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-              title="Mostra anche gli annullati"
-            >
-              👁️ Mostra annullati
-            </button>
-            <button
-              onClick={() => setFilters({ ...filters, only_cancelled: true, include_cancelled: false })}
-              className={`px-3 py-1.5 rounded text-xs flex items-center gap-1 ${filters.only_cancelled ? 'bg-red-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-              title="Solo Action Plan annullati"
-            >
-              🚫 Solo annullati
-            </button>
-          </div>
           <div className="bg-white border rounded-lg p-1 flex gap-1 shadow-sm">
             <button onClick={() => setViewMode('list')}
               className={`px-3 py-1.5 rounded text-sm flex items-center gap-1 transition-all ${viewMode === 'list' ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-100'}`}>📋 Lista</button>
@@ -168,6 +190,7 @@ export default function ActionPlanPage() {
         </div>
       </div>
 
+      {/* STAT CARDS */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <StatCard label="Totale" value={stats.totale || 0} color="gray" icon={Activity}
           onClick={() => setFilters({...filters, stato: '', overdue: false})}
@@ -189,49 +212,157 @@ export default function ActionPlanPage() {
           active={filters.overdue} />
       </div>
 
+      {/* SEARCH + FILTRI AVANZATI */}
       <div className="bg-white p-3 rounded-lg shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
-          <div className="relative md:col-span-2">
+        <div className="flex gap-2 items-center">
+          <div className="relative flex-1">
             <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
-            <input type="text" placeholder="Cerca titolo, numero, tag, descrizione..."
-              value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm" />
+            <input
+              type="text"
+              placeholder="Cerca titolo, numero, tag, descrizione..."
+              value={filters.search}
+              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm"
+            />
           </div>
-         <select value={filters.tipo} onChange={(e) => setFilters({ ...filters, tipo: e.target.value })}
-            className="border rounded-lg px-3 py-2 text-sm">
-            <option value="">Tutti i tipi</option>
-            {tipiConfig.length === 0 ? (
-              <option disabled>⚠️ Configura in Settings</option>
-            ) : (
-              tipiConfig.map(t => (
-                <option key={t._id} value={t.label}>
-                  {t.icon ? `${t.icon} ` : ''}{t.label}
-                </option>
-              ))
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 border-2 transition-all ${
+              showFilters || activeFiltersCount > 0
+                ? 'bg-primary text-white border-primary shadow-md'
+                : 'bg-white border-gray-200 hover:border-primary text-gray-700'
+            }`}
+          >
+            <Filter size={16} />
+            Filtri avanzati
+            {activeFiltersCount > 0 && (
+              <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold ${
+                showFilters ? 'bg-white text-primary' : 'bg-primary text-white'
+              }`}>
+                {activeFiltersCount}
+              </span>
             )}
-          </select>
-          <select value={filters.priorita} onChange={(e) => setFilters({ ...filters, priorita: e.target.value })}
-            className="border rounded-lg px-3 py-2 text-sm">
-            <option value="">Tutte le priorità</option>
-            {prioritaConfig.length === 0 ? (
-              <option disabled>⚠️ Configura in Settings</option>
-            ) : (
-              prioritaConfig.map(p => (
-                <option key={p._id} value={p.label}>
-                  {p.icon ? `${p.icon} ` : ''}{p.label}
-                </option>
-              ))
-            )}
-          </select>
-          <input type="text" placeholder="Responsabile" value={filters.responsabile}
-            onChange={(e) => setFilters({ ...filters, responsabile: e.target.value })}
-            className="border rounded-lg px-3 py-2 text-sm" />
-          <input type="text" placeholder="Reparto" value={filters.reparto}
-            onChange={(e) => setFilters({ ...filters, reparto: e.target.value })}
-            className="border rounded-lg px-3 py-2 text-sm" />
+            <ChevronDown size={14} className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+          </button>
+          {activeFiltersCount > 0 && (
+            <button
+              onClick={resetFilters}
+              className="px-3 py-2 rounded-lg text-sm border-2 border-gray-200 text-gray-600 hover:bg-gray-100 hover:border-gray-300"
+              title="Pulisci tutti i filtri"
+            >
+              🔄 Reset
+            </button>
+          )}
         </div>
-      </div>
 
+        {showFilters && (
+          <div className="mt-3 pt-3 border-t space-y-3">
+            {/* Riga 1: Vista */}
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">📦 Vista</label>
+              <div className="flex flex-wrap gap-2">
+                <FilterChip
+                  active={!filters.only_cancelled && !filters.include_cancelled && !filters.overdue}
+                  onClick={() => setFilters({ ...filters, only_cancelled: false, include_cancelled: false, overdue: false })}
+                  label="✅ Solo attivi"
+                />
+                <FilterChip
+                  active={filters.overdue}
+                  onClick={() => setFilters({ ...filters, overdue: !filters.overdue, only_cancelled: false })}
+                  label="⏰ Solo scaduti"
+                />
+                <FilterChip
+                  active={filters.include_cancelled && !filters.only_cancelled}
+                  onClick={() => setFilters({ ...filters, include_cancelled: true, only_cancelled: false })}
+                  label="👁️ Mostra anche annullati"
+                />
+                <FilterChip
+                  active={filters.only_cancelled}
+                  onClick={() => setFilters({ ...filters, only_cancelled: true, include_cancelled: false })}
+                  label="🚫 Solo annullati"
+                  variant="danger"
+                />
+              </div>
+            </div>
+
+            {/* Riga 2: Classificazione */}
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">🏷️ Classificazione</label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <select value={filters.stato} onChange={(e) => setFilters({ ...filters, stato: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
+                  <option value="">📍 Tutti gli stati</option>
+                  {statiConfig.map(s => <option key={s._id} value={s.label}>{s.icon ? `${s.icon} ` : ''}{s.label}</option>)}
+                </select>
+                <select value={filters.tipo} onChange={(e) => setFilters({ ...filters, tipo: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
+                  <option value="">🏷️ Tutti i tipi</option>
+                  {tipiConfig.map(t => <option key={t._id} value={t.label}>{t.icon ? `${t.icon} ` : ''}{t.label}</option>)}
+                </select>
+                <select value={filters.priorita} onChange={(e) => setFilters({ ...filters, priorita: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
+                  <option value="">🎚️ Tutte le priorità</option>
+                  {prioritaConfig.map(p => <option key={p._id} value={p.label}>{p.icon ? `${p.icon} ` : ''}{p.label}</option>)}
+                </select>
+                <select value={filters.categoria_perdita} onChange={(e) => setFilters({ ...filters, categoria_perdita: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
+                  <option value="">💥 Tutte categorie perdita</option>
+                  {(configs.categorie_perdita || []).map(c => <option key={c._id} value={c.label}>{c.icon ? `${c.icon} ` : ''}{c.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Riga 3: Struttura aziendale */}
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">🏭 Struttura aziendale</label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <select value={filters.reparto} onChange={(e) => setFilters({ ...filters, reparto: e.target.value, linea: '', macchina: '' })} className="border rounded-lg px-3 py-2 text-sm">
+                  <option value="">🏭 Tutti i reparti</option>
+                  {reparti.filter(r => r.attivo !== false).map(r => <option key={r._id} value={r.nome}>{r.nome}{r.codice ? ` [${r.codice}]` : ''}</option>)}
+                </select>
+                <select value={filters.linea} onChange={(e) => setFilters({ ...filters, linea: e.target.value, macchina: '' })} disabled={!filters.reparto} className="border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100">
+                  <option value="">{filters.reparto ? '🔹 Tutte le linee' : '— prima il reparto —'}</option>
+                  {lineeFiltrate.filter(l => l.attivo !== false).map(l => <option key={l.id} value={l.nome}>{l.nome}{l.codice ? ` [${l.codice}]` : ''}</option>)}
+                </select>
+                <select value={filters.macchina} onChange={(e) => setFilters({ ...filters, macchina: e.target.value })} disabled={!filters.linea} className="border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100">
+                  <option value="">{filters.linea ? '⚙️ Tutte le macchine' : '— prima la linea —'}</option>
+                  {macchineFiltrate.filter(m => m.attivo !== false).map(m => <option key={m.id} value={m.nome}>{m.nome}{m.codice ? ` [${m.codice}]` : ''}</option>)}
+                </select>
+                <select value={filters.quinta_m} onChange={(e) => setFilters({ ...filters, quinta_m: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
+                  <option value="">🧩 Tutte le 5M</option>
+                  <option value="Machine">⚙️ Machine</option>
+                  <option value="Manodopera">👷 Manodopera</option>
+                  <option value="Metodo">📋 Metodo</option>
+                  <option value="Materiale">📦 Materiale</option>
+                  <option value="Misurazione">📏 Misurazione</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Riga 4: Contesto */}
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">🔗 Contesto</label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <select value={filters.pillar_id} onChange={(e) => setFilters({ ...filters, pillar_id: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
+                  <option value="">🏛️ Tutti i pillars</option>
+                  {pillars.filter(p => p.attivo !== false).map(p => (
+                    <option key={p._id} value={p._id}>{p.icon ? `${p.icon} ` : ''}{p.sigla} — {p.label}</option>
+                  ))}
+                </select>
+                <select value={filters.dashboard_id} onChange={(e) => setFilters({ ...filters, dashboard_id: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
+                  <option value="">📊 Tutte le dashboard</option>
+                  {dashboards.map(d => (
+                    <option key={d._id} value={d._id}>{d.icon ? `${d.icon} ` : '📊 '}{d.nome || d.label || d.titolo || 'Dashboard'}</option>
+                  ))}
+                </select>
+                <input type="text" list="responsabili-list" placeholder="👤 Responsabile" value={filters.responsabile}
+                  onChange={(e) => setFilters({ ...filters, responsabile: e.target.value })}
+                  className="border rounded-lg px-3 py-2 text-sm" />
+                <datalist id="responsabili-list">
+                  {responsabiliUnici.map(r => <option key={r} value={r} />)}
+                </datalist>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      {/* LISTA/KANBAN */}
       {loading ? (
         <div className="bg-white rounded-lg shadow-sm p-12 text-center text-gray-400">⏳ Caricamento...</div>
       ) : plans.length === 0 ? (
@@ -262,7 +393,7 @@ export default function ActionPlanPage() {
           onSaved={(saved) => { setShowForm(false); setEditingPlan(null); loadData(); if (saved) setSelectedPlan(saved) }}
         />
       )}
-   {selectedPlan && (
+      {selectedPlan && (
         <ActionPlanDetail plan={selectedPlan}
           onClose={() => setSelectedPlan(null)}
           onUpdated={() => loadData()}
@@ -273,6 +404,21 @@ export default function ActionPlanPage() {
         />
       )}
     </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────
+// HELPER COMPONENTS
+// ──────────────────────────────────────────────────────────
+function FilterChip({ active, onClick, label, variant = 'primary' }) {
+  const styles = {
+    primary: active ? 'bg-primary text-white border-primary' : 'bg-white text-gray-700 border-gray-200 hover:border-primary',
+    danger: active ? 'bg-red-600 text-white border-red-600' : 'bg-white text-gray-700 border-gray-200 hover:border-red-400',
+  }
+  return (
+    <button onClick={onClick} className={`px-3 py-1.5 rounded-full text-xs font-medium border-2 transition-all ${styles[variant]}`}>
+      {label}
+    </button>
   )
 }
 
@@ -321,153 +467,6 @@ function HealthBadge({ score }) {
   )
 }
 
-function ActionPlanForm({ plan, onClose, onSaved }) {
-  const [form, setForm] = useState({
-    titolo: plan?.titolo || '', descrizione: plan?.descrizione || '',
-    tipo: plan?.tipo || '', priorita: plan?.priorita || 'Medium',
-    stato: plan?.stato || 'Da Valutare', categoria: plan?.categoria || '',
-    tipo_perdita: plan?.tipo_perdita || '', responsabile: plan?.responsabile || '',
-    reparto: plan?.reparto || '', linea: plan?.linea || '', macchina: plan?.macchina || '',
-    data_scadenza: plan?.data_scadenza ? plan.data_scadenza.slice(0, 10) : '',
-    tags: plan?.tags?.join(', ') || '',
-  })
-  const [saving, setSaving] = useState(false)
-  const { configs } = useAllConfigurations()
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    setSaving(true)
-    try {
-      const payload = {
-        ...form,
-        tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
-        data_scadenza: form.data_scadenza ? new Date(form.data_scadenza).toISOString() : null,
-      }
-      let res
-      if (plan?._id) res = await api.put(`/action-plans/${plan._id}`, payload)
-      else res = await api.post('/action-plans/', payload)
-      onSaved(res.data)
-    } catch (err) {
-      console.error(err)
-      alert('Errore: ' + (err.response?.data?.detail || err.message))
-    } finally { setSaving(false) }
-  }
-
-  return (
-    <Modal title={plan ? `✏️ Modifica ${plan.numero}` : '➕ Nuovo Action Plan'} onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Field label="Titolo *">
-          <input required value={form.titolo} onChange={(e) => setForm({ ...form, titolo: e.target.value })}
-            className="w-full border rounded-lg px-3 py-2" placeholder="Es: Sostituire filtro Bindler linea 11" />
-        </Field>
-
-        <Field label="Descrizione (supporta @mentions e #tags)">
-          <textarea value={form.descrizione} onChange={(e) => setForm({ ...form, descrizione: e.target.value })}
-            rows={4} className="w-full border rounded-lg px-3 py-2 font-mono text-sm"
-            placeholder="Es: @mario.rossi devi sostituire il filtro #manutenzione #linea-2" />
-          <div className="text-xs text-gray-500 mt-1">
-            💡 Usa <code className="bg-gray-100 px-1">@nome</code> per taggare persone e <code className="bg-gray-100 px-1">#argomento</code> per categorizzare
-          </div>
-        </Field>
-
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="Tipo">
-            <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}
-              className="w-full border rounded-lg px-3 py-2">
-              <option value="">— Seleziona —</option>
-              {(configs.tipi_action_plan || []).map(t => (
-                <option key={t._id} value={t.label}>{t.icon ? `${t.icon} ` : ''}{t.label}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Priorità">
-            <select value={form.priorita} onChange={(e) => setForm({ ...form, priorita: e.target.value })} className="w-full border rounded-lg px-3 py-2">
-              {PRIORITA.map(p => <option key={p}>{p}</option>)}
-            </select>
-          </Field>
-          <Field label="Stato">
-            <select value={form.stato} onChange={(e) => setForm({ ...form, stato: e.target.value })} className="w-full border rounded-lg px-3 py-2">
-              {STATI.map(s => <option key={s}>{s}</option>)}
-            </select>
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Categoria">
-            <select value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-              className="w-full border rounded-lg px-3 py-2">
-              <option value="">— Seleziona —</option>
-              {(configs.categorie_action_plan || []).map(c => (
-                <option key={c._id} value={c.label}>{c.icon ? `${c.icon} ` : ''}{c.label}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Tipo Perdita (TPM)">
-            <select value={form.tipo_perdita} onChange={(e) => setForm({ ...form, tipo_perdita: e.target.value })}
-              className="w-full border rounded-lg px-3 py-2">
-              <option value="">— Nessuna —</option>
-              {(configs.tipi_perdita || []).map(p => (
-                <option key={p._id} value={p.label}>{p.icon ? `${p.icon} ` : ''}{p.label}</option>
-              ))}
-            </select>
-          </Field>
-        </div>
-
-        <Field label="Responsabile">
-          <input value={form.responsabile} onChange={(e) => setForm({ ...form, responsabile: e.target.value })}
-            placeholder="Es: Mario Rossi" className="w-full border rounded-lg px-3 py-2" />
-        </Field>
-
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="Reparto">
-            <select value={form.reparto} onChange={(e) => setForm({ ...form, reparto: e.target.value })}
-              className="w-full border rounded-lg px-3 py-2">
-              <option value="">— Seleziona —</option>
-              {(configs.reparti || []).map(r => (
-                <option key={r._id} value={r.label}>{r.icon ? `${r.icon} ` : ''}{r.label}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Linea">
-            <select value={form.linea} onChange={(e) => setForm({ ...form, linea: e.target.value })}
-              className="w-full border rounded-lg px-3 py-2">
-              <option value="">— Seleziona —</option>
-              {(configs.linee || []).map(l => (
-                <option key={l._id} value={l.label}>{l.icon ? `${l.icon} ` : ''}{l.label}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Macchina">
-            <select value={form.macchina} onChange={(e) => setForm({ ...form, macchina: e.target.value })}
-              className="w-full border rounded-lg px-3 py-2">
-              <option value="">— Seleziona —</option>
-              {(configs.macchine || []).map(m => (
-                <option key={m._id} value={m.label}>{m.icon ? `${m.icon} ` : ''}{m.label}</option>
-              ))}
-            </select>
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Scadenza">
-            <input type="date" value={form.data_scadenza} onChange={(e) => setForm({ ...form, data_scadenza: e.target.value })} className="w-full border rounded-lg px-3 py-2" />
-          </Field>
-          <Field label="Tags (separati da virgola)">
-            <input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })}
-              placeholder="sicurezza, manutenzione, linea-2" className="w-full border rounded-lg px-3 py-2" />
-          </Field>
-        </div>
-
-        <div className="flex justify-end gap-2 pt-3 border-t">
-          <button type="button" onClick={onClose} className="px-4 py-2 border rounded-lg">Annulla</button>
-          <button type="submit" disabled={saving} className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-light disabled:opacity-50">
-            {saving ? 'Salvataggio...' : (plan ? '💾 Salva modifiche' : '➕ Crea Action Plan')}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  )
-}
 function ActionPlanDetail({ plan, onClose, onUpdated, onEdit, onCancel, onRestore, onDelete }) {
   const [detail, setDetail] = useState(plan)
   const [nuovoCommento, setNuovoCommento] = useState('')
@@ -623,48 +622,25 @@ function ActionPlanDetail({ plan, onClose, onUpdated, onEdit, onCancel, onRestor
             <span className="text-sm font-medium">Dettagli</span>
             <div className="flex gap-1">
               {!detail.is_cancelled && onCancel && (
-                <button
-                  onClick={() => onCancel(detail)}
-                  className="p-1.5 hover:bg-orange-100 rounded text-orange-600"
-                  title="🚫 Annulla Action Plan"
-                >
-                  🚫
-                </button>
+                <button onClick={() => onCancel(detail)} className="p-1.5 hover:bg-orange-100 rounded text-orange-600" title="🚫 Annulla Action Plan">🚫</button>
               )}
               {detail.is_cancelled && onRestore && (
-                <button
-                  onClick={() => onRestore(detail)}
-                  className="p-1.5 hover:bg-green-100 rounded text-green-600"
-                  title="♻️ Ripristina"
-                >
-                  ♻️
-                </button>
+                <button onClick={() => onRestore(detail)} className="p-1.5 hover:bg-green-100 rounded text-green-600" title="♻️ Ripristina">♻️</button>
               )}
               {onDelete && (
-                <button
-                  onClick={() => onDelete(detail._id)}
-                  className="p-1.5 hover:bg-red-100 rounded text-red-600"
-                  title="🗑️ Elimina definitivamente"
-                >
+                <button onClick={() => onDelete(detail._id)} className="p-1.5 hover:bg-red-100 rounded text-red-600" title="🗑️ Elimina definitivamente">
                   <Trash2 size={14} />
                 </button>
               )}
-              <button onClick={() => onEdit(detail)} className="p-1.5 hover:bg-gray-200 rounded" title="Modifica">
-                <Edit2 size={14} />
-              </button>
-              <button onClick={onClose} className="p-1.5 hover:bg-gray-200 rounded" title="Chiudi">
-                <X size={14} />
-              </button>
+              <button onClick={() => onEdit(detail)} className="p-1.5 hover:bg-gray-200 rounded" title="Modifica"><Edit2 size={14} /></button>
+              <button onClick={onClose} className="p-1.5 hover:bg-gray-200 rounded" title="Chiudi"><X size={14} /></button>
             </div>
           </div>
 
-          {/* 🆕 Banner annullamento (visibile solo se annullato) */}
           {detail.is_cancelled && (
             <div className="bg-red-100 border border-red-300 rounded p-2 text-xs">
               <div className="font-bold text-red-800 mb-1">🚫 Action Plan annullato</div>
-              {detail.cancelled_reason && (
-                <div className="text-red-700 italic">"{detail.cancelled_reason}"</div>
-              )}
+              {detail.cancelled_reason && <div className="text-red-700 italic">"{detail.cancelled_reason}"</div>}
               {detail.cancelled_at && (
                 <div className="text-red-600 mt-1">
                   📅 {new Date(detail.cancelled_at).toLocaleDateString('it-IT')}
@@ -676,19 +652,19 @@ function ActionPlanDetail({ plan, onClose, onUpdated, onEdit, onCancel, onRestor
 
           <SidebarRow label="Stato">
             <select value={detail.stato} onChange={(e) => changeStato(e.target.value)}
-              className={`text-xs px-2 py-1 rounded border ${STATO_COLORS[detail.stato_visuale] || STATO_COLORS[detail.stato]}`}>
+              className={`text-xs px-2 py-1 rounded border ${STATO_COLORS[detail.stato_visuale] || STATO_COLORS[detail.stato] || 'bg-gray-100 text-gray-700 border-gray-300'}`}>
               {STATI.map(s => <option key={s}>{s}</option>)}
             </select>
           </SidebarRow>
 
           <SidebarRow label="Priorità">
-            <span className={`px-2 py-0.5 rounded text-xs ${PRIORITA_BG[detail.priorita]}`}>
+            <span className={`px-2 py-0.5 rounded text-xs ${PRIORITA_BG[detail.priorita] || ''}`}>
               {detail.priorita === 'Critical' && '🔥 '}{detail.priorita}
             </span>
           </SidebarRow>
 
           <SidebarRow label="Tipo">
-            <span className={`text-xs flex items-center gap-1 ${TIPO_COLORS[detail.tipo]}`}>
+            <span className={`text-xs flex items-center gap-1 ${TIPO_COLORS[detail.tipo] || ''}`}>
               <TipoIcon size={12} /> {detail.tipo}
             </span>
           </SidebarRow>
@@ -712,15 +688,9 @@ function ActionPlanDetail({ plan, onClose, onUpdated, onEdit, onCancel, onRestor
             </span>
           </SidebarRow>
 
-          <SidebarRow label="Categoria">
-            <span className="text-xs">{detail.categoria || '—'}</span>
+          <SidebarRow label="Categoria Perdita">
+            <span className="text-xs">{detail.categoria_perdita || detail.tipo_perdita || '—'}</span>
           </SidebarRow>
-
-          {detail.tipo_perdita && (
-            <SidebarRow label="Tipo Perdita">
-              <span className="text-xs">{detail.tipo_perdita}</span>
-            </SidebarRow>
-          )}
 
           {(detail.reparto || detail.linea || detail.macchina) && (
             <SidebarRow label="Location">
@@ -760,7 +730,6 @@ function ActionPlanDetail({ plan, onClose, onUpdated, onEdit, onCancel, onRestor
     </Modal>
   )
 }
-
 function ListView({ plans, onSelect, onEdit, onDelete, onCancel, onRestore, onQuickStateChange, statiConfig = [] }) {
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden">
@@ -775,7 +744,7 @@ function ListView({ plans, onSelect, onEdit, onDelete, onCancel, onRestore, onQu
             <th className="px-3 py-2 text-left w-32">Stato</th>
             <th className="px-3 py-2 text-left w-28">Scadenza</th>
             <th className="px-3 py-2 text-left w-20">Health</th>
-            <th className="px-3 py-2 text-center w-32">Azioni</th>
+            <th className="px-3 py-2 text-center w-40">Azioni</th>
           </tr>
         </thead>
         <tbody>
@@ -812,12 +781,12 @@ function ListView({ plans, onSelect, onEdit, onDelete, onCancel, onRestore, onQu
                   )}
                 </td>
                 <td className="px-3 py-2">
-                  <div className={`flex items-center gap-1 text-xs ${TIPO_COLORS[p.tipo]}`}>
+                  <div className={`flex items-center gap-1 text-xs ${TIPO_COLORS[p.tipo] || ''}`}>
                     <TipoIcon size={14} /><span>{p.tipo}</span>
                   </div>
                 </td>
                 <td className="px-3 py-2">
-                  <span className={`px-2 py-0.5 rounded text-xs ${PRIORITA_BG[p.priorita]}`}>
+                  <span className={`px-2 py-0.5 rounded text-xs ${PRIORITA_BG[p.priorita] || ''}`}>
                     {p.priorita === 'Critical' && '🔥 '}{p.priorita}
                   </span>
                 </td>
@@ -829,6 +798,26 @@ function ListView({ plans, onSelect, onEdit, onDelete, onCancel, onRestore, onQu
                     </div>
                   ) : <span className="text-xs text-gray-400">— Non assegnato</span>}
                 </td>
+                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                  <select value={p.stato} onChange={(e) => onQuickStateChange(p._id, e.target.value)}
+                    className={`text-xs px-1.5 py-1 rounded border ${STATO_COLORS[p.stato_visuale] || STATO_COLORS[p.stato] || 'bg-gray-100 text-gray-700 border-gray-300'}`}>
+                    {statiConfig.length === 0 ? (
+                      <option value={p.stato}>{p.stato || '— Configura stati —'}</option>
+                    ) : (
+                      statiConfig.map(s => (
+                        <option key={s._id} value={s.label}>{s.icon ? `${s.icon} ` : ''}{s.label}</option>
+                      ))
+                    )}
+                  </select>
+                </td>
+                <td className="px-3 py-2 text-xs">
+                  {p.data_scadenza ? (
+                    <div className={p.stato_visuale === 'In Ritardo' ? 'text-red-600 font-bold' : ''}>
+                      {new Date(p.data_scadenza).toLocaleDateString('it-IT')}
+                    </div>
+                  ) : '—'}
+                </td>
+                <td className="px-3 py-2"><HealthBadge score={p.health_score || 0} /></td>
                 <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                   <div className="flex justify-center gap-1">
                     <button onClick={() => onSelect(p)} className="p-1 hover:bg-blue-100 rounded text-blue-600" title="Dettaglio"><Eye size={14} /></button>
@@ -844,21 +833,6 @@ function ListView({ plans, onSelect, onEdit, onDelete, onCancel, onRestore, onQu
                     <button onClick={() => onDelete(p._id)} className="p-1 hover:bg-red-100 rounded text-red-600" title="🗑️ Elimina definitivamente"><Trash2 size={14} /></button>
                   </div>
                 </td>
-                <td className="px-3 py-2 text-xs">
-                  {p.data_scadenza ? (
-                    <div className={p.stato_visuale === 'In Ritardo' ? 'text-red-600 font-bold' : ''}>
-                      {new Date(p.data_scadenza).toLocaleDateString('it-IT')}
-                    </div>
-                  ) : '—'}
-                </td>
-                <td className="px-3 py-2"><HealthBadge score={p.health_score || 0} /></td>
-                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex justify-center gap-1">
-                    <button onClick={() => onSelect(p)} className="p-1 hover:bg-blue-100 rounded text-blue-600" title="Dettaglio"><Eye size={14} /></button>
-                    <button onClick={() => onEdit(p)} className="p-1 hover:bg-yellow-100 rounded text-yellow-600" title="Modifica"><Edit2 size={14} /></button>
-                    <button onClick={() => onDelete(p._id)} className="p-1 hover:bg-red-100 rounded text-red-600" title="Elimina"><Trash2 size={14} /></button>
-                  </div>
-                </td>
               </tr>
             )
           })}
@@ -868,7 +842,6 @@ function ListView({ plans, onSelect, onEdit, onDelete, onCancel, onRestore, onQu
   )
 }
 
-// 🎨 Palette colori per generare automaticamente lo stile delle colonne Kanban
 const KANBAN_PALETTE = [
   { color: 'bg-gray-50 border-gray-300', headerColor: 'bg-gray-200 text-gray-700' },
   { color: 'bg-blue-50 border-blue-200', headerColor: 'bg-blue-200 text-blue-800' },
@@ -882,7 +855,6 @@ const KANBAN_PALETTE = [
 ]
 
 function KanbanView({ plans, onSelect, onStateChange, reload, statiConfig = [], onCancel, onRestore }) {
-  // 🆕 Costruisco le colonne dinamicamente dagli stati configurati in Settings
   const columns = statiConfig.length > 0
     ? statiConfig.map((s, idx) => {
         const palette = KANBAN_PALETTE[idx % KANBAN_PALETTE.length]
@@ -894,17 +866,15 @@ function KanbanView({ plans, onSelect, onStateChange, reload, statiConfig = [], 
         }
       })
     : []
-// 🆕 Separo annullati dal flusso Kanban
+
   const cancelledPlans = plans.filter(p => p.is_cancelled)
   const activePlans = plans.filter(p => !p.is_cancelled)
-  // 🆕 Raggruppo gli AP per stato. Se uno stato non è più tra i configurati, 
-  // l'AP finisce in una colonna speciale "Stato non riconosciuto"
+
   const grouped = columns.reduce((acc, col) => {
     acc[col.id] = activePlans.filter(p => p.stato === col.id)
     return acc
   }, {})
 
-  // 🆕 Orfani: AP con stato che non è più nelle Settings
   const knownStati = new Set(columns.map(c => c.id))
   const orphans = activePlans.filter(p => !knownStati.has(p.stato))
   if (orphans.length > 0) {
@@ -921,11 +891,10 @@ function KanbanView({ plans, onSelect, onStateChange, reload, statiConfig = [], 
     const { source, destination, draggableId } = result
     if (!destination) return
     if (source.droppableId === destination.droppableId) return
-    if (destination.droppableId === '__orphans__') return  // non si può droppare in orfani
+    if (destination.droppableId === '__orphans__') return
     await onStateChange(draggableId, destination.droppableId)
   }
 
-  // 🆕 Empty state se nessuno stato è configurato
   if (statiConfig.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow-sm p-12 text-center">
@@ -979,7 +948,6 @@ function KanbanView({ plans, onSelect, onStateChange, reload, statiConfig = [], 
         </div>
       </DragDropContext>
 
-      {/* 🆕 Sezione separata: Annullati */}
       {cancelledPlans.length > 0 && (
         <div className="mt-6 bg-red-50 border-2 border-red-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-3">
@@ -989,19 +957,13 @@ function KanbanView({ plans, onSelect, onStateChange, reload, statiConfig = [], 
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
             {cancelledPlans.map(plan => (
-              <div
-                key={plan._id}
-                onClick={() => onSelect(plan)}
-                className="bg-white rounded-md p-3 shadow-sm border border-red-300 cursor-pointer hover:shadow-md transition-all opacity-75 hover:opacity-100"
-              >
+              <div key={plan._id} onClick={() => onSelect(plan)}
+                className="bg-white rounded-md p-3 shadow-sm border border-red-300 cursor-pointer hover:shadow-md transition-all opacity-75 hover:opacity-100">
                 <div className="flex justify-between items-start mb-2">
                   <span className="font-mono text-xs text-red-600 font-bold">{plan.numero}</span>
                   {onRestore && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onRestore(plan) }}
-                      className="text-green-600 hover:bg-green-100 p-0.5 rounded text-xs"
-                      title="♻️ Ripristina"
-                    >
+                    <button onClick={(e) => { e.stopPropagation(); onRestore(plan) }}
+                      className="text-green-600 hover:bg-green-100 p-0.5 rounded text-xs" title="♻️ Ripristina">
                       ♻️
                     </button>
                   )}
@@ -1037,7 +999,7 @@ function KanbanCard({ plan }) {
     <>
       <div className="flex justify-between items-center mb-1">
         <span className="font-mono text-xs text-primary font-bold">{plan.numero}</span>
-        <span className={`text-xs px-1.5 py-0.5 rounded ${PRIORITA_BG[plan.priorita]}`}>
+        <span className={`text-xs px-1.5 py-0.5 rounded ${PRIORITA_BG[plan.priorita] || ''}`}>
           {plan.priorita === 'Critical' && '🔥'}
           {plan.priorita === 'High' && '⬆️'}
           {plan.priorita === 'Medium' && '➖'}
@@ -1046,7 +1008,7 @@ function KanbanCard({ plan }) {
         </span>
       </div>
       <div className="font-medium text-sm mb-2 line-clamp-2">{plan.titolo}</div>
-      <div className={`flex items-center gap-1 text-xs mb-2 ${TIPO_COLORS[plan.tipo]}`}>
+      <div className={`flex items-center gap-1 text-xs mb-2 ${TIPO_COLORS[plan.tipo] || ''}`}>
         <TipoIcon size={12} /><span>{plan.tipo}</span>
       </div>
       {plan.tags?.length > 0 && (
@@ -1143,3 +1105,4 @@ function renderWithMentionsTags(text) {
     return p
   })
 }
+      
