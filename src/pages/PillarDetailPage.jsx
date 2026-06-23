@@ -1,14 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import api from '../services/api'
-import { ArrowLeft, User, Calendar, Users, Edit2, Plus, Trash2 } from 'lucide-react'
-
-export default function PillarDetailPage() {
-  const { id } = useParams()
-  const navigate = useNavigate()
-  const [pillar, setPillar] = useState(null)
-  const [stats, setStats] = useState(null)
-  const [kaizens, setKaizens] = useState([])
+import { ArrowLeft, User, Calendar, UsersionPlans] = useState([])import { ArrowLeft, User, Calendar, Users, Edit2, Plus, Trash2, ClipboardList } from 'lucide-react'
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('anagrafica')
 
@@ -17,14 +10,16 @@ export default function PillarDetailPage() {
   async function loadAll() {
     setLoading(true)
     try {
-      const [pillarRes, statsRes, kaizensRes] = await Promise.all([
+      const [pillarRes, statsRes, kaizensRes, apsRes] = await Promise.all([
         api.get(`/pillars/${id}`),
         api.get(`/pillars/${id}/stats`),
         api.get(`/pillars/${id}/kaizens`),
+        api.get(`/action-plans/?pillar_id=${id}`),
       ])
       setPillar(pillarRes.data)
       setStats(statsRes.data)
       setKaizens(kaizensRes.data || [])
+      setActionPlans(apsRes.data || [])
     } catch (err) {
       console.error(err)
       alert('Errore caricamento pillar')
@@ -53,6 +48,7 @@ export default function PillarDetailPage() {
     { id: 'kpi', label: `🎯 5 Step KPI (${stepsCompleted}/${stepsTotal})` },
     { id: 'masterplan', label: '📅 Master Plan' },
     { id: 'kaizen', label: `📋 Kaizen (${kaizens.length})` },
+    { id: 'action_plan', label: `📌 Action Plan (${actionPlans.length})` },
     { id: 'maturity', label: '📈 Maturity Grid' },
   ]
 
@@ -130,7 +126,133 @@ export default function PillarDetailPage() {
       {activeTab === 'kpi' && <KpiManagementTab pillar={pillar} color={color} onSaved={loadAll} />}
       {activeTab === 'masterplan' && <MasterPlanTab pillar={pillar} color={color} onSaved={loadAll} />}
       {activeTab === 'kaizen' && <KaizenList kaizens={kaizens} pillar={pillar} />}
+      {activeTab === 'action_plan' && <ActionPlanTab actionPlans={actionPlans} pillar={pillar} color={color} onReload={loadAll} />}
       {activeTab === 'maturity' && <MaturityPlaceholder color={color} />}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────
+// NUOVO: TAB ACTION PLAN (Pillar)
+// ──────────────────────────────────────────────────────────
+function ActionPlanTab({ actionPlans, pillar, color, onReload }) {
+  const navigate = useNavigate()
+  const [showForm, setShowForm] = useState(false)
+
+  const prefilledPillar = {
+    parent_type: 'pillar',
+    parent_id: pillar._id,
+    parent_label: pillar.sigla,
+    pillar_id: pillar._id,
+  }
+
+  function handleSaved() {
+    setShowForm(false)
+    onReload()
+  }
+
+  const counts = {
+    totale: actionPlans.length,
+    da_valutare: actionPlans.filter(a => a.stato === 'Da Valutare').length,
+    in_corso: actionPlans.filter(a => a.stato === 'In Corso').length,
+    done: actionPlans.filter(a => a.stato === 'Done').length,
+    overdue: actionPlans.filter(a => a.stato_visuale === 'In Ritardo').length,
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl shadow p-4 flex justify-between items-center">
+        <div>
+          <h3 className="font-bold text-lg flex items-center gap-2">
+            <ClipboardList size={20} style={{ color }} />
+            Action Plan collegati a {pillar.sigla}
+          </h3>
+          <div className="flex gap-4 text-xs text-gray-500 mt-1">
+            <span>Totale: <strong className="text-gray-700">{counts.totale}</strong></span>
+            <span>Da valutare: <strong className="text-gray-700">{counts.da_valutare}</strong></span>
+            <span>In corso: <strong className="text-blue-600">{counts.in_corso}</strong></span>
+            <span>Done: <strong className="text-green-600">{counts.done}</strong></span>
+            {counts.overdue > 0 && <span>Scaduti: <strong className="text-red-600">{counts.overdue}</strong></span>}
+          </div>
+        </div>
+        <button
+          onClick={() => setShowForm(true)}
+          className="text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow"
+          style={{ backgroundColor: color }}
+        >
+          <Plus size={16} /> Nuovo Action Plan
+        </button>
+      </div>
+
+      {actionPlans.length === 0 ? (
+        <div className="bg-white rounded-xl shadow p-12 text-center">
+          <ClipboardList className="mx-auto text-gray-300 mb-3" size={48} />
+          <p className="text-gray-400 mb-3">Nessun Action Plan collegato a questo pillar</p>
+          <p className="text-xs text-gray-400 mb-4">
+            Crea un AP qui per averlo automaticamente collegato a <strong>{pillar.sigla}</strong>
+          </p>
+          <button onClick={() => setShowForm(true)} className="text-primary hover:underline text-sm">
+            + Crea il primo Action Plan
+          </button>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl shadow overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b text-xs uppercase text-gray-500">
+              <tr>
+                <th className="px-4 py-2 text-left w-24">Numero</th>
+                <th className="px-4 py-2 text-left">Titolo</th>
+                <th className="px-4 py-2 text-left w-28">Tipo</th>
+                <th className="px-4 py-2 text-left w-24">Priorità</th>
+                <th className="px-4 py-2 text-left w-32">Responsabile</th>
+                <th className="px-4 py-2 text-left w-28">Stato</th>
+                <th className="px-4 py-2 text-left w-28">Scadenza</th>
+                <th className="px-4 py-2 text-right w-20">Azioni</th>
+              </tr>
+            </thead>
+            <tbody>
+              {actionPlans.map(ap => {
+                const isOverdue = ap.stato_visuale === 'In Ritardo'
+                return (
+                  <tr key={ap._id} className="border-b hover:bg-gray-50 cursor-pointer"
+                    onClick={() => navigate(`/action-plan`)}>
+                    <td className="px-4 py-2 font-mono text-xs text-primary font-bold">{ap.numero}</td>
+                    <td className="px-4 py-2 font-medium">{ap.titolo}</td>
+                    <td className="px-4 py-2 text-xs">{ap.tipo || '—'}</td>
+                    <td className="px-4 py-2">
+                      <span className="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700">
+                        {ap.priorita || '—'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-xs">{ap.responsabile || '— Non assegnato'}</td>
+                    <td className="px-4 py-2">
+                      <span className="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700">{ap.stato}</span>
+                    </td>
+                    <td className={`px-4 py-2 text-xs ${isOverdue ? 'text-red-600 font-bold' : ''}`}>
+                      {ap.data_scadenza ? new Date(ap.data_scadenza).toLocaleDateString('it-IT') : '—'}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <Link to={`/action-plan`} onClick={(e) => e.stopPropagation()} className="text-primary hover:underline text-xs">
+                        Apri →
+                      </Link>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showForm && (
+        <ActionPlanFormShared
+          plan={null}
+          prefilledKaizen={null}
+          prefilledParent={prefilledPillar}
+          onClose={() => setShowForm(false)}
+          onSaved={handleSaved}
+        />
+      )}
     </div>
   )
 }
@@ -231,7 +353,14 @@ const ACTUAL_STATUS = [
   { value: 'blocked', label: 'Blocked', icon: '🚧', color: 'bg-orange-100 text-orange-700 border-orange-300' },
   { value: 'cancelled', label: 'Cancelled', icon: '🔴', color: 'bg-red-100 text-red-700 border-red-300' },
 ]
+import ActionPlanFormShared from '../components/ActionPlanFormShared'
 
+export default function PillarDetailPage() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const [pillar, setPillar] = useState(null)
+  const [stats, setStats] = useState(null)
+  const [kaizens, setKaizens] = useState([])
 function KpiManagementTab({ pillar, color, onSaved }) {
   const [stepsData, setStepsData] = useState(() => {
     const initial = {}
@@ -266,7 +395,6 @@ function KpiManagementTab({ pillar, color, onSaved }) {
     setHasUnsavedChanges(true)
     const timer = setTimeout(() => doSave(false), 600)
     return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stepsData])
 
   function updateStep(stepId, updates) {
@@ -508,6 +636,7 @@ function Step2Content({ data, color, onUpdate }) {
     </div>
   )
 }
+
 function Step3Content({ data, color, onUpdate, lossesStep2 = [] }) {
   const progetti = data.progetti || []
 
@@ -515,35 +644,17 @@ function Step3Content({ data, color, onUpdate, lossesStep2 = [] }) {
     onUpdate({
       progetti: [...progetti, {
         id: Date.now().toString(),
-        origine: 'step3',
-        label: '',
-        loss_target_id: '',
-        loss_target_label: '',
-        kaizen_numero: '',
-        saving_planned: '',
-        owner: '',
-        deadline: '',
-        status: 'planned',
+        origine: 'step3', label: '', loss_target_id: '', loss_target_label: '',
+        kaizen_numero: '', saving_planned: '', owner: '', deadline: '', status: 'planned',
       }]
     })
   }
-
-  function updateProject(id, updates) {
-    onUpdate({ progetti: progetti.map(p => p.id === id ? { ...p, ...updates } : p) })
-  }
-
-  function removeProject(id) {
-    onUpdate({ progetti: progetti.filter(p => p.id !== id) })
-  }
-
+  function updateProject(id, updates) { onUpdate({ progetti: progetti.map(p => p.id === id ? { ...p, ...updates } : p) }) }
+  function removeProject(id) { onUpdate({ progetti: progetti.filter(p => p.id !== id) }) }
   function handleLossChange(projectId, lossId) {
     const loss = lossesStep2.find(l => l.id === lossId)
-    updateProject(projectId, {
-      loss_target_id: lossId,
-      loss_target_label: loss?.label || '',
-    })
+    updateProject(projectId, { loss_target_id: lossId, loss_target_label: loss?.label || '' })
   }
-
   const totalPlanned = progetti.reduce((sum, p) => sum + (parseFloat(p.saving_planned) || 0), 0)
 
   return (
@@ -551,33 +662,23 @@ function Step3Content({ data, color, onUpdate, lossesStep2 = [] }) {
       <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-3 text-sm text-blue-800">
         ℹ️ <strong>Cosa fare:</strong> Pianifica i progetti (Kaizen) che chiuderanno il gap del KPI. Collega ogni progetto a una loss dello Step 2 e specifica saving atteso, owner, deadline.
       </div>
-
       {progetti.length > 0 && (
         <div className="bg-white p-3 rounded-lg border-2 border-dashed flex justify-between items-center">
           <span className="text-sm text-gray-600">📊 Saving totale pianificato:</span>
-          <span className="text-2xl font-bold" style={{ color }}>
-            {totalPlanned.toLocaleString('it-IT')} €
-          </span>
+          <span className="text-2xl font-bold" style={{ color }}>{totalPlanned.toLocaleString('it-IT')} €</span>
         </div>
       )}
-
       {lossesStep2.length === 0 && (
         <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-r-lg p-3 text-sm text-yellow-800">
           ⚠️ Non hai ancora compilato lo <strong>Step 2 (Pareto)</strong>. Senza losses i progetti non possono essere collegati alle perdite da chiudere.
         </div>
       )}
-
       <div className="flex justify-between items-center">
         <h4 className="font-semibold text-sm uppercase text-gray-700">🎯 Progetti pianificati ({progetti.length})</h4>
-        <button onClick={addProject} className="text-xs px-3 py-1 text-white rounded shadow" style={{ backgroundColor: color }}>
-          + Pianifica progetto
-        </button>
+        <button onClick={addProject} className="text-xs px-3 py-1 text-white rounded shadow" style={{ backgroundColor: color }}>+ Pianifica progetto</button>
       </div>
-
       {progetti.length === 0 ? (
-        <div className="bg-white p-6 rounded-lg text-center text-sm text-gray-400 italic">
-          Nessun progetto pianificato. Inizia ora la pianificazione dei Kaizen per chiudere il gap KPI.
-        </div>
+        <div className="bg-white p-6 rounded-lg text-center text-sm text-gray-400 italic">Nessun progetto pianificato. Inizia ora la pianificazione dei Kaizen per chiudere il gap KPI.</div>
       ) : (
         <div className="space-y-2">
           {progetti.map((p, idx) => {
@@ -585,76 +686,35 @@ function Step3Content({ data, color, onUpdate, lossesStep2 = [] }) {
             const statusInfo = PROGETTO_STATUS.find(s => s.value === status) || PROGETTO_STATUS[0]
             return (
               <div key={p.id} className="bg-white p-3 rounded-lg border-l-4 border" style={{ borderLeftColor: color }}>
-                {/* Riga 1: titolo + status + delete */}
                 <div className="flex items-center gap-2 mb-2">
                   <span className="font-bold text-gray-400 text-sm">#{idx + 1}</span>
-                  <input
-                    className="flex-1 border rounded px-2 py-1 text-sm font-medium"
-                    value={p.label}
-                    onChange={(e) => updateProject(p.id, { label: e.target.value })}
-                    placeholder="Titolo del progetto / Kaizen"
-                  />
-                  <span className={`px-2 py-1 rounded text-xs font-bold border ${statusInfo.color}`}>
-                    {statusInfo.icon} {statusInfo.label}
-                  </span>
-                  <button onClick={() => removeProject(p.id)} className="text-red-500 hover:bg-red-50 p-1 rounded">
-                    <Trash2 size={14} />
-                  </button>
+                  <input className="flex-1 border rounded px-2 py-1 text-sm font-medium" value={p.label} onChange={(e) => updateProject(p.id, { label: e.target.value })} placeholder="Titolo del progetto / Kaizen" />
+                  <span className={`px-2 py-1 rounded text-xs font-bold border ${statusInfo.color}`}>{statusInfo.icon} {statusInfo.label}</span>
+                  <button onClick={() => removeProject(p.id)} className="text-red-500 hover:bg-red-50 p-1 rounded"><Trash2 size={14} /></button>
                 </div>
-
-                {/* Riga 2: Loss target + Kaizen# + Saving + Deadline + Owner */}
                 <div className="grid grid-cols-12 gap-2">
                   <div className="col-span-3">
                     <label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Loss target (da Step 2)</label>
-                    <select
-                      className="w-full border rounded px-2 py-1 text-xs"
-                      value={p.loss_target_id || ''}
-                      onChange={(e) => handleLossChange(p.id, e.target.value)}
-                    >
+                    <select className="w-full border rounded px-2 py-1 text-xs" value={p.loss_target_id || ''} onChange={(e) => handleLossChange(p.id, e.target.value)}>
                       <option value="">— Seleziona loss —</option>
-                      {lossesStep2.map(l => (
-                        <option key={l.id} value={l.id}>
-                          {l.label || 'Senza nome'} ({l.percent_impact || 0}%)
-                        </option>
-                      ))}
+                      {lossesStep2.map(l => <option key={l.id} value={l.id}>{l.label || 'Senza nome'} ({l.percent_impact || 0}%)</option>)}
                     </select>
                   </div>
                   <div className="col-span-2">
                     <label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Kaizen #</label>
-                    <input
-                      className="w-full border rounded px-2 py-1 text-xs font-mono"
-                      value={p.kaizen_numero}
-                      onChange={(e) => updateProject(p.id, { kaizen_numero: e.target.value })}
-                      placeholder="MAJ-001"
-                    />
+                    <input className="w-full border rounded px-2 py-1 text-xs font-mono" value={p.kaizen_numero} onChange={(e) => updateProject(p.id, { kaizen_numero: e.target.value })} placeholder="MAJ-001" />
                   </div>
                   <div className="col-span-2">
                     <label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Saving Planned €</label>
-                    <input
-                      type="number"
-                      className="w-full border rounded px-2 py-1 text-xs"
-                      value={p.saving_planned !== undefined ? p.saving_planned : (p.saving_atteso || '')}
-                      onChange={(e) => updateProject(p.id, { saving_planned: e.target.value })}
-                      placeholder="25000"
-                    />
+                    <input type="number" className="w-full border rounded px-2 py-1 text-xs" value={p.saving_planned !== undefined ? p.saving_planned : (p.saving_atteso || '')} onChange={(e) => updateProject(p.id, { saving_planned: e.target.value })} placeholder="25000" />
                   </div>
                   <div className="col-span-2">
                     <label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Deadline</label>
-                    <input
-                      type="date"
-                      className="w-full border rounded px-2 py-1 text-xs"
-                      value={p.deadline}
-                      onChange={(e) => updateProject(p.id, { deadline: e.target.value })}
-                    />
+                    <input type="date" className="w-full border rounded px-2 py-1 text-xs" value={p.deadline} onChange={(e) => updateProject(p.id, { deadline: e.target.value })} />
                   </div>
                   <div className="col-span-3">
                     <label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Owner</label>
-                    <input
-                      className="w-full border rounded px-2 py-1 text-xs"
-                      value={p.owner || ''}
-                      onChange={(e) => updateProject(p.id, { owner: e.target.value })}
-                      placeholder="Responsabile"
-                    />
+                    <input className="w-full border rounded px-2 py-1 text-xs" value={p.owner || ''} onChange={(e) => updateProject(p.id, { owner: e.target.value })} placeholder="Responsabile" />
                   </div>
                 </div>
               </div>
@@ -665,74 +725,35 @@ function Step3Content({ data, color, onUpdate, lossesStep2 = [] }) {
     </div>
   )
 }
-
-function Step4Content({ data, color, onUpdate, allStepsData }) {
+  function Step4Content({ data, color, onUpdate, allStepsData }) {
   const step3Progetti = allStepsData?.step3_target_definition?.progetti || []
   const progettiActual = data.progetti_actual || []
 
-  // 🔄 AUTO-SYNC: ogni volta che entri nel tab o cambia lo Step 3,
-  // crea automaticamente un tracking record per i progetti Step 3 nuovi (non-cancelled)
   useEffect(() => {
-    const existingStep3Ids = new Set(
-      progettiActual.filter(p => p.source === 'step3').map(p => p.step3_project_id)
-    )
+    const existingStep3Ids = new Set(progettiActual.filter(p => p.source === 'step3').map(p => p.step3_project_id))
     const newOnes = step3Progetti
       .filter(p => p.status !== 'cancelled' && !existingStep3Ids.has(p.id))
       .map(p => ({
-        id: `s4_${p.id}_${Date.now()}`,
-        source: 'step3',
-        step3_project_id: p.id,
-        // Campi per step4_new only (qui null perché lookup live):
-        label: '',
-        loss_target_label: '',
-        kaizen_numero: '',
-        saving_planned: '',
-        owner: '',
-        deadline: '',
-        // Campi actual (editabili):
-        actual_status: 'not_started',
-        actual_saving: '',
-        actual_completion_date: '',
-        notes_implementation: '',
+        id: `s4_${p.id}_${Date.now()}`, source: 'step3', step3_project_id: p.id,
+        label: '', loss_target_label: '', kaizen_numero: '', saving_planned: '', owner: '', deadline: '',
+        actual_status: 'not_started', actual_saving: '', actual_completion_date: '', notes_implementation: '',
       }))
-    if (newOnes.length > 0) {
-      onUpdate({ progetti_actual: [...progettiActual, ...newOnes] })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (newOnes.length > 0) onUpdate({ progetti_actual: [...progettiActual, ...newOnes] })
   }, [step3Progetti.length])
 
-  function updateActual(id, updates) {
-    onUpdate({
-      progetti_actual: progettiActual.map(p => p.id === id ? { ...p, ...updates } : p)
-    })
-  }
-
+  function updateActual(id, updates) { onUpdate({ progetti_actual: progettiActual.map(p => p.id === id ? { ...p, ...updates } : p) }) }
   function removeActual(id) {
-    if (!confirm('Rimuovere questo progetto dal tracking Step 4? (Se è collegato a Step 3 verrà ricreato alla riapertura)')) return
+    if (!confirm('Rimuovere questo progetto dal tracking Step 4?')) return
     onUpdate({ progetti_actual: progettiActual.filter(p => p.id !== id) })
   }
-
   function addNewProject() {
-    onUpdate({
-      progetti_actual: [...progettiActual, {
-        id: `s4new_${Date.now()}`,
-        source: 'step4_new',
-        step3_project_id: null,
-        label: '',
-        loss_target_label: '',
-        kaizen_numero: '',
-        saving_planned: '',
-        owner: '',
-        deadline: '',
-        actual_status: 'not_started',
-        actual_saving: '',
-        actual_completion_date: '',
-        notes_implementation: '',
-      }]
-    })
+    onUpdate({ progetti_actual: [...progettiActual, {
+      id: `s4new_${Date.now()}`, source: 'step4_new', step3_project_id: null,
+      label: '', loss_target_label: '', kaizen_numero: '', saving_planned: '', owner: '', deadline: '',
+      actual_status: 'not_started', actual_saving: '', actual_completion_date: '', notes_implementation: '',
+    }] })
   }
 
-  // 🔍 Helper: per ogni progetto actual, recupera i dati planned (live da Step 3 o locali se step4_new)
   function getPlannedData(p) {
     if (p.source === 'step3') {
       const step3p = step3Progetti.find(s => s.id === p.step3_project_id)
@@ -741,25 +762,14 @@ function Step4Content({ data, color, onUpdate, allStepsData }) {
         loss_target_label: step3p?.loss_target_label || '',
         kaizen_numero: step3p?.kaizen_numero || '',
         saving_planned: step3p?.saving_planned || '',
-        owner: step3p?.owner || '',
-        deadline: step3p?.deadline || '',
-        step3_status: step3p?.status,
-        step3_exists: !!step3p,
+        owner: step3p?.owner || '', deadline: step3p?.deadline || '',
+        step3_status: step3p?.status, step3_exists: !!step3p,
       }
     }
-    return {
-      label: p.label,
-      loss_target_label: p.loss_target_label,
-      kaizen_numero: p.kaizen_numero,
-      saving_planned: p.saving_planned,
-      owner: p.owner,
-      deadline: p.deadline,
-      step3_status: null,
-      step3_exists: true,
-    }
+    return { label: p.label, loss_target_label: p.loss_target_label, kaizen_numero: p.kaizen_numero,
+      saving_planned: p.saving_planned, owner: p.owner, deadline: p.deadline, step3_status: null, step3_exists: true }
   }
 
-  // 📊 Calcolo summary
   const summary = {
     pianificati: progettiActual.filter(p => p.source === 'step3').length,
     aggiunti: progettiActual.filter(p => p.source === 'step4_new').length,
@@ -775,10 +785,8 @@ function Step4Content({ data, color, onUpdate, allStepsData }) {
   return (
     <div className="space-y-3 mt-3">
       <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-3 text-sm text-blue-800">
-        ℹ️ <strong>Cosa fare:</strong> Monitora l'implementazione dei progetti pianificati nello Step 3. Aggiorna status, actual saving e note. Aggiungi nuovi progetti emersi durante l'anno con il bottone "Aggiungi progetto nuovo".
+        ℹ️ <strong>Cosa fare:</strong> Monitora l'implementazione dei progetti pianificati nello Step 3.
       </div>
-
-      {/* 📊 SUMMARY in alto */}
       {progettiActual.length > 0 && (
         <div className="bg-white rounded-lg border-2 p-4" style={{ borderColor: color }}>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
@@ -789,42 +797,18 @@ function Step4Content({ data, color, onUpdate, allStepsData }) {
             <SummaryBlock label="🚧 Bloccati" value={summary.bloccati} color="orange" />
           </div>
           <div className="grid grid-cols-3 gap-3 pt-3 border-t">
-            <div className="text-center">
-              <div className="text-xs text-gray-500 uppercase">Total Planned €</div>
-              <div className="text-xl font-bold text-gray-700">{summary.totalPlanned.toLocaleString('it-IT')} €</div>
-            </div>
-            <div className="text-center">
-              <div className="text-xs text-gray-500 uppercase">Total Actual €</div>
-              <div className="text-xl font-bold" style={{ color }}>{summary.totalActual.toLocaleString('it-IT')} €</div>
-            </div>
-            <div className="text-center">
-              <div className="text-xs text-gray-500 uppercase">Gap</div>
-              <div className={`text-xl font-bold ${totalGap >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {totalGap >= 0 ? '+' : ''}{totalGap.toLocaleString('it-IT')} €
-                <span className="text-xs ml-1">({gapPercent >= 0 ? '+' : ''}{gapPercent.toFixed(1)}%)</span>
-              </div>
-            </div>
+            <div className="text-center"><div className="text-xs text-gray-500 uppercase">Total Planned €</div><div className="text-xl font-bold text-gray-700">{summary.totalPlanned.toLocaleString('it-IT')} €</div></div>
+            <div className="text-center"><div className="text-xs text-gray-500 uppercase">Total Actual €</div><div className="text-xl font-bold" style={{ color }}>{summary.totalActual.toLocaleString('it-IT')} €</div></div>
+            <div className="text-center"><div className="text-xs text-gray-500 uppercase">Gap</div><div className={`text-xl font-bold ${totalGap >= 0 ? 'text-green-600' : 'text-red-600'}`}>{totalGap >= 0 ? '+' : ''}{totalGap.toLocaleString('it-IT')} €<span className="text-xs ml-1">({gapPercent >= 0 ? '+' : ''}{gapPercent.toFixed(1)}%)</span></div></div>
           </div>
         </div>
       )}
-
-      {step3Progetti.length === 0 && progettiActual.length === 0 && (
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-r-lg p-3 text-sm text-yellow-800">
-          ⚠️ Non hai ancora pianificato progetti nello <strong>Step 3</strong>. Vai allo Step 3 per pianificarli, poi torna qui per il tracking di implementazione.
-        </div>
-      )}
-
       <div className="flex justify-between items-center">
         <h4 className="font-semibold text-sm uppercase text-gray-700">🚧 Tracking implementazione ({progettiActual.length})</h4>
-        <button onClick={addNewProject} className="text-xs px-3 py-1 text-white rounded shadow" style={{ backgroundColor: color }}>
-          + Aggiungi progetto nuovo
-        </button>
+        <button onClick={addNewProject} className="text-xs px-3 py-1 text-white rounded shadow" style={{ backgroundColor: color }}>+ Aggiungi progetto nuovo</button>
       </div>
-
       {progettiActual.length === 0 ? (
-        <div className="bg-white p-6 rounded-lg text-center text-sm text-gray-400 italic">
-          Nessun progetto in tracking. I progetti dello Step 3 verranno sincronizzati automaticamente.
-        </div>
+        <div className="bg-white p-6 rounded-lg text-center text-sm text-gray-400 italic">Nessun progetto in tracking. I progetti dello Step 3 verranno sincronizzati automaticamente.</div>
       ) : (
         <div className="space-y-2">
           {progettiActual.map((p, idx) => {
@@ -834,169 +818,43 @@ function Step4Content({ data, color, onUpdate, allStepsData }) {
             const plannedSaving = parseFloat(planned.saving_planned) || 0
             const gap = actualSaving - plannedSaving
             const isOrphan = p.source === 'step3' && !planned.step3_exists
-
             return (
               <div key={p.id} className="bg-white p-3 rounded-lg border-l-4 border" style={{ borderLeftColor: isOrphan ? '#ef4444' : color }}>
-                {/* Riga 1: badge origine + titolo (read-only o editable) + status + delete */}
                 <div className="flex items-center gap-2 mb-2">
                   <span className="font-bold text-gray-400 text-sm">#{idx + 1}</span>
+                  {p.source === 'step3' ? <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs font-bold whitespace-nowrap">📋 Pianificato</span> : <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold whitespace-nowrap">🆕 Aggiunto in Step 4</span>}
+                  {isOrphan && <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold whitespace-nowrap">⚠️ Step 3 rimosso</span>}
                   {p.source === 'step3' ? (
-                    <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs font-bold whitespace-nowrap">
-                      📋 Pianificato
-                    </span>
+                    <div className="flex-1 px-2 py-1 text-sm font-medium text-gray-700">{planned.label || '(senza titolo)'}{planned.kaizen_numero && <span className="ml-2 font-mono text-xs text-gray-500">[{planned.kaizen_numero}]</span>}</div>
                   ) : (
-                    <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold whitespace-nowrap">
-                      🆕 Aggiunto in Step 4
-                    </span>
+                    <input className="flex-1 border rounded px-2 py-1 text-sm font-medium" value={p.label} onChange={(e) => updateActual(p.id, { label: e.target.value })} placeholder="Titolo del progetto / Kaizen" />
                   )}
-                  {isOrphan && (
-                    <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold whitespace-nowrap">
-                      ⚠️ Step 3 rimosso
-                    </span>
-                  )}
-                  {p.source === 'step3' ? (
-                    <div className="flex-1 px-2 py-1 text-sm font-medium text-gray-700">
-                      {planned.label || '(senza titolo)'}
-                      {planned.kaizen_numero && <span className="ml-2 font-mono text-xs text-gray-500">[{planned.kaizen_numero}]</span>}
-                    </div>
-                  ) : (
-                    <input
-                      className="flex-1 border rounded px-2 py-1 text-sm font-medium"
-                      value={p.label}
-                      onChange={(e) => updateActual(p.id, { label: e.target.value })}
-                      placeholder="Titolo del progetto / Kaizen"
-                    />
-                  )}
-                  <span className={`px-2 py-1 rounded text-xs font-bold border ${statusInfo.color}`}>
-                    {statusInfo.icon} {statusInfo.label}
-                  </span>
-                  <button onClick={() => removeActual(p.id)} className="text-red-500 hover:bg-red-50 p-1 rounded">
-                    <Trash2 size={14} />
-                  </button>
+                  <span className={`px-2 py-1 rounded text-xs font-bold border ${statusInfo.color}`}>{statusInfo.icon} {statusInfo.label}</span>
+                  <button onClick={() => removeActual(p.id)} className="text-red-500 hover:bg-red-50 p-1 rounded"><Trash2 size={14} /></button>
                 </div>
-
-                {/* Riga 2: Info Planned (read-only da Step 3) */}
                 {p.source === 'step3' && !isOrphan && (
                   <div className="grid grid-cols-12 gap-2 mb-2 text-xs bg-gray-50 rounded p-2">
-                    <div className="col-span-3">
-                      <span className="text-gray-500 uppercase text-[10px] block">Loss target</span>
-                      <span className="font-medium">{planned.loss_target_label || '—'}</span>
-                    </div>
-                    <div className="col-span-3">
-                      <span className="text-gray-500 uppercase text-[10px] block">Planned €</span>
-                      <span className="font-mono font-bold">{plannedSaving.toLocaleString('it-IT')} €</span>
-                    </div>
-                    <div className="col-span-3">
-                      <span className="text-gray-500 uppercase text-[10px] block">Owner</span>
-                      <span>{planned.owner || '—'}</span>
-                    </div>
-                    <div className="col-span-3">
-                      <span className="text-gray-500 uppercase text-[10px] block">Deadline</span>
-                      <span>{planned.deadline || '—'}</span>
-                    </div>
+                    <div className="col-span-3"><span className="text-gray-500 uppercase text-[10px] block">Loss target</span><span className="font-medium">{planned.loss_target_label || '—'}</span></div>
+                    <div className="col-span-3"><span className="text-gray-500 uppercase text-[10px] block">Planned €</span><span className="font-mono font-bold">{plannedSaving.toLocaleString('it-IT')} €</span></div>
+                    <div className="col-span-3"><span className="text-gray-500 uppercase text-[10px] block">Owner</span><span>{planned.owner || '—'}</span></div>
+                    <div className="col-span-3"><span className="text-gray-500 uppercase text-[10px] block">Deadline</span><span>{planned.deadline || '—'}</span></div>
                   </div>
                 )}
-
-                {/* Riga 2bis (solo step4_new): campi planned editabili */}
                 {p.source === 'step4_new' && (
                   <div className="grid grid-cols-12 gap-2 mb-2">
-                    <div className="col-span-3">
-                      <label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Loss target (label libera)</label>
-                      <input
-                        className="w-full border rounded px-2 py-1 text-xs"
-                        value={p.loss_target_label}
-                        onChange={(e) => updateActual(p.id, { loss_target_label: e.target.value })}
-                        placeholder="Es: Microfermate"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Kaizen #</label>
-                      <input
-                        className="w-full border rounded px-2 py-1 text-xs font-mono"
-                        value={p.kaizen_numero}
-                        onChange={(e) => updateActual(p.id, { kaizen_numero: e.target.value })}
-                        placeholder="MAJ-001"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Planned €</label>
-                      <input
-                        type="number"
-                        className="w-full border rounded px-2 py-1 text-xs"
-                        value={p.saving_planned}
-                        onChange={(e) => updateActual(p.id, { saving_planned: e.target.value })}
-                        placeholder="0"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Deadline</label>
-                      <input
-                        type="date"
-                        className="w-full border rounded px-2 py-1 text-xs"
-                        value={p.deadline}
-                        onChange={(e) => updateActual(p.id, { deadline: e.target.value })}
-                      />
-                    </div>
-                    <div className="col-span-3">
-                      <label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Owner</label>
-                      <input
-                        className="w-full border rounded px-2 py-1 text-xs"
-                        value={p.owner}
-                        onChange={(e) => updateActual(p.id, { owner: e.target.value })}
-                        placeholder="Responsabile"
-                      />
-                    </div>
+                    <div className="col-span-3"><label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Loss target</label><input className="w-full border rounded px-2 py-1 text-xs" value={p.loss_target_label} onChange={(e) => updateActual(p.id, { loss_target_label: e.target.value })} placeholder="Es: Microfermate" /></div>
+                    <div className="col-span-2"><label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Kaizen #</label><input className="w-full border rounded px-2 py-1 text-xs font-mono" value={p.kaizen_numero} onChange={(e) => updateActual(p.id, { kaizen_numero: e.target.value })} placeholder="MAJ-001" /></div>
+                    <div className="col-span-2"><label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Planned €</label><input type="number" className="w-full border rounded px-2 py-1 text-xs" value={p.saving_planned} onChange={(e) => updateActual(p.id, { saving_planned: e.target.value })} placeholder="0" /></div>
+                    <div className="col-span-2"><label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Deadline</label><input type="date" className="w-full border rounded px-2 py-1 text-xs" value={p.deadline} onChange={(e) => updateActual(p.id, { deadline: e.target.value })} /></div>
+                    <div className="col-span-3"><label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Owner</label><input className="w-full border rounded px-2 py-1 text-xs" value={p.owner} onChange={(e) => updateActual(p.id, { owner: e.target.value })} placeholder="Responsabile" /></div>
                   </div>
                 )}
-
-                {/* Riga 3: ACTUAL — status + actual saving + completion date + gap */}
                 <div className="grid grid-cols-12 gap-2">
-                  <div className="col-span-3">
-                    <label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Actual Status</label>
-                    <select
-                      className="w-full border rounded px-2 py-1 text-xs"
-                      value={p.actual_status || 'not_started'}
-                      onChange={(e) => updateActual(p.id, { actual_status: e.target.value })}
-                    >
-                      {ACTUAL_STATUS.map(s => (
-                        <option key={s.value} value={s.value}>{s.icon} {s.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Actual Saving €</label>
-                    <input
-                      type="number"
-                      className="w-full border rounded px-2 py-1 text-xs"
-                      value={p.actual_saving}
-                      onChange={(e) => updateActual(p.id, { actual_saving: e.target.value })}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Gap vs Planned</label>
-                    <div className={`w-full border rounded px-2 py-1 text-xs font-bold text-center ${gap >= 0 ? 'bg-green-50 border-green-300 text-green-700' : 'bg-red-50 border-red-300 text-red-700'}`}>
-                      {gap >= 0 ? '+' : ''}{gap.toLocaleString('it-IT')} €
-                    </div>
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Completion Date</label>
-                    <input
-                      type="date"
-                      className="w-full border rounded px-2 py-1 text-xs"
-                      value={p.actual_completion_date || ''}
-                      onChange={(e) => updateActual(p.id, { actual_completion_date: e.target.value })}
-                    />
-                  </div>
-                  <div className="col-span-3">
-                    <label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Note implementazione</label>
-                    <input
-                      className="w-full border rounded px-2 py-1 text-xs"
-                      value={p.notes_implementation || ''}
-                      onChange={(e) => updateActual(p.id, { notes_implementation: e.target.value })}
-                      placeholder="Issues, contromisure..."
-                    />
-                  </div>
+                  <div className="col-span-3"><label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Actual Status</label><select className="w-full border rounded px-2 py-1 text-xs" value={p.actual_status || 'not_started'} onChange={(e) => updateActual(p.id, { actual_status: e.target.value })}>{ACTUAL_STATUS.map(s => <option key={s.value} value={s.value}>{s.icon} {s.label}</option>)}</select></div>
+                  <div className="col-span-2"><label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Actual Saving €</label><input type="number" className="w-full border rounded px-2 py-1 text-xs" value={p.actual_saving} onChange={(e) => updateActual(p.id, { actual_saving: e.target.value })} placeholder="0" /></div>
+                  <div className="col-span-2"><label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Gap vs Planned</label><div className={`w-full border rounded px-2 py-1 text-xs font-bold text-center ${gap >= 0 ? 'bg-green-50 border-green-300 text-green-700' : 'bg-red-50 border-red-300 text-red-700'}`}>{gap >= 0 ? '+' : ''}{gap.toLocaleString('it-IT')} €</div></div>
+                  <div className="col-span-2"><label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Completion Date</label><input type="date" className="w-full border rounded px-2 py-1 text-xs" value={p.actual_completion_date || ''} onChange={(e) => updateActual(p.id, { actual_completion_date: e.target.value })} /></div>
+                  <div className="col-span-3"><label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Note implementazione</label><input className="w-full border rounded px-2 py-1 text-xs" value={p.notes_implementation || ''} onChange={(e) => updateActual(p.id, { notes_implementation: e.target.value })} placeholder="Issues, contromisure..." /></div>
                 </div>
               </div>
             )
@@ -1008,14 +866,7 @@ function Step4Content({ data, color, onUpdate, allStepsData }) {
 }
 
 function SummaryBlock({ label, value, color = 'gray' }) {
-  const colors = {
-    gray: 'text-gray-700 bg-gray-50',
-    indigo: 'text-indigo-700 bg-indigo-50',
-    purple: 'text-purple-700 bg-purple-50',
-    yellow: 'text-yellow-700 bg-yellow-50',
-    green: 'text-green-700 bg-green-50',
-    orange: 'text-orange-700 bg-orange-50',
-  }
+  const colors = { gray: 'text-gray-700 bg-gray-50', indigo: 'text-indigo-700 bg-indigo-50', purple: 'text-purple-700 bg-purple-50', yellow: 'text-yellow-700 bg-yellow-50', green: 'text-green-700 bg-green-50', orange: 'text-orange-700 bg-orange-50' }
   return (
     <div className={`text-center rounded-lg py-2 ${colors[color]}`}>
       <div className="text-2xl font-bold">{value}</div>
@@ -1025,78 +876,29 @@ function SummaryBlock({ label, value, color = 'gray' }) {
 }
 
 function Step5Content({ data, color, onUpdate, allStepsData }) {
-  // 📥 Estrai dati dagli step precedenti
   const kpiPrincipale = allStepsData?.step1_kpi_definition?.kpi_principale || {}
   const kmis = allStepsData?.step1_kpi_definition?.kmis || []
   const step3Progetti = allStepsData?.step3_target_definition?.progetti || []
   const step4Actual = allStepsData?.step4_implementation?.progetti_actual || []
-
-  // 🔧 Override manuali salvati (per KPI/KMI singoli)
   const overrides = data.bridge_overrides || {}
-  // Shape: { "principale": { baseline, planned, actual, gap_reason }, "kmi_<id>": {...} }
 
-  // 📊 Aggregazioni globali
-  const totalPlanned = step3Progetti
-    .filter(p => p.status !== 'cancelled')
-    .reduce((sum, p) => sum + (parseFloat(p.saving_planned) || 0), 0)
+  const totalPlanned = step3Progetti.filter(p => p.status !== 'cancelled').reduce((sum, p) => sum + (parseFloat(p.saving_planned) || 0), 0)
+  const totalActual = step4Actual.filter(p => p.actual_status === 'done').reduce((sum, p) => sum + (parseFloat(p.actual_saving) || 0), 0)
 
-  const totalActual = step4Actual
-    .filter(p => p.actual_status === 'done')
-    .reduce((sum, p) => sum + (parseFloat(p.actual_saving) || 0), 0)
-
-  // 🧮 Costruisci le righe del bridge (1 per KPI + 1 per ogni KMI)
   const bridgeRows = [
-    {
-      key: 'principale',
-      label: kpiPrincipale.label || 'KPI Principale',
-      unit: kpiPrincipale.unit || '',
-      auto_baseline: kpiPrincipale.baseline || '',
-      auto_target: kpiPrincipale.target || '',
-      auto_planned_saving: totalPlanned,
-      auto_actual_saving: totalActual,
-      isMain: true,
-    },
-    ...kmis.map(k => ({
-      key: `kmi_${k.id}`,
-      label: k.label || 'KMI',
-      unit: k.unit || '',
-      auto_baseline: k.baseline || '',
-      auto_target: k.target || '',
-      // Per i KMI non aggreghiamo (sono indicatori secondari): default 0, l'utente può override
-      auto_planned_saving: 0,
-      auto_actual_saving: 0,
-      isMain: false,
-    })),
+    { key: 'principale', label: kpiPrincipale.label || 'KPI Principale', unit: kpiPrincipale.unit || '', auto_baseline: kpiPrincipale.baseline || '', auto_target: kpiPrincipale.target || '', auto_planned_saving: totalPlanned, auto_actual_saving: totalActual, isMain: true },
+    ...kmis.map(k => ({ key: `kmi_${k.id}`, label: k.label || 'KMI', unit: k.unit || '', auto_baseline: k.baseline || '', auto_target: k.target || '', auto_planned_saving: 0, auto_actual_saving: 0, isMain: false })),
   ]
 
-  function updateOverride(key, field, value) {
-    onUpdate({
-      bridge_overrides: {
-        ...overrides,
-        [key]: { ...(overrides[key] || {}), [field]: value },
-      },
-    })
-  }
-
+  function updateOverride(key, field, value) { onUpdate({ bridge_overrides: { ...overrides, [key]: { ...(overrides[key] || {}), [field]: value } } }) }
   function resetOverride(key, field) {
     const rowOverride = { ...(overrides[key] || {}) }
     delete rowOverride[field]
-    onUpdate({
-      bridge_overrides: { ...overrides, [key]: rowOverride },
-    })
+    onUpdate({ bridge_overrides: { ...overrides, [key]: rowOverride } })
   }
+  function getValue(key, field, autoValue) { const ov = overrides[key]?.[field]; return ov !== undefined && ov !== '' ? ov : autoValue }
+  function isOverridden(key, field) { const ov = overrides[key]?.[field]; return ov !== undefined && ov !== '' }
 
-  // Helper: valore effettivo (override se presente, altrimenti auto)
-  function getValue(key, field, autoValue) {
-    const ov = overrides[key]?.[field]
-    return ov !== undefined && ov !== '' ? ov : autoValue
-  }
-  function isOverridden(key, field) {
-    const ov = overrides[key]?.[field]
-    return ov !== undefined && ov !== ''
-  }
-
-  // 📈 Summary globale (sul KPI principale)
   const mainPlanned = parseFloat(getValue('principale', 'planned', totalPlanned)) || 0
   const mainActual = parseFloat(getValue('principale', 'actual', totalActual)) || 0
   const mainGap = mainActual - mainPlanned
@@ -1105,66 +907,28 @@ function Step5Content({ data, color, onUpdate, allStepsData }) {
   return (
     <div className="space-y-3 mt-3">
       <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-3 text-sm text-blue-800">
-        ℹ️ <strong>Cosa fare:</strong> Il Bridge chart si compila <strong>automaticamente</strong> dagli step precedenti:
-        Baseline (Step 1) + Σ planned (Step 3) = Target | Σ actual da progetti completati (Step 4) = Risultato.
-        Puoi sovrascrivere manualmente ogni cella se serve, e devi compilare i motivi del gap + le lezioni apprese.
+        ℹ️ <strong>Cosa fare:</strong> Il Bridge chart si compila automaticamente dagli step precedenti.
       </div>
-
-      {/* 📊 SUMMARY in alto */}
       <div className="bg-white rounded-lg border-2 p-4" style={{ borderColor: color }}>
         <div className="flex items-center justify-between mb-2">
           <h4 className="font-bold text-sm uppercase" style={{ color }}>🏁 Risultato globale — KPI {kpiPrincipale.label || 'Principale'}</h4>
-          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-            coveragePercent >= 100 ? 'bg-green-100 text-green-700' :
-            coveragePercent >= 80 ? 'bg-yellow-100 text-yellow-700' :
-            'bg-red-100 text-red-700'
-          }`}>
+          <span className={`px-3 py-1 rounded-full text-xs font-bold ${coveragePercent >= 100 ? 'bg-green-100 text-green-700' : coveragePercent >= 80 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
             {coveragePercent >= 100 ? '✅ Target raggiunto' : coveragePercent >= 80 ? '⚠️ Vicino al target' : '🔴 Sotto target'}
           </span>
         </div>
         <div className="grid grid-cols-4 gap-3">
-          <div className="text-center bg-gray-50 rounded p-2">
-            <div className="text-[10px] uppercase text-gray-500">Planned</div>
-            <div className="text-xl font-bold text-gray-700">{mainPlanned.toLocaleString('it-IT')} €</div>
-          </div>
-          <div className="text-center bg-blue-50 rounded p-2">
-            <div className="text-[10px] uppercase text-blue-600">Actual (done)</div>
-            <div className="text-xl font-bold text-blue-700">{mainActual.toLocaleString('it-IT')} €</div>
-          </div>
-          <div className={`text-center rounded p-2 ${mainGap >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
-            <div className={`text-[10px] uppercase ${mainGap >= 0 ? 'text-green-600' : 'text-red-600'}`}>Gap</div>
-            <div className={`text-xl font-bold ${mainGap >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-              {mainGap >= 0 ? '+' : ''}{mainGap.toLocaleString('it-IT')} €
-            </div>
-          </div>
-          <div className="text-center rounded p-2" style={{ backgroundColor: `${color}15` }}>
-            <div className="text-[10px] uppercase" style={{ color }}>Copertura</div>
-            <div className="text-xl font-bold" style={{ color }}>{coveragePercent.toFixed(1)}%</div>
-          </div>
+          <div className="text-center bg-gray-50 rounded p-2"><div className="text-[10px] uppercase text-gray-500">Planned</div><div className="text-xl font-bold text-gray-700">{mainPlanned.toLocaleString('it-IT')} €</div></div>
+          <div className="text-center bg-blue-50 rounded p-2"><div className="text-[10px] uppercase text-blue-600">Actual (done)</div><div className="text-xl font-bold text-blue-700">{mainActual.toLocaleString('it-IT')} €</div></div>
+          <div className={`text-center rounded p-2 ${mainGap >= 0 ? 'bg-green-50' : 'bg-red-50'}`}><div className={`text-[10px] uppercase ${mainGap >= 0 ? 'text-green-600' : 'text-red-600'}`}>Gap</div><div className={`text-xl font-bold ${mainGap >= 0 ? 'text-green-700' : 'text-red-700'}`}>{mainGap >= 0 ? '+' : ''}{mainGap.toLocaleString('it-IT')} €</div></div>
+          <div className="text-center rounded p-2" style={{ backgroundColor: `${color}15` }}><div className="text-[10px] uppercase" style={{ color }}>Copertura</div><div className="text-xl font-bold" style={{ color }}>{coveragePercent.toFixed(1)}%</div></div>
         </div>
       </div>
-
-{/* 📊 BRIDGE WATERFALL CHART (SVG) */}
-      <BridgeWaterfallChart
-        baseline={getValue('principale', 'baseline', kpiPrincipale.baseline) || 0}
-        step3Progetti={step3Progetti}
-        step4Actual={step4Actual}
-        color={color}
-        unit="€"
-      />
-      {/* ⚠️ Warning se Step 1 mancante */}
       {!kpiPrincipale.label && (
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-r-lg p-3 text-sm text-yellow-800">
-          ⚠️ Non hai ancora definito il KPI principale nello <strong>Step 1</strong>. Compilalo prima per vedere il bridge completo.
-        </div>
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-r-lg p-3 text-sm text-yellow-800">⚠️ Non hai ancora definito il KPI principale nello Step 1.</div>
       )}
-
       <h4 className="font-semibold text-sm uppercase text-gray-700 mt-4">📊 Bridge Chart per KPI / KMI</h4>
-
       {bridgeRows.length === 0 ? (
-        <div className="bg-white p-6 rounded-lg text-center text-sm text-gray-400 italic">
-          Nessun KPI definito. Compila Step 1 per iniziare.
-        </div>
+        <div className="bg-white p-6 rounded-lg text-center text-sm text-gray-400 italic">Nessun KPI definito.</div>
       ) : (
         <div className="space-y-2">
           {bridgeRows.map(row => {
@@ -1173,389 +937,47 @@ function Step5Content({ data, color, onUpdate, allStepsData }) {
             const actual = getValue(row.key, 'actual', row.auto_actual_saving)
             const gapReason = overrides[row.key]?.gap_reason || ''
             const rowGap = (parseFloat(actual) || 0) - (parseFloat(planned) || 0)
-
             return (
-              <div
-                key={row.key}
-                className="bg-white p-3 rounded-lg border-l-4"
-                style={{ borderLeftColor: row.isMain ? color : '#9ca3af' }}
-              >
-                {/* Riga 1: label + badge */}
+              <div key={row.key} className="bg-white p-3 rounded-lg border-l-4" style={{ borderLeftColor: row.isMain ? color : '#9ca3af' }}>
                 <div className="flex items-center gap-2 mb-2">
-                  {row.isMain ? (
-                    <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs font-bold whitespace-nowrap">
-                      🎯 KPI Principale
-                    </span>
-                  ) : (
-                    <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-bold whitespace-nowrap">
-                      📊 KMI
-                    </span>
-                  )}
+                  {row.isMain ? <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs font-bold whitespace-nowrap">🎯 KPI Principale</span> : <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-bold whitespace-nowrap">📊 KMI</span>}
                   <span className="font-bold text-sm">{row.label}</span>
                   {row.unit && <span className="text-xs text-gray-500">[{row.unit}]</span>}
                 </div>
-
-                {/* Riga 2: Bridge celle */}
                 <div className="grid grid-cols-12 gap-2 items-end">
-                  <BridgeCell
-                    label="Baseline"
-                    value={baseline}
-                    autoValue={row.auto_baseline}
-                    isOverridden={isOverridden(row.key, 'baseline')}
-                    onChange={(v) => updateOverride(row.key, 'baseline', v)}
-                    onReset={() => resetOverride(row.key, 'baseline')}
-                    colSpan="col-span-3"
-                  />
-                  <BridgeCell
-                    label={row.isMain ? 'Σ Planned (Step 3)' : 'Planned'}
-                    value={planned}
-                    autoValue={row.auto_planned_saving}
-                    isOverridden={isOverridden(row.key, 'planned')}
-                    onChange={(v) => updateOverride(row.key, 'planned', v)}
-                    onReset={() => resetOverride(row.key, 'planned')}
-                    colSpan="col-span-3"
-                    suffix={row.isMain ? '€' : ''}
-                  />
-                  <BridgeCell
-                    label={row.isMain ? 'Σ Actual (Step 4 done)' : 'Actual'}
-                    value={actual}
-                    autoValue={row.auto_actual_saving}
-                    isOverridden={isOverridden(row.key, 'actual')}
-                    onChange={(v) => updateOverride(row.key, 'actual', v)}
-                    onReset={() => resetOverride(row.key, 'actual')}
-                    colSpan="col-span-3"
-                    suffix={row.isMain ? '€' : ''}
-                  />
-                  <div className="col-span-3">
-                    <label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Gap</label>
-                    <div className={`w-full border rounded px-2 py-1 text-xs font-bold text-center ${
-                      rowGap >= 0 ? 'bg-green-50 border-green-300 text-green-700' : 'bg-red-50 border-red-300 text-red-700'
-                    }`}>
-                      {rowGap >= 0 ? '+' : ''}{rowGap.toLocaleString('it-IT')}
-                    </div>
-                  </div>
+                  <BridgeCell label="Baseline" value={baseline} autoValue={row.auto_baseline} isOverridden={isOverridden(row.key, 'baseline')} onChange={(v) => updateOverride(row.key, 'baseline', v)} onReset={() => resetOverride(row.key, 'baseline')} colSpan="col-span-3" />
+                  <BridgeCell label={row.isMain ? 'Σ Planned (Step 3)' : 'Planned'} value={planned} autoValue={row.auto_planned_saving} isOverridden={isOverridden(row.key, 'planned')} onChange={(v) => updateOverride(row.key, 'planned', v)} onReset={() => resetOverride(row.key, 'planned')} colSpan="col-span-3" suffix={row.isMain ? '€' : ''} />
+                  <BridgeCell label={row.isMain ? 'Σ Actual (Step 4 done)' : 'Actual'} value={actual} autoValue={row.auto_actual_saving} isOverridden={isOverridden(row.key, 'actual')} onChange={(v) => updateOverride(row.key, 'actual', v)} onReset={() => resetOverride(row.key, 'actual')} colSpan="col-span-3" suffix={row.isMain ? '€' : ''} />
+                  <div className="col-span-3"><label className="block text-[10px] font-medium text-gray-500 uppercase mb-0.5">Gap</label><div className={`w-full border rounded px-2 py-1 text-xs font-bold text-center ${rowGap >= 0 ? 'bg-green-50 border-green-300 text-green-700' : 'bg-red-50 border-red-300 text-red-700'}`}>{rowGap >= 0 ? '+' : ''}{rowGap.toLocaleString('it-IT')}</div></div>
                 </div>
-
-                {/* Riga 3: motivo del gap (solo se gap < 0) */}
                 {rowGap < 0 && (
-                  <div className="mt-2">
-                    <label className="block text-[10px] font-medium text-red-600 uppercase mb-0.5">⚠️ Motivo del gap</label>
-                    <input
-                      className="w-full border border-red-300 rounded px-2 py-1 text-xs"
-                      value={gapReason}
-                      onChange={(e) => updateOverride(row.key, 'gap_reason', e.target.value)}
-                      placeholder="Es: Ritardo fornitore, mancanza risorse, progetto bloccato..."
-                    />
-                  </div>
+                  <div className="mt-2"><label className="block text-[10px] font-medium text-red-600 uppercase mb-0.5">⚠️ Motivo del gap</label><input className="w-full border border-red-300 rounded px-2 py-1 text-xs" value={gapReason} onChange={(e) => updateOverride(row.key, 'gap_reason', e.target.value)} placeholder="Es: Ritardo fornitore, mancanza risorse..." /></div>
                 )}
               </div>
             )
           })}
         </div>
       )}
-
-      {/* 💡 Lezioni apprese */}
       <div className="bg-white p-3 rounded-lg border mt-4">
         <label className="block text-xs font-medium text-gray-600 uppercase mb-1">💡 Lezioni apprese (Close the Loop)</label>
-        <textarea
-          value={data.lezioni_apprese || ''}
-          onChange={(e) => onUpdate({ lezioni_apprese: e.target.value })}
-          rows={4}
-          className="w-full border rounded-lg px-3 py-2 text-sm"
-          placeholder="Cosa abbiamo imparato? Cosa replicheremo? Cosa cambieremo per il prossimo ciclo? Quali contromisure sono state efficaci?"
-        />
-      </div>
-
-      {/* Legenda */}
-      <div className="text-[10px] text-gray-500 italic flex items-center gap-3 flex-wrap">
-        <span><span className="inline-block w-3 h-3 bg-gray-50 border border-gray-300 rounded mr-1"></span> AUTO (calcolato dagli step)</span>
-        <span><span className="inline-block w-3 h-3 bg-yellow-50 border border-yellow-400 rounded mr-1"></span> OVERRIDE manuale</span>
-        <span>💡 Click sull'icona ↺ per ripristinare il valore automatico</span>
+        <textarea value={data.lezioni_apprese || ''} onChange={(e) => onUpdate({ lezioni_apprese: e.target.value })} rows={4} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Cosa abbiamo imparato? Cosa replicheremo?" />
       </div>
     </div>
   )
 }
 
-// 📊 BRIDGE WATERFALL CHART (SVG)
-function BridgeWaterfallChart({ baseline, step3Progetti, step4Actual, color, unit = '€' }) {
-  // Costruisco i "passi" del waterfall
-  const baselineVal = parseFloat(baseline) || 0
-
-  // Step 3: progetti non-cancelled con planned saving
-  const plannedSteps = step3Progetti
-    .filter(p => p.status !== 'cancelled' && parseFloat(p.saving_planned) > 0)
-    .map(p => ({
-      label: p.label || 'Senza nome',
-      kaizen: p.kaizen_numero || '',
-      value: parseFloat(p.saving_planned) || 0,
-      type: 'planned',
-    }))
-
-  // Step 4: progetti done con actual saving
-  const actualSteps = step4Actual
-    .filter(p => p.actual_status === 'done' && parseFloat(p.actual_saving) > 0)
-    .map(p => ({
-      label: p.label || 'Senza nome',
-      kaizen: p.kaizen_numero || '',
-      value: parseFloat(p.actual_saving) || 0,
-      type: 'actual',
-    }))
-
-  const totalPlanned = plannedSteps.reduce((s, p) => s + p.value, 0)
-  const totalActual = actualSteps.reduce((s, p) => s + p.value, 0)
-  const targetAtteso = baselineVal + totalPlanned
-  const risultatoReale = baselineVal + totalActual
-  const gap = totalActual - totalPlanned
-
-  // Costruisco l'array di barre
-  const bars = [
-    { label: 'Baseline', value: baselineVal, cumulative: baselineVal, type: 'total', sublabel: '' },
-    ...plannedSteps.map((p, i) => {
-      const prevCum = baselineVal + plannedSteps.slice(0, i).reduce((s, x) => s + x.value, 0)
-      return { label: p.label, sublabel: p.kaizen, value: p.value, cumulative: prevCum + p.value, prevCumulative: prevCum, type: 'planned' }
-    }),
-    { label: 'Target Atteso', value: targetAtteso, cumulative: targetAtteso, type: 'subtotal', sublabel: 'Baseline + Σ Planned' },
-    ...actualSteps.map((p, i) => {
-      // Per gli actual, riparto da baseline e accumulo
-      const prevCum = baselineVal + actualSteps.slice(0, i).reduce((s, x) => s + x.value, 0)
-      return { label: p.label, sublabel: p.kaizen, value: p.value, cumulative: prevCum + p.value, prevCumulative: prevCum, type: 'actual' }
-    }),
-    { label: 'Risultato Reale', value: risultatoReale, cumulative: risultatoReale, type: 'total', sublabel: gap >= 0 ? `✅ ${gap >= 0 ? '+' : ''}${gap.toLocaleString('it-IT')} vs target` : `🔴 ${gap.toLocaleString('it-IT')} vs target` },
-  ]
-
-  // Calcolo scala
-  const maxValue = Math.max(targetAtteso, risultatoReale, baselineVal) * 1.15
-  const minValue = 0
-  const chartHeight = 280
-  const barWidth = 60
-  const barGap = 18
-  const leftPadding = 50
-  const bottomPadding = 80
-  const topPadding = 30
-  const chartWidth = leftPadding + bars.length * (barWidth + barGap) + 30
-
-  function yScale(val) {
-    return topPadding + chartHeight - ((val - minValue) / (maxValue - minValue)) * chartHeight
-  }
-
-  function getBarColor(type) {
-    if (type === 'total') return '#6b7280'    // grigio scuro - totali iniziali/finali
-    if (type === 'subtotal') return color || '#6366f1' // colore pillar - target
-    if (type === 'planned') return '#3b82f6'  // blu - planned
-    if (type === 'actual') return '#10b981'   // verde - actual done
-    return '#9ca3af'
-  }
-
-  if (bars.length <= 2) {
-    return (
-      <div className="bg-white p-6 rounded-lg text-center text-sm text-gray-400 italic">
-        📊 Bridge Chart vuoto. Aggiungi progetti con saving in Step 3 e completane qualcuno in Step 4 per popolare il waterfall.
-      </div>
-    )
-  }
-
-  return (
-    <div className="bg-white p-4 rounded-lg border-2 overflow-x-auto" style={{ borderColor: color }}>
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="font-bold text-sm" style={{ color }}>📊 Bridge Waterfall — Baseline → Target → Reale</h4>
-        <div className="flex gap-3 text-[10px] items-center">
-          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded" style={{ backgroundColor: '#6b7280' }} /> Totale</span>
-          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded" style={{ backgroundColor: '#3b82f6' }} /> Planned</span>
-          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded" style={{ backgroundColor: '#10b981' }} /> Actual (done)</span>
-          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded" style={{ backgroundColor: color }} /> Target</span>
-        </div>
-      </div>
-
-      <svg width={chartWidth} height={chartHeight + topPadding + bottomPadding} style={{ minWidth: '100%' }}>
-        {/* Griglia orizzontale */}
-        {[0, 0.25, 0.5, 0.75, 1].map(p => {
-          const y = topPadding + chartHeight - p * chartHeight
-          const val = minValue + p * (maxValue - minValue)
-          return (
-            <g key={p}>
-              <line x1={leftPadding} y1={y} x2={chartWidth - 20} y2={y} stroke="#e5e7eb" strokeDasharray="2,2" />
-              <text x={leftPadding - 5} y={y + 3} textAnchor="end" fontSize="9" fill="#9ca3af">
-                {Math.round(val).toLocaleString('it-IT')}
-              </text>
-            </g>
-          )
-        })}
-
-        {/* Barre */}
-        {bars.map((bar, idx) => {
-          const x = leftPadding + idx * (barWidth + barGap)
-          const isStep = bar.type === 'planned' || bar.type === 'actual'
-          const yTop = yScale(bar.cumulative)
-          const yBottom = isStep ? yScale(bar.prevCumulative) : yScale(0)
-          const barHeight = Math.abs(yBottom - yTop)
-          const barY = Math.min(yTop, yBottom)
-          const fillColor = getBarColor(bar.type)
-
-          return (
-            <g key={idx}>
-              {/* Linea di connessione tra step (tratteggiata) */}
-              {idx > 0 && isStep && (
-                <line
-                  x1={x - barGap}
-                  y1={yScale(bar.prevCumulative)}
-                  x2={x}
-                  y2={yScale(bar.prevCumulative)}
-                  stroke="#9ca3af"
-                  strokeDasharray="3,3"
-                  strokeWidth="1"
-                />
-              )}
-              {/* Linea di connessione per totali */}
-              {idx > 0 && !isStep && bars[idx - 1] && (
-                <line
-                  x1={x - barGap}
-                  y1={yScale(bars[idx - 1].cumulative)}
-                  x2={x}
-                  y2={yScale(bars[idx - 1].cumulative)}
-                  stroke="#d1d5db"
-                  strokeDasharray="2,4"
-                  strokeWidth="1"
-                />
-              )}
-
-              {/* Barra */}
-              <rect
-                x={x}
-                y={barY}
-                width={barWidth}
-                height={Math.max(barHeight, 2)}
-                fill={fillColor}
-                opacity={isStep ? 0.85 : 1}
-                rx="2"
-              >
-                <title>{`${bar.label}: ${bar.value.toLocaleString('it-IT')} ${unit}${isStep ? ` (cumulato: ${bar.cumulative.toLocaleString('it-IT')})` : ''}`}</title>
-              </rect>
-
-              {/* Valore sopra la barra */}
-              <text
-                x={x + barWidth / 2}
-                y={barY - 5}
-                textAnchor="middle"
-                fontSize="10"
-                fontWeight="bold"
-                fill={fillColor}
-              >
-                {isStep ? '+' : ''}{Math.round(bar.value).toLocaleString('it-IT')}
-              </text>
-
-              {/* Label sotto la barra (ruotata se lunga) */}
-              <text
-                x={x + barWidth / 2}
-                y={topPadding + chartHeight + 15}
-                textAnchor="middle"
-                fontSize="9"
-                fill="#374151"
-                fontWeight={!isStep ? 'bold' : 'normal'}
-              >
-                {bar.label.length > 12 ? bar.label.substring(0, 12) + '…' : bar.label}
-              </text>
-              {bar.sublabel && (
-                <text
-                  x={x + barWidth / 2}
-                  y={topPadding + chartHeight + 28}
-                  textAnchor="middle"
-                  fontSize="8"
-                  fill="#9ca3af"
-                >
-                  {bar.sublabel.length > 18 ? bar.sublabel.substring(0, 18) + '…' : bar.sublabel}
-                </text>
-              )}
-            </g>
-          )
-        })}
-
-        {/* Linea baseline orizzontale di riferimento */}
-        <line
-          x1={leftPadding}
-          y1={yScale(baselineVal)}
-          x2={chartWidth - 20}
-          y2={yScale(baselineVal)}
-          stroke="#6b7280"
-          strokeDasharray="4,4"
-          strokeWidth="1"
-          opacity="0.5"
-        />
-        <text
-          x={chartWidth - 22}
-          y={yScale(baselineVal) - 3}
-          textAnchor="end"
-          fontSize="9"
-          fill="#6b7280"
-          fontStyle="italic"
-        >
-          baseline
-        </text>
-
-        {/* Linea target orizzontale di riferimento */}
-        <line
-          x1={leftPadding}
-          y1={yScale(targetAtteso)}
-          x2={chartWidth - 20}
-          y2={yScale(targetAtteso)}
-          stroke={color}
-          strokeDasharray="4,4"
-          strokeWidth="1"
-          opacity="0.5"
-        />
-        <text
-          x={chartWidth - 22}
-          y={yScale(targetAtteso) - 3}
-          textAnchor="end"
-          fontSize="9"
-          fill={color}
-          fontStyle="italic"
-        >
-          target atteso
-        </text>
-      </svg>
-
-      <div className="text-[10px] text-gray-500 italic mt-2 flex items-center gap-3 flex-wrap">
-        <span>💡 Hover sulle barre per il dettaglio</span>
-        <span>📊 Barre blu = saving pianificato per progetto (Step 3)</span>
-        <span>✅ Barre verdi = saving realizzato da progetti "done" (Step 4)</span>
-      </div>
-    </div>
-  )
-}
-
-// 🧩 Helper component per le celle del bridge con auto/override
 function BridgeCell({ label, value, autoValue, isOverridden, onChange, onReset, colSpan = 'col-span-3', suffix = '' }) {
   return (
     <div className={colSpan}>
       <div className="flex items-center justify-between mb-0.5">
         <label className="block text-[10px] font-medium text-gray-500 uppercase">{label}</label>
-        {isOverridden && (
-          <button
-            onClick={onReset}
-            className="text-[10px] text-blue-600 hover:underline"
-            title="Ripristina valore automatico"
-          >
-            ↺ auto
-          </button>
-        )}
+        {isOverridden && <button onClick={onReset} className="text-[10px] text-blue-600 hover:underline" title="Ripristina automatico">↺ auto</button>}
       </div>
       <div className="relative">
-        <input
-          type="number"
-          className={`w-full border rounded px-2 py-1 text-xs ${
-            isOverridden ? 'bg-yellow-50 border-yellow-400 font-bold' : 'bg-gray-50'
-          }`}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={autoValue ? String(autoValue) : '0'}
-        />
-        {suffix && (
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">{suffix}</span>
-        )}
+        <input type="number" className={`w-full border rounded px-2 py-1 text-xs ${isOverridden ? 'bg-yellow-50 border-yellow-400 font-bold' : 'bg-gray-50'}`} value={value} onChange={(e) => onChange(e.target.value)} placeholder={autoValue ? String(autoValue) : '0'} />
+        {suffix && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">{suffix}</span>}
       </div>
-      {!isOverridden && autoValue !== '' && autoValue !== 0 && (
-        <div className="text-[9px] text-gray-400 mt-0.5">auto: {Number(autoValue).toLocaleString('it-IT')}</div>
-      )}
+      {!isOverridden && autoValue !== '' && autoValue !== 0 && <div className="text-[9px] text-gray-400 mt-0.5">auto: {Number(autoValue).toLocaleString('it-IT')}</div>}
     </div>
   )
 }
@@ -1573,20 +995,9 @@ function KaizenList({ kaizens, pillar }) {
   }
   return (
     <div className="bg-white rounded-xl shadow overflow-hidden">
-      <div className="px-4 py-3 border-b bg-gray-50">
-        <h3 className="font-bold">📋 Kaizen collegati al Pillar {pillar.sigla} <span className="text-xs font-normal text-gray-500">({kaizens.length})</span></h3>
-      </div>
+      <div className="px-4 py-3 border-b bg-gray-50"><h3 className="font-bold">📋 Kaizen collegati al Pillar {pillar.sigla} <span className="text-xs font-normal text-gray-500">({kaizens.length})</span></h3></div>
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 border-b text-xs uppercase text-gray-500">
-          <tr>
-            <th className="px-4 py-2 text-left w-24">Numero</th>
-            <th className="px-4 py-2 text-left">Titolo</th>
-            <th className="px-4 py-2 text-left w-32">Livello</th>
-            <th className="px-4 py-2 text-left w-28">Stato</th>
-            <th className="px-4 py-2 text-left w-32">Reparto</th>
-            <th className="px-4 py-2 text-right w-24">Azioni</th>
-          </tr>
-        </thead>
+        <thead className="bg-gray-50 border-b text-xs uppercase text-gray-500"><tr><th className="px-4 py-2 text-left w-24">Numero</th><th className="px-4 py-2 text-left">Titolo</th><th className="px-4 py-2 text-left w-32">Livello</th><th className="px-4 py-2 text-left w-28">Stato</th><th className="px-4 py-2 text-left w-32">Reparto</th><th className="px-4 py-2 text-right w-24">Azioni</th></tr></thead>
         <tbody>
           {kaizens.map(k => {
             const livello = k.livello || (k.tipo?.includes('Major') ? 'Major' : k.tipo?.includes('Standard') ? 'Standard' : 'Quick')
@@ -1640,9 +1051,7 @@ function getDefaultMasterplan() {
       { id: 's5', num: 5, label: 'Improve Resource Saturation at Micro Level' },
       { id: 's6', num: 6, label: 'Develop the daily control system to hold the gains' },
     ],
-    cells: {},
-    start_year: currentYear - 1,
-    end_year: currentYear + 5,
+    cells: {}, start_year: currentYear - 1, end_year: currentYear + 5,
   }
 }
 
@@ -1660,16 +1069,12 @@ function MasterPlanTab({ pillar, color, onSaved }) {
   async function doSave(silent = false) {
     if (!silent) setSaving(true)
     try {
-      await api.put(`/pillars/${pillar._id}`, {
-        gantt_items: [{ type: 'masterplan', data: dataRef.current }],
-      })
+      await api.put(`/pillars/${pillar._id}`, { gantt_items: [{ type: 'masterplan', data: dataRef.current }] })
       if (!silent) { setLastSaved(new Date()); setHasUnsavedChanges(false) }
     } catch (err) {
       console.error(err)
       if (!silent) alert('Errore salvataggio: ' + (err.response?.data?.detail || err.message))
-    } finally {
-      if (!silent) setSaving(false)
-    }
+    } finally { if (!silent) setSaving(false) }
   }
 
   useEffect(() => {
@@ -1677,33 +1082,20 @@ function MasterPlanTab({ pillar, color, onSaved }) {
     setHasUnsavedChanges(true)
     const timer = setTimeout(() => doSave(false), 700)
     return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data])
 
-  function getCellValue(stepId, year, quarter) {
-    return data.cells[`${stepId}_${year}_${quarter}`] || 0
-  }
+  function getCellValue(stepId, year, quarter) { return data.cells[`${stepId}_${year}_${quarter}`] || 0 }
   function cycleCell(stepId, year, quarter) {
     const key = `${stepId}_${year}_${quarter}`
     const current = data.cells[key] || 0
     const next = (current + 1) % CELL_STATES.length
-    setData(prev => {
-      const newCells = { ...prev.cells }
-      newCells[key] = next
-      return { ...prev, cells: newCells }
-    })
+    setData(prev => { const newCells = { ...prev.cells }; newCells[key] = next; return { ...prev, cells: newCells } })
   }
   function clearRow(stepId) {
     if (!confirm('Pulire tutte le celle di questa riga?')) return
-    setData(prev => {
-      const newCells = { ...prev.cells }
-      Object.keys(newCells).forEach(k => { if (k.startsWith(`${stepId}_`)) delete newCells[k] })
-      return { ...prev, cells: newCells }
-    })
+    setData(prev => { const newCells = { ...prev.cells }; Object.keys(newCells).forEach(k => { if (k.startsWith(`${stepId}_`)) delete newCells[k] }); return { ...prev, cells: newCells } })
   }
-  function updateStepLabel(stepId, newLabel) {
-    setData(prev => ({ ...prev, steps: prev.steps.map(s => s.id === stepId ? { ...s, label: newLabel } : s) }))
-  }
+  function updateStepLabel(stepId, newLabel) { setData(prev => ({ ...prev, steps: prev.steps.map(s => s.id === stepId ? { ...s, label: newLabel } : s) })) }
   function addStep() {
     const newId = `s${Date.now()}`
     const newNum = data.steps.length + 1
@@ -1726,9 +1118,7 @@ function MasterPlanTab({ pillar, color, onSaved }) {
       const newIdx = direction === 'up' ? idx - 1 : idx + 1
       if (newIdx < 0 || newIdx >= prev.steps.length) return prev
       const newSteps = [...prev.steps]
-      const tmp = newSteps[idx]
-      newSteps[idx] = newSteps[newIdx]
-      newSteps[newIdx] = tmp
+      const tmp = newSteps[idx]; newSteps[idx] = newSteps[newIdx]; newSteps[newIdx] = tmp
       const renumbered = newSteps.map((s, i) => ({ ...s, num: i + 1 }))
       return { ...prev, steps: renumbered }
     })
@@ -1736,11 +1126,7 @@ function MasterPlanTab({ pillar, color, onSaved }) {
   function updateYearRange(field, value) {
     const v = parseInt(value) || 0
     if (v < 2000 || v > 2100) return
-    setData(prev => {
-      const newData = { ...prev }
-      newData[field] = v
-      return newData
-    })
+    setData(prev => ({ ...prev, [field]: v }))
   }
 
   const years = []
@@ -1756,31 +1142,19 @@ function MasterPlanTab({ pillar, color, onSaved }) {
             <p className="text-xs text-gray-500">Pianificazione multi-anno per trimestri — Pillar <strong>{pillar.sigla}</strong></p>
           </div>
           <div className="flex items-center gap-3 text-xs">
-            {saving ? <span className="text-blue-600">⏳ Salvataggio...</span> :
-             hasUnsavedChanges ? <span className="text-orange-600 font-medium">⚠️ Non salvato</span> :
-             lastSaved ? <span className="text-green-600">💾 Salvato {lastSaved.toLocaleTimeString('it-IT')}</span> :
-             <span className="text-gray-400">Pronto</span>}
+            {saving ? <span className="text-blue-600">⏳ Salvataggio...</span> : hasUnsavedChanges ? <span className="text-orange-600 font-medium">⚠️ Non salvato</span> : lastSaved ? <span className="text-green-600">💾 Salvato {lastSaved.toLocaleTimeString('it-IT')}</span> : <span className="text-gray-400">Pronto</span>}
             <button onClick={() => doSave(false)} disabled={saving} className="text-white px-3 py-1 rounded text-xs shadow" style={{ backgroundColor: color }}>💾 Salva ora</button>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end pt-3 border-t">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Anno inizio</label>
-            <input type="number" min="2000" max="2100" value={data.start_year} onChange={(e) => updateYearRange('start_year', e.target.value)} className="w-full border rounded px-2 py-1 text-sm" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Anno fine</label>
-            <input type="number" min="2000" max="2100" value={data.end_year} onChange={(e) => updateYearRange('end_year', e.target.value)} className="w-full border rounded px-2 py-1 text-sm" />
-          </div>
+          <div><label className="block text-xs font-medium text-gray-600 mb-1">Anno inizio</label><input type="number" min="2000" max="2100" value={data.start_year} onChange={(e) => updateYearRange('start_year', e.target.value)} className="w-full border rounded px-2 py-1 text-sm" /></div>
+          <div><label className="block text-xs font-medium text-gray-600 mb-1">Anno fine</label><input type="number" min="2000" max="2100" value={data.end_year} onChange={(e) => updateYearRange('end_year', e.target.value)} className="w-full border rounded px-2 py-1 text-sm" /></div>
           <button onClick={addStep} className="text-white px-3 py-1.5 rounded text-sm font-medium flex items-center justify-center gap-1 shadow" style={{ backgroundColor: color }}><Plus size={14} /> Aggiungi Step</button>
         </div>
         <div className="flex gap-3 mt-3 pt-3 border-t text-xs items-center flex-wrap">
           <span className="font-medium text-gray-600">Stati cella:</span>
           {CELL_STATES.map(s => (
-            <div key={s.value} className="flex items-center gap-1">
-              <div className="w-4 h-4 border rounded" style={{ backgroundColor: s.color || 'white' }} />
-              <span>{s.label}</span>
-            </div>
+            <div key={s.value} className="flex items-center gap-1"><div className="w-4 h-4 border rounded" style={{ backgroundColor: s.color || 'white' }} /><span>{s.label}</span></div>
           ))}
           <span className="ml-auto text-gray-500 italic">💡 Click su cella per cambiare stato</span>
         </div>
@@ -1794,11 +1168,7 @@ function MasterPlanTab({ pillar, color, onSaved }) {
             {years.map(year => (
               <div key={year} className="flex-1 min-w-[80px] border-r last:border-r-0">
                 <div className="text-center font-bold text-xs py-1 border-b" style={{ backgroundColor: `${color}15`, color }}>{year}</div>
-                <div className="flex">
-                  {quarters.map(q => (
-                    <div key={q} className="flex-1 text-center text-[10px] font-medium text-gray-500 py-0.5 border-r last:border-r-0">{q}</div>
-                  ))}
-                </div>
+                <div className="flex">{quarters.map(q => <div key={q} className="flex-1 text-center text-[10px] font-medium text-gray-500 py-0.5 border-r last:border-r-0">{q}</div>)}</div>
               </div>
             ))}
           </div>
@@ -1814,31 +1184,4 @@ function MasterPlanTab({ pillar, color, onSaved }) {
               </div>
               <div className="w-20 px-1 border-r flex items-center justify-center gap-0.5">
                 <button onClick={() => moveStep(step.id, 'up')} disabled={idx === 0} className="text-xs px-1 hover:bg-gray-200 rounded disabled:opacity-30" title="Sposta su">▲</button>
-                <button onClick={() => moveStep(step.id, 'down')} disabled={idx === data.steps.length - 1} className="text-xs px-1 hover:bg-gray-200 rounded disabled:opacity-30" title="Sposta giù">▼</button>
-                <button onClick={() => clearRow(step.id)} className="text-xs px-1 hover:bg-yellow-100 rounded text-yellow-600" title="Pulisci riga">⌫</button>
-                <button onClick={() => removeStep(step.id)} className="p-0.5 hover:bg-red-100 rounded text-red-600" title="Elimina step"><Trash2 size={11} /></button>
-              </div>
-              {years.map(year => (
-                <div key={year} className="flex-1 min-w-[80px] border-r last:border-r-0 flex">
-                  {quarters.map((q, qIdx) => {
-                    const val = getCellValue(step.id, year, qIdx + 1)
-                    const state = CELL_STATES[val]
-                    return (
-                      <button key={q} onClick={() => cycleCell(step.id, year, qIdx + 1)} className="flex-1 border-r last:border-r-0 hover:opacity-75 transition-opacity" style={{ backgroundColor: state.color || 'transparent', minHeight: '32px' }} title={`${year} ${q}: ${state.label}`} />
-                    )
-                  })}
-                </div>
-              ))}
-            </div>
-          ))}
-          {data.steps.length === 0 && (
-            <div className="text-center py-12 text-gray-400">
-              <div className="text-4xl mb-2">📅</div>
-              <p>Nessuno step. Aggiungi il primo!</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
+                <button onClick={() => moveStep(step
