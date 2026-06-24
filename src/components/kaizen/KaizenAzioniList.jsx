@@ -1,35 +1,20 @@
 import { useState, useEffect, useMemo } from 'react'
 import api from '../../services/api'
-import { Plus, Filter, X } from 'lucide-react'
-import ActionPlanFormShared from '../ActionPlanFormShared'
-
-const STATO_COLORS = {
-  'Da Valutare': 'bg-gray-100 text-gray-700',
-  'Aperto': 'bg-blue-100 text-blue-700',
-  'In Corso': 'bg-yellow-100 text-yellow-700',
-  'In Verifica': 'bg-purple-100 text-purple-700',
-  'Done': 'bg-green-100 text-green-700',
+import { Plus, Filter, X, Trash2 } from 'lucide-react'-100 text-green-700',import { Plus, Filter, X, Trash2 } from 'lucide-react'
   'Cancelled': 'bg-gray-200 text-gray-500',
 }
 
 /**
  * KaizenAzioniList — Lista AP con filtro per step del Gant
- *
- * Props:
- *   - kaizen: oggetto kaizen (per leggere gant_master_plan.steps)
- *   - kaizenId
- *   - kaizenNumero
- *   - onUpdate: callback dopo modifiche (reload del kaizen)
  */
 export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpdate }) {
   const [azioni, setAzioni] = useState([])
   const [loading, setLoading] = useState(true)
-  const [filterStep, setFilterStep] = useState('')  // '' = tutti, 'none' = standalone, '<id>' = step specifico
+  const [filterStep, setFilterStep] = useState('')
   const [filterStato, setFilterStato] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingAP, setEditingAP] = useState(null)
 
-  // Lista degli step del Gant macro
   const steps = kaizen?.gant_master_plan?.steps || []
 
   useEffect(() => { loadAzioni() }, [kaizenId])
@@ -46,7 +31,6 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
     }
   }
 
-  // Cambio step di un AP (assegnazione/rimozione)
   const changeStepAP = async (apId, stepId) => {
     try {
       await api.put(`/action-plans/${apId}`, {
@@ -70,13 +54,28 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
   }
 
   const unlinkAP = async (apId, apNumero) => {
-    if (!confirm(`Scollegare ${apNumero} dal Kaizen ${kaizenNumero}?\nL'AP rimane in vita ma non sarà più collegato.`)) return
+    if (!confirm(`Scollegare ${apNumero} dal Kaizen ${kaizenNumero}?\nL'AP rimane nel sistema ma non sarà più collegato a questo Kaizen.`)) return
     try {
       await api.delete(`/action-plans/${apId}/link-kaizen/${kaizenId}`)
       loadAzioni()
     } catch (err) {
       alert('Errore: ' + (err.response?.data?.detail || err.message))
     }
+  }
+
+  const deleteAP = async (apId, apNumero) => {
+    if (!confirm(`ELIMINA ${apNumero}?\n\nQuesto rimuove l'Action Plan in modo permanente. Conferma solo se sei sicuro.`)) return
+    try {
+      await api.delete(`/action-plans/${apId}`)
+      loadAzioni()
+    } catch (err) {
+      alert('Errore: ' + (err.response?.data?.detail || err.message))
+    }
+  }
+
+  const handleNewAP = () => {
+    setEditingAP(null)
+    setShowForm(true)
   }
 
   // Statistiche
@@ -89,19 +88,15 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
     })),
   }), [azioni, steps])
 
-  // Filtraggio
   const azioniFiltrate = useMemo(() => {
     return azioni.filter(ap => {
-      // Filtro step
       if (filterStep === 'none' && ap.gant_step_id) return false
       if (filterStep && filterStep !== 'none' && ap.gant_step_id !== filterStep) return false
-      // Filtro stato
       if (filterStato && ap.stato !== filterStato) return false
       return true
     })
   }, [azioni, filterStep, filterStato])
 
-  // Helper per il nome dello step
   const getStepLabel = (stepId) => {
     if (!stepId) return null
     const step = steps.find(s => s.id === stepId)
@@ -110,27 +105,24 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
 
   return (
     <div className="space-y-4">
-      {/* Header con stats + bottone create */}
+      {/* Header */}
       <div className="bg-white rounded-xl shadow p-4">
         <div className="flex justify-between items-center mb-3">
           <div>
             <h4 className="font-bold text-sm uppercase text-gray-700">Azioni del Kaizen</h4>
-            <p className="text-xs text-gray-500">Tutte le azioni concrete, eventualmente legate a uno step del Gant macro</p>
+            <p className="text-xs text-gray-500">Azioni concrete, eventualmente legate a uno step del Gant macro</p>
           </div>
           <button
-            onClick={() => { setEditingAP(null); setShowForm(true) }}
+            onClick={handleNewAP}
             className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-light text-sm font-medium flex items-center gap-1"
           >
             <Plus size={14} /> Crea Action Plan
           </button>
         </div>
 
-        {/* Filtri */}
         <div className="flex items-center gap-2 flex-wrap mt-2 pt-3 border-t">
           <Filter size={14} className="text-gray-400" />
           <span className="text-xs font-medium text-gray-600">Filtri:</span>
-
-          {/* Filtro step */}
           <select
             value={filterStep}
             onChange={(e) => setFilterStep(e.target.value)}
@@ -144,8 +136,6 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
               </option>
             ))}
           </select>
-
-          {/* Filtro stato */}
           <select
             value={filterStato}
             onChange={(e) => setFilterStato(e.target.value)}
@@ -159,7 +149,6 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
             <option>Done</option>
             <option>Cancelled</option>
           </select>
-
           {(filterStep || filterStato) && (
             <button
               onClick={() => { setFilterStep(''); setFilterStato('') }}
@@ -168,14 +157,13 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
               <X size={10} /> Reset
             </button>
           )}
-
           <span className="text-xs text-gray-500 ml-auto">
             {azioniFiltrate.length} azion{azioniFiltrate.length === 1 ? 'e' : 'i'} visualizzate
           </span>
         </div>
       </div>
 
-      {/* Lista azioni */}
+      {/* Lista */}
       {loading ? (
         <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">Caricamento...</div>
       ) : azioniFiltrate.length === 0 ? (
@@ -187,7 +175,7 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
           </p>
           {azioni.length === 0 && (
             <button
-              onClick={() => { setEditingAP(null); setShowForm(true) }}
+              onClick={handleNewAP}
               className="text-primary hover:underline text-sm"
             >
               + Crea la prima azione
@@ -199,7 +187,6 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
           {azioniFiltrate.map(ap => {
             const isOverdue = ap.stato_visuale === 'In Ritardo'
             const isCancelled = ap.is_cancelled
-            const stepLabel = getStepLabel(ap.gant_step_id)
             return (
               <div
                 key={ap._id}
@@ -210,7 +197,6 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  {/* Numero + titolo */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-mono text-xs text-primary font-bold">{ap.numero}</span>
@@ -227,7 +213,6 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
                       )}
                     </div>
 
-                    {/* Step di appartenenza (badge cliccabile per cambiare) */}
                     <div className="mt-2 flex items-center gap-2">
                       <span className="text-[10px] uppercase text-gray-500 font-bold">Step Gant:</span>
                       <select
@@ -249,7 +234,6 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
                     </div>
                   </div>
 
-                  {/* Stato (cambiabile) */}
                   <div>
                     <select
                       value={ap.stato || 'Aperto'}
@@ -266,7 +250,6 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
                   </div>
                 </div>
 
-                {/* Azioni: modifica e scollega */}
                 <div className="flex justify-end gap-2 mt-2 pt-2 border-t">
                   <button
                     onClick={() => { setEditingAP(ap); setShowForm(true) }}
@@ -276,9 +259,17 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
                   </button>
                   <button
                     onClick={() => unlinkAP(ap._id, ap.numero)}
-                    className="text-xs px-3 py-1 bg-red-50 hover:bg-red-100 rounded text-red-600"
+                    className="text-xs px-3 py-1 bg-yellow-50 hover:bg-yellow-100 rounded text-yellow-700"
+                    title="Scollega dal Kaizen (l'AP resta nel sistema)"
                   >
                     Scollega
+                  </button>
+                  <button
+                    onClick={() => deleteAP(ap._id, ap.numero)}
+                    className="text-xs px-3 py-1 bg-red-50 hover:bg-red-100 rounded text-red-700 flex items-center gap-1"
+                    title="Elimina definitivamente l'Action Plan"
+                  >
+                    <Trash2 size={12} /> Elimina
                   </button>
                 </div>
               </div>
@@ -287,7 +278,7 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
         </div>
       )}
 
-      {/* Modal form AP */}
+      {/* Modal form */}
       {showForm && (
         <ActionPlanFormShared
           plan={editingAP}
@@ -304,3 +295,10 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
     </div>
   )
 }
+import ActionPlanFormShared from '../ActionPlanFormShared'
+
+const STATO_COLORS = {
+  'Da Valutare': 'bg-gray-100 text-gray-700',
+  'Aperto': 'bg-blue-100 text-blue-700',
+  'In Corso': 'bg-yellow-100 text-yellow-700',
+  'In Verifica': 'bg-purple-100 text-purple-700',
