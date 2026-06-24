@@ -497,6 +497,84 @@ export default function KaizenDetailPage() {
         </div>
       )}
 
+      {activeTab === 'figli' && (
+        <FigliTab
+          kaizenId={id}
+          kaizenNumero={kaizen.numero}
+          kaizenLivello={livelloAttuale}
+          kaizenReparto={kaizen.reparto}
+          kaizenLinea={kaizen.linea}
+          onUpdate={loadKaizen}
+        />
+      )}
+
+      {activeTab === 'stdelements' && (
+        <StandardElementsTab kaizen={kaizen} onSaved={loadKaizen} />
+      )}
+
+      {activeTab === 'cmladder' && (
+        <CountermeasureLadderTab kaizen={kaizen} onSaved={loadKaizen} />
+      )}
+
+      {activeTab === 'costbenefit' && (
+        <PlaceholderTab icon="💰" title="Cost & Benefit" subtitle="Business case e calcolo ROI automatico"
+          features={[
+            'Calcolo costo totale (investimento + manodopera + materiali)',
+            'Saving annuo stimato vs reale',
+            'ROI % e Payback period automatici',
+            'Grafico proiezione 5 anni',
+            'VAN (Valore Attuale Netto)',
+            'Confronto stimato vs reale post-progetto',
+            'Import template Excel Lindt',
+          ]} phase="Futura" />
+      )}
+
+      {activeTab === 'lavagna' && (
+        <div className="bg-white rounded-xl shadow p-6">
+          <textarea value={kaizen.lavagna || ''} onChange={(e) => setKaizen({...kaizen, lavagna: e.target.value})}
+            className="w-full border rounded-lg px-4 py-3 min-h-[400px]" placeholder="Scrivi qui le tue note..." />
+        </div>
+      )}
+
+      {activeTab === 'feed' && (
+        <div className="bg-white rounded-xl shadow p-6">
+          <h3 className="font-bold mb-4">Cronologia Attività</h3>
+          {kaizen.feed?.map((entry, i) => (
+            <div key={i} className="flex gap-3 mb-3 pb-3 border-b last:border-0">
+              <div className="w-2 h-2 rounded-full bg-primary mt-2"></div>
+              <div>
+                <p className="text-sm"><strong>{entry.utente}</strong> — {entry.azione}</p>
+                <p className="text-xs text-gray-400">{entry.timestamp}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Form AP creato da Root Cause dei 5 Perché */}
+      {showAPFormFromRootCause && rootCausePrefill && (
+        <ActionPlanFormShared
+          plan={{
+            titolo: rootCausePrefill.titolo,
+            descrizione: rootCausePrefill.descrizione,
+          }}
+          prefilledKaizen={{ kaizen_id: id, kaizen_numero: kaizen.numero }}
+          onClose={() => {
+            setShowAPFormFromRootCause(false)
+            setRootCausePrefill(null)
+          }}
+          onSaved={() => {
+            setShowAPFormFromRootCause(false)
+            setRootCausePrefill(null)
+            loadKaizen()
+            alert('Action Plan creato e collegato al Kaizen')
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
 // ──────────────────────────────────────────────────────────
 // COMPONENTE PLACEHOLDER
 // ──────────────────────────────────────────────────────────
