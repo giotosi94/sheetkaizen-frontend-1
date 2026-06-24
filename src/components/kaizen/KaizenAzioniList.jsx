@@ -1,15 +1,60 @@
 import { useState, useEffect, useMemo } from 'react'
 import api from '../../services/api'
-import { Plus, Filter, X, Trash2 } from 'lucide-react'
+import { Plus, Filter, X, Trash2, Edit2, Link2, AlertCircle, CheckSquare, Bug, TrendingUp, Shield, Wrench, Eye } from 'lucide-react'
 import ActionPlanFormShared from '../ActionPlanFormShared'
 
 const STATO_COLORS = {
-  'Da Valutare': 'bg-gray-100 text-gray-700',
-  'Aperto': 'bg-blue-100 text-blue-700',
-  'In Corso': 'bg-yellow-100 text-yellow-700',
-  'In Verifica': 'bg-purple-100 text-purple-700',
-  'Done': 'bg-green-100 text-green-700',
-  'Cancelled': 'bg-gray-200 text-gray-500',
+  'Da Valutare': 'bg-gray-100 text-gray-700 border-gray-300',
+  'Aperto': 'bg-blue-100 text-blue-700 border-blue-300',
+  'In Corso': 'bg-indigo-100 text-indigo-700 border-indigo-300',
+  'In Verifica': 'bg-purple-100 text-purple-700 border-purple-300',
+  'Done': 'bg-green-100 text-green-700 border-green-300',
+  'Cancelled': 'bg-gray-200 text-gray-500 border-gray-300',
+}
+
+const PRIORITA_BG = {
+  Lowest: 'bg-gray-100 text-gray-700',
+  Low: 'bg-blue-100 text-blue-700',
+  Medium: 'bg-yellow-100 text-yellow-700',
+  High: 'bg-orange-100 text-orange-700',
+  Critical: 'bg-red-100 text-red-700',
+}
+
+const TIPO_ICONS = {
+  Task: CheckSquare,
+  Bug: Bug,
+  Improvement: TrendingUp,
+  Audit: Shield,
+  Manutenzione: Wrench,
+  Sicurezza: AlertCircle,
+}
+
+const TIPO_COLORS = {
+  Task: 'text-blue-600',
+  Bug: 'text-red-600',
+  Improvement: 'text-green-600',
+  Audit: 'text-purple-600',
+  Manutenzione: 'text-orange-600',
+  Sicurezza: 'text-yellow-600',
+}
+
+// Avatar circolare con iniziali
+function Avatar({ name }) {
+  if (!name) return <span className="text-xs text-gray-400 italic">— Non assegnato</span>
+  const initials = name.split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase()
+  const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-yellow-500', 'bg-orange-500']
+  const color = colors[name.charCodeAt(0) % colors.length]
+  return (
+    <div className="flex items-center gap-2">
+      <div
+        className={`${color} text-white rounded-full flex items-center justify-center font-bold flex-shrink-0`}
+        style={{ width: 24, height: 24, fontSize: 10 }}
+      >
+        {initials}
+      </div>
+      <span className="text-xs">{name}</span>
+    </div>
+  )
 }
 
 export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpdate }) {
@@ -39,11 +84,10 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
   const changeStepAP = async (apId, stepId) => {
     try {
       await api.put(`/action-plans/${apId}`, {
-        gant_step_id: stepId === 'none' || !stepId ? null : stepId,
+        gant_step_id: stepId || null,
       })
       loadAzioni()
     } catch (err) {
-      console.error(err)
       alert('Errore: ' + (err.response?.data?.detail || err.message))
     }
   }
@@ -53,7 +97,6 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
       await api.patch(`/action-plans/${apId}/stato`, { stato: nuovoStato })
       loadAzioni()
     } catch (err) {
-      console.error(err)
       alert('Errore cambio stato: ' + (err.response?.data?.detail || err.message))
     }
   }
@@ -85,7 +128,6 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
 
   const stats = useMemo(() => ({
     totale: azioni.length,
-    standalone: azioni.filter(a => !a.gant_step_id).length,
     perStep: steps.map(s => ({
       ...s,
       count: azioni.filter(a => a.gant_step_id === s.id).length,
@@ -94,8 +136,7 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
 
   const azioniFiltrate = useMemo(() => {
     return azioni.filter(ap => {
-      if (filterStep === 'none' && ap.gant_step_id) return false
-      if (filterStep && filterStep !== 'none' && ap.gant_step_id !== filterStep) return false
+      if (filterStep && ap.gant_step_id !== filterStep) return false
       if (filterStato && ap.stato !== filterStato) return false
       return true
     })
@@ -108,7 +149,7 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
         <div className="flex justify-between items-center mb-3">
           <div>
             <h4 className="font-bold text-sm uppercase text-gray-700">Azioni del Kaizen</h4>
-            <p className="text-xs text-gray-500">Azioni concrete, eventualmente legate a uno step del Gant macro</p>
+            <p className="text-xs text-gray-500">Azioni concrete, legate o meno a uno step del Gant macro</p>
           </div>
           <button
             onClick={handleNewAP}
@@ -127,7 +168,6 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
             className="text-xs border rounded px-2 py-1"
           >
             <option value="">Tutti gli step ({stats.totale})</option>
-            <option value="none">Standalone — Senza step ({stats.standalone})</option>
             {stats.perStep.map(s => (
               <option key={s.id} value={s.id}>
                 Step {s.num}: {s.label} ({s.count})
@@ -161,7 +201,7 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
         </div>
       </div>
 
-      {/* Lista */}
+      {/* Tabella stile Action Plan Management */}
       {loading ? (
         <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">Caricamento...</div>
       ) : azioniFiltrate.length === 0 ? (
@@ -172,111 +212,134 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
               : 'Nessun risultato per i filtri impostati'}
           </p>
           {azioni.length === 0 && (
-            <button
-              onClick={handleNewAP}
-              className="text-primary hover:underline text-sm"
-            >
+            <button onClick={handleNewAP} className="text-primary hover:underline text-sm">
               + Crea la prima azione
             </button>
           )}
         </div>
       ) : (
-        <div className="space-y-2">
-          {azioniFiltrate.map(ap => {
-            const isOverdue = ap.stato_visuale === 'In Ritardo'
-            const isCancelled = ap.is_cancelled
-            return (
-              <div
-                key={ap._id}
-                className={`bg-white rounded-xl shadow p-3 border-l-4 ${
-                  isCancelled ? 'border-gray-400 opacity-60' :
-                  isOverdue ? 'border-red-500' :
-                  'border-primary'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-mono text-xs text-primary font-bold">{ap.numero}</span>
-                      <h4 className="font-semibold truncate">{ap.titolo}</h4>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap text-xs">
-                      {ap.responsabile && <span className="text-gray-600">{ap.responsabile}</span>}
-                      {ap.tipo && <span className="text-gray-500">{ap.tipo}</span>}
-                      {ap.priorita && <span className="text-gray-500">{ap.priorita}</span>}
-                      {ap.data_scadenza && (
-                        <span className={isOverdue ? 'text-red-600 font-bold' : 'text-gray-600'}>
-                          Scadenza: {new Date(ap.data_scadenza).toLocaleDateString('it-IT')}
+        <div className="bg-white rounded-xl shadow overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b text-xs uppercase text-gray-500">
+              <tr>
+                <th className="px-3 py-2 text-left w-24">Numero</th>
+                <th className="px-3 py-2 text-left">Titolo</th>
+                <th className="px-3 py-2 text-left w-24">Tipo</th>
+                <th className="px-3 py-2 text-left w-24">Priorità</th>
+                <th className="px-3 py-2 text-left w-40">Responsabile</th>
+                <th className="px-3 py-2 text-left w-32">Stato</th>
+                <th className="px-3 py-2 text-left w-28">Scadenza</th>
+                <th className="px-3 py-2 text-left w-48">Step Gant</th>
+                <th className="px-3 py-2 text-center w-32">Azioni</th>
+              </tr>
+            </thead>
+            <tbody>
+              {azioniFiltrate.map(ap => {
+                const TipoIcon = TIPO_ICONS[ap.tipo] || CheckSquare
+                const isOverdue = ap.stato_visuale === 'In Ritardo'
+                const isCancelled = ap.is_cancelled
+                return (
+                  <tr
+                    key={ap._id}
+                    className={`border-b hover:bg-gray-50 ${isCancelled ? 'opacity-60' : ''}`}
+                  >
+                    <td className="px-3 py-2 font-mono text-primary text-xs font-bold">
+                      {ap.numero}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="font-medium truncate max-w-md">{ap.titolo}</div>
+                    </td>
+                    <td className="px-3 py-2">
+                      {ap.tipo ? (
+                        <div className={`flex items-center gap-1 text-xs ${TIPO_COLORS[ap.tipo] || 'text-gray-500'}`}>
+                          <TipoIcon size={14} />
+                          <span>{ap.tipo}</span>
+                        </div>
+                      ) : <span className="text-xs text-gray-300">—</span>}
+                    </td>
+                    <td className="px-3 py-2">
+                      {ap.priorita ? (
+                        <span className={`px-2 py-0.5 rounded text-xs ${PRIORITA_BG[ap.priorita] || 'bg-gray-100 text-gray-700'}`}>
+                          {ap.priorita}
                         </span>
-                      )}
-                    </div>
-
-                    <div className="mt-2 flex items-center gap-2">
-                      <span className="text-[10px] uppercase text-gray-500 font-bold">Step Gant:</span>
+                      ) : <span className="text-xs text-gray-300">—</span>}
+                    </td>
+                    <td className="px-3 py-2">
+                      <Avatar name={ap.responsabile} />
+                    </td>
+                    <td className="px-3 py-2">
                       <select
-                        value={ap.gant_step_id || 'none'}
+                        value={ap.stato || 'Aperto'}
+                        onChange={(e) => changeStato(ap._id, e.target.value)}
+                        className={`text-xs px-1.5 py-1 rounded border font-medium ${STATO_COLORS[ap.stato] || 'bg-gray-100 text-gray-700'}`}
+                      >
+                        <option>Da Valutare</option>
+                        <option>Aperto</option>
+                        <option>In Corso</option>
+                        <option>In Verifica</option>
+                        <option>Done</option>
+                        <option>Cancelled</option>
+                      </select>
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      {ap.data_scadenza ? (
+                        <div className={isOverdue ? 'text-red-600 font-bold' : 'text-gray-700'}>
+                          {new Date(ap.data_scadenza).toLocaleDateString('it-IT')}
+                        </div>
+                      ) : '—'}
+                    </td>
+                    <td className="px-3 py-2">
+                      <select
+                        value={ap.gant_step_id || ''}
                         onChange={(e) => changeStepAP(ap._id, e.target.value)}
-                        className={`text-xs px-2 py-1 rounded border ${
+                        className={`text-xs px-2 py-1 rounded border w-full ${
                           ap.gant_step_id
                             ? 'bg-blue-50 text-blue-700 border-blue-200'
-                            : 'bg-gray-50 text-gray-600 border-gray-200'
+                            : 'bg-white text-gray-500 border-gray-200'
                         }`}
                       >
-                        <option value="none">— Standalone (nessuno step) —</option>
+                        <option value="">— Nessuno step —</option>
                         {steps.map(s => (
                           <option key={s.id} value={s.id}>
                             Step {s.num}: {s.label}
                           </option>
                         ))}
                       </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <select
-                      value={ap.stato || 'Aperto'}
-                      onChange={(e) => changeStato(ap._id, e.target.value)}
-                      className={`text-xs px-2 py-1 rounded border font-medium ${STATO_COLORS[ap.stato] || 'bg-gray-100 text-gray-700'}`}
-                    >
-                      <option>Da Valutare</option>
-                      <option>Aperto</option>
-                      <option>In Corso</option>
-                      <option>In Verifica</option>
-                      <option>Done</option>
-                      <option>Cancelled</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 mt-2 pt-2 border-t">
-                  <button
-                    onClick={() => { setEditingAP(ap); setShowForm(true) }}
-                    className="text-xs px-3 py-1 bg-blue-50 hover:bg-blue-100 rounded text-blue-700"
-                  >
-                    Modifica
-                  </button>
-                  <button
-                    onClick={() => unlinkAP(ap._id, ap.numero)}
-                    className="text-xs px-3 py-1 bg-yellow-50 hover:bg-yellow-100 rounded text-yellow-700"
-                    title="Scollega dal Kaizen (l'AP resta nel sistema)"
-                  >
-                    Scollega
-                  </button>
-                  <button
-                    onClick={() => deleteAP(ap._id, ap.numero)}
-                    className="text-xs px-3 py-1 bg-red-50 hover:bg-red-100 rounded text-red-700 flex items-center gap-1"
-                    title="Elimina definitivamente l'Action Plan"
-                  >
-                    <Trash2 size={12} /> Elimina
-                  </button>
-                </div>
-              </div>
-            )
-          })}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex justify-center gap-1">
+                        <button
+                          onClick={() => { setEditingAP(ap); setShowForm(true) }}
+                          className="p-1 hover:bg-yellow-100 rounded text-yellow-600"
+                          title="Modifica"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          onClick={() => unlinkAP(ap._id, ap.numero)}
+                          className="p-1 hover:bg-orange-100 rounded text-orange-600"
+                          title="Scollega dal Kaizen"
+                        >
+                          <Link2 size={14} />
+                        </button>
+                        <button
+                          onClick={() => deleteAP(ap._id, ap.numero)}
+                          className="p-1 hover:bg-red-100 rounded text-red-600"
+                          title="Elimina definitivamente"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* Modal form */}
+      {/* Modal */}
       {showForm && (
         <ActionPlanFormShared
           plan={editingAP}
