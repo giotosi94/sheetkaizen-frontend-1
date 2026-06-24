@@ -1,12 +1,17 @@
 import { useState, useEffect, useMemo } from 'react'
 import api from '../../services/api'
-import { Plus, Filter, X, Trash2 } from 'lucide-react'-100 text-green-700',import { Plus, Filter, X, Trash2 } from 'lucide-react'
+import { Plus, Filter, X, Trash2 } from 'lucide-react'
+import ActionPlanFormShared from '../ActionPlanFormShared'
+
+const STATO_COLORS = {
+  'Da Valutare': 'bg-gray-100 text-gray-700',
+  'Aperto': 'bg-blue-100 text-blue-700',
+  'In Corso': 'bg-yellow-100 text-yellow-700',
+  'In Verifica': 'bg-purple-100 text-purple-700',
+  'Done': 'bg-green-100 text-green-700',
   'Cancelled': 'bg-gray-200 text-gray-500',
 }
 
-/**
- * KaizenAzioniList — Lista AP con filtro per step del Gant
- */
 export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpdate }) {
   const [azioni, setAzioni] = useState([])
   const [loading, setLoading] = useState(true)
@@ -78,7 +83,6 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
     setShowForm(true)
   }
 
-  // Statistiche
   const stats = useMemo(() => ({
     totale: azioni.length,
     standalone: azioni.filter(a => !a.gant_step_id).length,
@@ -96,12 +100,6 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
       return true
     })
   }, [azioni, filterStep, filterStato])
-
-  const getStepLabel = (stepId) => {
-    if (!stepId) return null
-    const step = steps.find(s => s.id === stepId)
-    return step ? `Step ${step.num}: ${step.label}` : 'Step rimosso'
-  }
 
   return (
     <div className="space-y-4">
@@ -295,10 +293,3 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
     </div>
   )
 }
-import ActionPlanFormShared from '../ActionPlanFormShared'
-
-const STATO_COLORS = {
-  'Da Valutare': 'bg-gray-100 text-gray-700',
-  'Aperto': 'bg-blue-100 text-blue-700',
-  'In Corso': 'bg-yellow-100 text-yellow-700',
-  'In Verifica': 'bg-purple-100 text-purple-700',
