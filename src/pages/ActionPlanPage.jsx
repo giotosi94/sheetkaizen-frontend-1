@@ -942,7 +942,11 @@ function KanbanCard({ plan }) {
         </span>
       </div>
       <div className="font-medium text-sm mb-2 line-clamp-2">{plan.titolo}</div>
-      <div className={`flex items-center gap-1 text-xs mb-2 ${TIPO_COLORS[plan.tipo] || ''}`}>      <div className={`flex items-center gap-1 text-xs mb{/* Badge "Collegato a" */}
+      <div className={`flex items-center gap-1 text-xs mb-2 ${TIPO_COLORS[plan.tipo] || ''}`}>
+        <TipoIcon size={12} /><span>{plan.tipo}</span>
+      </div>
+
+      {/* Badge "Collegato a" */}
       {plan.parent_type && plan.parent_type !== 'standalone' && (
         <div className="mb-2">
           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
@@ -958,8 +962,6 @@ function KanbanCard({ plan }) {
           </span>
         </div>
       )}
-        <TipoIcon size={12} /><span>{plan.tipo}</span>
-      </div>
 
 
       {plan.tags?.length > 0 && (
