@@ -64,7 +64,9 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
   const [filterStato, setFilterStato] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingAP, setEditingAP] = useState(null)
-  const [selectedAP, setSelectedAP] = useState(null)  // 🆕 AP aperto nel pannello dettaglio
+  const [selectedAP, setSelectedAP] = useState(null)
+  const [viewMode, setViewMode] = useState('list')  // 🆕 'list' | 'calendar'
+  const [calendarDays, setCalendarDays] = useState(30)
 
   const steps = kaizen?.gant_master_plan?.steps || []
 
@@ -178,12 +180,33 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
             <h4 className="font-bold text-sm uppercase text-gray-700">Azioni del Kaizen</h4>
             <p className="text-xs text-gray-500">Azioni concrete, legate o meno a uno step del Gant macro</p>
           </div>
-          <button
-            onClick={handleNewAP}
-            className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-light text-sm font-medium flex items-center gap-1"
-          >
-            <Plus size={14} /> Crea Action Plan
-          </button>
+          <div className="flex gap-2 items-center">
+            {/* Toggle Vista */}
+            <div className="bg-white border rounded-lg p-1 flex gap-1">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-1 text-xs rounded transition-all ${
+                  viewMode === 'list' ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Lista
+              </button>
+              <button
+                onClick={() => setViewMode('calendar')}
+                className={`px-3 py-1 text-xs rounded transition-all ${
+                  viewMode === 'calendar' ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Calendario
+              </button>
+            </div>
+            <button
+              onClick={handleNewAP}
+              className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-light text-sm font-medium flex items-center gap-1"
+            >
+              <Plus size={14} /> Crea Action Plan
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap mt-2 pt-3 border-t">
@@ -244,6 +267,13 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
             </button>
           )}
         </div>
+      ) : viewMode === 'calendar' ? (
+        <CalendarKaizenView
+          azioni={azioniFiltrate}
+          onSelect={setSelectedAP}
+          calendarDays={calendarDays}
+          setCalendarDays={setCalendarDays}
+        />
       ) : (
         <div className="bg-white rounded-xl shadow overflow-hidden">
           <table className="w-full text-sm">
@@ -393,6 +423,179 @@ export default function KaizenAzioniList({ kaizen, kaizenId, kaizenNumero, onUpd
           onRestore={async (p) => { await restoreAP(p); setSelectedAP(null) }}
           onDelete={async (apId) => { await deleteAP(apId, selectedAP.numero); setSelectedAP(null) }}
         />
+      )}
+    </div>
+  )
+}
+// ──────────────────────────────────────────────────────────
+// CALENDAR VIEW per Kaizen — Raggruppato per scadenza
+// ──────────────────────────────────────────────────────────
+function CalendarKaizenView({ azioni, onSelect, calendarDays, setCalendarDays }) {
+  const oggi = new Date()
+  oggi.setHours(0, 0, 0, 0)
+
+  const fineSettimana = new Date(oggi)
+  fineSettimana.setDate(fineSettimana.getDate() + (7 - oggi.getDay()))
+  fineSettimana.setHours(23, 59, 59, 999)
+
+  const fineProssimePeriodo = new Date(fineSettimana)
+  fineProssimePeriodo.setDate(fineProssimePeriodo.getDate() + calendarDays)
+
+  // Filtra solo gli AP NON cancellati e NON done
+  const apsAttivi = azioni.filter(p => !p.is_cancelled && p.stato !== 'Done')
+
+  const scaduti = []
+  const oggiAPs = []
+  const settimanaAPs = []
+  const prossimeAPs = []
+  const senzaScadenza = []
+
+  apsAttivi.forEach(ap => {
+    if (!ap.data_scadenza) {
+      senzaScadenza.push(ap)
+      return
+    }
+    const scadenza = new Date(ap.data_scadenza)
+    scadenza.setHours(0, 0, 0, 0)
+
+    if (scadenza < oggi) {
+      const giorniRitardo = Math.floor((oggi - scadenza) / (1000 * 60 * 60 * 24))
+      scaduti.push({ ...ap, _giorniRitardo: giorniRitardo })
+    } else if (scadenza.getTime() === oggi.getTime()) {
+      oggiAPs.push(ap)
+    } else if (scadenza <= fineSettimana) {
+      settimanaAPs.push(ap)
+    } else if (scadenza <= fineProssimePeriodo) {
+      prossimeAPs.push(ap)
+    } else {
+      senzaScadenza.push(ap)
+    }
+  })
+
+  const sortByDate = (a, b) => {
+    if (!a.data_scadenza) return 1
+    if (!b.data_scadenza) return -1
+    return new Date(a.data_scadenza) - new Date(b.data_scadenza)
+  }
+  scaduti.sort(sortByDate)
+  oggiAPs.sort(sortByDate)
+  settimanaAPs.sort(sortByDate)
+  prossimeAPs.sort(sortByDate)
+
+  const colonne = [
+    { id: 'scaduti', label: 'Scaduti', headerBg: 'bg-red-100', headerText: 'text-red-700', border: 'border-red-300', plans: scaduti },
+    { id: 'oggi', label: 'Oggi', headerBg: 'bg-orange-100', headerText: 'text-orange-700', border: 'border-orange-300', plans: oggiAPs },
+    { id: 'settimana', label: 'Questa settimana', headerBg: 'bg-yellow-100', headerText: 'text-yellow-700', border: 'border-yellow-300', plans: settimanaAPs },
+    { id: 'prossime', label: `Prossimi ${calendarDays} giorni`, headerBg: 'bg-blue-100', headerText: 'text-blue-700', border: 'border-blue-300', plans: prossimeAPs },
+  ]
+
+  return (
+    <div className="space-y-4">
+      {/* Configurazione periodo */}
+      <div className="bg-white p-3 rounded-lg shadow-sm flex items-center gap-3 flex-wrap">
+        <span className="text-xs font-medium text-gray-600 uppercase">Periodo "Prossimi giorni":</span>
+        <div className="flex gap-1">
+          {[7, 14, 30, 60, 90].map(d => (
+            <button
+              key={d}
+              onClick={() => setCalendarDays(d)}
+              className={`px-3 py-1 text-xs rounded transition-all ${
+                calendarDays === d ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {d}gg
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-gray-500 ml-auto">Solo AP attivi (esclusi Done e Annullati)</span>
+      </div>
+
+      {/* 4 colonne */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        {colonne.map(col => (
+          <div key={col.id} className={`rounded-lg border-2 ${col.border} bg-white flex flex-col`}>
+            <div className={`${col.headerBg} ${col.headerText} px-3 py-2 rounded-t-md font-semibold text-sm flex justify-between items-center`}>
+              <span>{col.label}</span>
+              <span className="bg-white bg-opacity-70 px-2 py-0.5 rounded-full text-xs font-bold">
+                {col.plans.length}
+              </span>
+            </div>
+            <div className="flex-1 p-2 space-y-2 overflow-y-auto" style={{ minHeight: '300px', maxHeight: '70vh' }}>
+              {col.plans.length === 0 ? (
+                <div className="text-center text-xs text-gray-400 py-8 italic">Nessuna AP</div>
+              ) : (
+                col.plans.map(ap => <CalendarKaizenCard key={ap._id} ap={ap} onClick={() => onSelect(ap)} />)
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Sezione "Senza scadenza o Lontane" */}
+      {senzaScadenza.length > 0 && (
+        <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <h3 className="font-bold text-gray-700">Senza scadenza o lontane</h3>
+            <span className="text-xs bg-white px-2 py-0.5 rounded-full font-bold text-gray-700">
+              {senzaScadenza.length}
+            </span>
+            <span className="text-xs text-gray-500 italic">— AP senza data o oltre i {calendarDays} giorni</span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+            {senzaScadenza.map(ap => (
+              <CalendarKaizenCard key={ap._id} ap={ap} onClick={() => onSelect(ap)} compact />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CalendarKaizenCard({ ap, onClick, compact }) {
+  const TipoIcon = TIPO_ICONS[ap.tipo] || CheckSquare
+  return (
+    <div
+      onClick={onClick}
+      className={`bg-white rounded-md p-3 shadow-sm border cursor-pointer hover:shadow-md transition-all ${
+        compact ? 'opacity-80 hover:opacity-100' : ''
+      }`}
+    >
+      <div className="flex justify-between items-start mb-1">
+        <span className="font-mono text-xs text-primary font-bold">{ap.numero}</span>
+        {ap.priorita && (
+          <span className={`text-xs px-1.5 py-0.5 rounded ${PRIORITA_BG[ap.priorita] || ''}`}>
+            {ap.priorita}
+          </span>
+        )}
+      </div>
+      <div className="font-medium text-sm mb-2 line-clamp-2">{ap.titolo}</div>
+      {ap.tipo && (
+        <div className={`flex items-center gap-1 text-xs mb-2 ${TIPO_COLORS[ap.tipo] || ''}`}>
+          <TipoIcon size={12} />
+          <span>{ap.tipo}</span>
+        </div>
+      )}
+      <div className="flex justify-between items-center pt-2 border-t mt-2 text-xs">
+        {ap.responsabile ? (
+          <div className="flex items-center gap-1">
+            <Avatar name={ap.responsabile} />
+          </div>
+        ) : (
+          <span className="text-gray-400">— Non assegnato</span>
+        )}
+      </div>
+      {ap.data_scadenza && (
+        <div className="mt-2 pt-2 border-t flex items-center justify-between text-xs">
+          <span className="text-gray-500">
+            {new Date(ap.data_scadenza).toLocaleDateString('it-IT')}
+          </span>
+          {ap._giorniRitardo && ap._giorniRitardo > 0 && (
+            <span className="text-red-600 font-bold">
+              Da {ap._giorniRitardo} {ap._giorniRitardo === 1 ? 'giorno' : 'giorni'}
+            </span>
+          )}
+        </div>
       )}
     </div>
   )
