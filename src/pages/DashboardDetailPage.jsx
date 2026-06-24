@@ -9,11 +9,13 @@ import TextBlock from '../components/widgets/TextBlock'
 import BIEmbed from '../components/widgets/BIEmbed'
 import TableWidget from '../components/widgets/TableWidget'
 import ExcelLink from '../components/widgets/ExcelLink'
+import PresenzeWidget from '../components/widgets/PresenzeWidget'
 import TableEditor from '../components/TableEditor'
 import 'react-grid-layout/css/styles.css'
 
 const WIDGET_TYPES = [
   { id: 'action_plan', label: '📋 Action Plan', icon: '📋', defaultSize: { w: 6, h: 6 } },
+  { id: 'presenze', label: '✓ Presenze', icon: '✓', defaultSize: { w: 8, h: 6 } },
   { id: 'kpi_card', label: '🎯 KPI Card', icon: '🎯', defaultSize: { w: 3, h: 3 } },
   { id: 'text_block', label: '📝 Blocco Testo', icon: '📝', defaultSize: { w: 4, h: 4 } },
   { id: 'bi_embed', label: '📊 Embed BI', icon: '📊', defaultSize: { w: 6, h: 6 } },
@@ -113,6 +115,14 @@ export default function DashboardDetailPage() {
   )
       case 'excel_link':
         return <ExcelLink config={widget.config} />
+      case 'presenze':
+        return (
+          <PresenzeWidget
+            config={widget.config}
+            editMode={editMode}
+            onChange={(newConfig) => updateWidgetConfig(widget.widget_id, newConfig)}
+          />
+        )
       default:
         return <div className="bg-white p-4">Widget sconosciuto</div>
     }
