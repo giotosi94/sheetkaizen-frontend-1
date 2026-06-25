@@ -15,7 +15,6 @@ const SECTIONS = [
         isPillar: true,
         description: 'Pilastri TPM Lindt (FI, AM, PM, QM, ecc.)',
         usedIn: ['Kaizen', '5 Step KPI Management', 'Master Plan', 'Action Plan (transitivo)'],
-        examples: 'FI (Focused Improvement), AM (Autonomous Maintenance), PM (Planned Maintenance)',
       },
       {
         id: 'reparti_linee',
@@ -24,7 +23,6 @@ const SECTIONS = [
         isRepartiTree: true,
         description: 'Struttura gerarchica della fabbrica (3 livelli)',
         usedIn: ['Action Plan', 'Kaizen', 'Documenti', 'Filtri'],
-        examples: 'Reparto Cioccolato / Linea Bindler 11 / Macchina Conca 1',
       },
     ],
   },
@@ -39,15 +37,12 @@ const SECTIONS = [
         color: 'green',
         description: 'Tipologia funzionale dell\'Action Plan',
         usedIn: ['Form Action Plan (campo "Tipo")', 'Filtri /action-plan'],
-        examples: 'Sicurezza, Productivity, Manutenzione, Qualita, Ambiente',
-      },
       {
         id: 'priorita_ap',
         label: 'Priorita',
         color: 'green',
         description: 'Livelli di priorita per l\'Action Plan',
         usedIn: ['Form Action Plan (campo "Priorita")', 'Filtri /action-plan', 'Kanban color'],
-        examples: 'Low, Medium, High, Critical',
       },
       {
         id: 'stato_ap',
@@ -55,7 +50,6 @@ const SECTIONS = [
         color: 'green',
         description: 'Stati del flusso di lavoro Action Plan',
         usedIn: ['Form Action Plan', 'Kanban board', 'Filtri'],
-        examples: 'Da Valutare, Aperto, In Corso, In Verifica, Done',
       },
     ],
   },
@@ -70,7 +64,6 @@ const SECTIONS = [
         color: 'red',
         description: 'Le 6 grandi perdite TPM, condivisa Kaizen + Action Plan',
         usedIn: ['Kaizen (Ishikawa)', 'Action Plan', 'Step 2 Pareto Pillar'],
-        examples: 'OEE, Guasti, Setup, Microfermate, Scarti, Riavvii',
       },
       {
         id: 'argomenti',
@@ -78,7 +71,6 @@ const SECTIONS = [
         color: 'pink',
         description: 'Tag trasversali per hashtag in Kaizen e Action Plan',
         usedIn: ['Kaizen (hashtag)', 'Action Plan (tag)', 'Ricerca globale'],
-        examples: 'sicurezza, efficienza, OEE, 5S, leantools',
       },
     ],
   },
@@ -93,7 +85,6 @@ const SECTIONS = [
         color: 'purple',
         description: 'Categorizzazione dei documenti OPL/SOP/WI',
         usedIn: ['Documenti', 'Filtri Document Manager'],
-        examples: 'Operativa, Sicurezza, Manutenzione, Qualita',
       },
     ],
   },
@@ -199,17 +190,11 @@ export default function SettingsPage() {
               <div className="flex-1">
                 <div className="font-bold text-base mb-1">{currentTab.label}</div>
                 <p className="text-sm mb-2">{currentTab.description}</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <div className="font-semibold uppercase opacity-70 mb-0.5">Usato in:</div>
-                    <ul className="list-disc list-inside ml-1 space-y-0.5">
-                      {currentTab.usedIn.map((u, i) => <li key={i}>{u}</li>)}
-                    </ul>
-                  </div>
-                  <div>
-                    <div className="font-semibold uppercase opacity-70 mb-0.5">Esempi:</div>
-                    <p className="italic ml-1">{currentTab.examples}</p>
-                  </div>
+                <div className="text-xs">
+                  <div className="font-semibold uppercase opacity-70 mb-0.5">Usato in:</div>
+                  <ul className="list-disc list-inside ml-1 space-y-0.5">
+                    {currentTab.usedIn.map((u, i) => <li key={i}>{u}</li>)}
+                  </ul>
                 </div>
               </div>
             </div>
