@@ -139,7 +139,6 @@ export default function PresenzeWidget({ config, editMode, onChange }) {
                       return (
                         <td key={d} className="border-r border-b p-0">
                           <button
-                            <button
                             onClick={(e) => openCellMenu(p, d, e)}
                             onMouseDown={(e) => e.stopPropagation()}
                             className="widget-action-btn hover:opacity-75 transition-opacity rounded mx-auto block"
