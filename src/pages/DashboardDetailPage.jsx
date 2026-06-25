@@ -10,6 +10,7 @@ import BIEmbed from '../components/widgets/BIEmbed'
 import TableWidget from '../components/widgets/TableWidget'
 import ExcelLink from '../components/widgets/ExcelLink'
 import PresenzeWidget from '../components/widgets/PresenzeWidget'
+import GanttWidget from '../components/widgets/GanttWidget'
 import TableEditor from '../components/TableEditor'
 import 'react-grid-layout/css/styles.css'
 
@@ -21,6 +22,7 @@ const WIDGET_TYPES = [
   { id: 'bi_embed', label: '📊 Embed BI', icon: '📊', defaultSize: { w: 6, h: 6 } },
   { id: 'table', label: '📑 Tabella', icon: '📑', defaultSize: { w: 6, h: 5 } },
   { id: 'excel_link', label: '🔗 Link Excel', icon: '🔗', defaultSize: { w: 4, h: 4 } },
+  { id: 'gantt', label: '📅 Gantt', icon: '📅', defaultSize: { w: 12, h: 8 } },
 ]
 
 export default function DashboardDetailPage() {
@@ -115,7 +117,7 @@ export default function DashboardDetailPage() {
   )
       case 'excel_link':
         return <ExcelLink config={widget.config} />
-      case 'presenze':
+     case 'presenze':
         return (
           <PresenzeWidget
             config={widget.config}
@@ -123,6 +125,16 @@ export default function DashboardDetailPage() {
             onChange={(newConfig) => updateWidgetConfig(widget.widget_id, newConfig)}
           />
         )
+      case 'gantt':
+        return (
+          <GanttWidget
+            config={widget.config}
+            dashboardId={id}
+            dashboardName={dashboard.nome}
+            title={widget.config.titolo || 'Gantt'}
+          />
+        )
+      default:
       default:
         return <div className="bg-white p-4">Widget sconosciuto</div>
     }
