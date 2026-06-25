@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import api from '../services/api'
 import { useAllConfigurations } from '../hooks/useConfigurations'
-
+ 
 const PRIORITA_BG = {
   Lowest: 'bg-gray-100 text-gray-700',
   Low: 'bg-blue-100 text-blue-700',
