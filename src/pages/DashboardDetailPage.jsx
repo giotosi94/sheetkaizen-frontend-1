@@ -129,8 +129,7 @@ export default function DashboardDetailPage() {
         return (
           <GanttWidget
             config={widget.config}
-            dashboardId={id}
-            dashboardName={dashboard.nome}
+            onChange={(newConfig) => updateWidgetConfig(widget.widget_id, newConfig)}
             title={widget.config.titolo || 'Gantt'}
           />
         )
