@@ -1,25 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar } from 'lucide-react';
 import GanttMasterPlan from '../GanttMasterPlan'; // ⚠️ stesso del Kaizen
-import { actionPlanAPI } from '../../services/api';
+import api from '../../services/api';
 
-export default function GanttWidget({ widget, onUpdate }) {
+export default function GanttWidget({ config = {}, dashboardId, dashboardName, title = 'Gantt' }) {
   const [actionPlans, setActionPlans] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState(widget.config?.view || 'month'); // week | month | quarter
-  const [yearRange, setYearRange] = useState(widget.config?.yearRange || 1);
+  const [view, setView] = useState(config?.view || 'month'); // week | month | quarter
+  const [yearRange, setYearRange] = useState(config?.yearRange || 1);
 
   // Carica AP collegati al Meeting/Dashboard
   useEffect(() => {
     loadData();
-  }, [widget.parent_id]);
+  }, [dashboardId]);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const res = await actionPlanAPI.list({
-        parent_type: 'dashboard',
-        parent_id: widget.parent_id
+      const res = await api.get('/action-plans', {
+        params: {
+          parent_type: 'dashboard',
+          parent_id: dashboardId
+        }
       });
       // Solo AP attivi (no cancelled)
       const active = (res.data || []).filter(ap => ap.status !== 'Cancelled');
@@ -33,18 +35,10 @@ export default function GanttWidget({ widget, onUpdate }) {
 
   const handleViewChange = (newView) => {
     setView(newView);
-    onUpdate?.({
-      ...widget,
-      config: { ...widget.config, view: newView }
-    });
   };
 
   const handleYearRangeChange = (newRange) => {
     setYearRange(newRange);
-    onUpdate?.({
-      ...widget,
-      config: { ...widget.config, yearRange: newRange }
-    });
   };
 
   return (
@@ -53,7 +47,7 @@ export default function GanttWidget({ widget, onUpdate }) {
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <Calendar className="w-5 h-5 text-purple-600" />
-          <h3 className="font-semibold text-gray-800">Gantt</h3>
+          <h3 className="font-semibold text-gray-800">{title}</h3>
           <span className="text-xs text-gray-500">
             ({actionPlans.length} {actionPlans.length === 1 ? 'azione' : 'azioni'})
           </span>
