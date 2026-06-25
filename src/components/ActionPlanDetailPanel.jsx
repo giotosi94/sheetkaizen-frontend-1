@@ -330,8 +330,6 @@ export default function ActionPlanDetailPanel({ plan, onClose, onUpdated, onEdit
                       <button
                         {!isLocked && (
                         <button
-                          {!isLocked && (
-                        <button
                           onClick={() => removeAllegato(img.id, img.nome)}
                           className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                         >
@@ -360,7 +358,6 @@ export default function ActionPlanDetailPanel({ plan, onClose, onUpdated, onEdit
                         {(doc.dimensione / 1024).toFixed(0)} KB
                       </span>
                       {!isLocked && (
-                        <button
                           onClick={() => removeAllegato(doc.id, doc.nome)}
                           className="opacity-0 group-hover:opacity-100 text-red-500"
                         >
