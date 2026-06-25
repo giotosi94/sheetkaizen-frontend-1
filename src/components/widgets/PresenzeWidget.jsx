@@ -117,7 +117,7 @@ export default function PresenzeWidget({ config, editMode, onChange }) {
                   Partecipante
                 </th>
                 {date.map(d => (
-                  <th key={d} className="border-r border-b p-1 text-center font-medium text-[10px] min-w-[36px]">
+                  <th key={d} className="border-r border-b p-1 text-center font-medium text-[10px]" style={{ width: '40px', minWidth: '40px' }}>
                     {formatShortDate(d)}
                   </th>
                 ))}
@@ -139,12 +139,15 @@ export default function PresenzeWidget({ config, editMode, onChange }) {
                       return (
                         <td key={d} className="border-r border-b p-0">
                           <button
+                            <button
                             onClick={(e) => openCellMenu(p, d, e)}
                             onMouseDown={(e) => e.stopPropagation()}
-                            className="widget-action-btn w-full h-full hover:opacity-75 transition-opacity"
+                            className="widget-action-btn hover:opacity-75 transition-opacity rounded mx-auto block"
                             style={{
                               backgroundColor: bg || 'transparent',
-                              minHeight: '28px',
+                              border: bg ? 'none' : '1px solid #e5e7eb',
+                              width: '28px',
+                              height: '28px',
                             }}
                             title={`${p} · ${formatShortDate(d)}: ${getLabelForCell(p, d)}`}
                           />
