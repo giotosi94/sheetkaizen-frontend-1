@@ -1,15 +1,33 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
-import { Plus, Search, Trash2, CheckCircle } from 'lucide-react'
+import { Plus, Search, Trash2, CheckCircle, RotateCcw } from 'lucide-react'
 import { useAllConfigurations } from '../hooks/useConfigurations'
 import { usePillars } from '../hooks/usePillars'
+import { useAuth } from '../context/AuthContext'
+import UserPicker from '../components/UserPicker'
 
 const TIPOLOGIE_KAIZEN = [
   { value: 'Quick', label: 'Quick Kaizen', desc: 'Risoluzione rapida (1-3 giorni)' },
   { value: 'Standard', label: 'Standard Kaizen', desc: 'Progetto strutturato (1-4 settimane)' },
   { value: 'Major', label: 'Major Kaizen', desc: 'Iniziativa Pillar (1-3 mesi)' },
 ]
+
+const INITIAL_KAIZEN = {
+  titolo: '',
+  tipo: 'Quick',
+  reparto: '',
+  linea: '',
+  macchina: '',
+  tipo_perdita: '',
+  pillar_id: '',
+  // Team
+  team_leader_id: null,
+  team_leader_nome: '',
+  team_members_ids: [],
+  team_members_nomi: [],
+  team_members_data: [],
+}
 
 function giorniDaApertura(dataApertura) {
   if (!dataApertura) return null
@@ -34,20 +52,14 @@ export default function KaizenListPage() {
   const [kaizens, setKaizens] = useState([])
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
-  const [newKaizen, setNewKaizen] = useState({
-    titolo: '',
-    tipo: 'Quick',
-    reparto: '',
-    linea: '',
-    macchina: '',
-    tipo_perdita: '',
-    pillar_id: '',
-  })
+  const [newKaizen, setNewKaizen] = useState(INITIAL_KAIZEN)
   const [filterTipo, setFilterTipo] = useState('')
   const [filterPillar, setFilterPillar] = useState('')
   const [filterStato, setFilterStato] = useState('')
+
   const { configs } = useAllConfigurations()
   const { pillars } = usePillars()
+  const { user } = useAuth()
 
   // Carico reparti gerarchici (con linee + macchine annidate)
   const [reparti, setReparti] = useState([])
@@ -88,13 +100,42 @@ export default function KaizenListPage() {
     if (!newKaizen.titolo.trim()) return alert('Inserisci un titolo')
     if (!newKaizen.tipo) return alert('Seleziona una tipologia Kaizen')
     try {
-      // Mando sia 'tipo' (label leggibile) sia 'livello' (Quick/Standard/Major)
-      // così sia la pagina lista sia il detail interpretano correttamente
-      const payload = {
-        ...newKaizen,
-        livello: newKaizen.tipo,                  // 'Quick' | 'Standard' | 'Major'
-        tipo: `${newKaizen.tipo} Kaizen`,         // 'Quick Kaizen' | 'Standard Kaizen' | 'Major Kaizen'
+      // Rimuovi team_members_data dal payload (solo per UI)
+      const { team_members_data, ...formClean } = newKaizen
+
+      // Default Leader/Members per Quick Kaizen
+      let team_leader_id = newKaizen.team_leader_id
+      let team_leader_nome = newKaizen.team_leader_nome
+      let team_members_ids = newKaizen.team_members_ids
+      let team_members_nomi = newKaizen.team_members_nomi
+
+      if (newKaizen.tipo === 'Quick') {
+        // Se non specificato, leader = utente loggato
+        if (!team_leader_id && user?.id) {
+          team_leader_id = user.id
+          team_leader_nome = user.full_name || user.username || ''
+        }
+        // Se nessun membro, almeno il creator
+        if ((!team_members_ids || team_members_ids.length === 0) && user?.id) {
+          team_members_ids = [user.id]
+          team_members_nomi = [user.full_name || user.username || '']
+        }
       }
+
+      const payload = {
+        ...formClean,
+        livello: newKaizen.tipo,                  // 'Quick' | 'Standard' | 'Major'
+        tipo: `${newKaizen.tipo} Kaizen`,         // 'Quick Kaizen' | ...
+        // Creatore = utente loggato
+        creatore_id: user?.id || null,
+        creatore_nome: user?.full_name || user?.username || 'Default User',
+        // Team
+        team_leader_id,
+        team_leader_nome,
+        team_members_ids,
+        team_members_nomi,
+      }
+
       const res = await api.post('/kaizens', payload)
 
       if (newKaizen.pillar_id && res.data?.id) {
@@ -110,7 +151,7 @@ export default function KaizenListPage() {
       }
 
       setShowModal(false)
-      setNewKaizen({ titolo: '', tipo: 'Quick', reparto: '', linea: '', macchina: '', tipo_perdita: '', pillar_id: '' })
+      setNewKaizen(INITIAL_KAIZEN)
       loadKaizens()
     } catch (err) {
       console.error(err)
@@ -128,6 +169,19 @@ export default function KaizenListPage() {
     } catch (err) {
       console.error(err)
       alert('Errore chiusura: ' + (err.response?.data?.detail || err.message))
+    }
+  }
+
+  const riapriKaizen = async (kaizen, e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!confirm(`Riaprire il Kaizen "${kaizen.numero} - ${kaizen.titolo}"?\n\nLo stato tornerà a "Aperto" e sarà nuovamente modificabile.`)) return
+    try {
+      await api.put(`/kaizens/${kaizen._id}`, { stato: 'Aperto' })
+      loadKaizens()
+    } catch (err) {
+      console.error(err)
+      alert('Errore riapertura: ' + (err.response?.data?.detail || err.message))
     }
   }
 
@@ -273,13 +327,21 @@ export default function KaizenListPage() {
                   </td>
                   <td className="p-4 text-center">
                     <div className="flex justify-center gap-1">
-                      {!isChiuso && (
+                      {!isChiuso ? (
                         <button
                           onClick={(e) => chiudiKaizen(k, e)}
                           className="text-green-600 hover:bg-green-50 p-2 rounded-full transition-colors"
                           title="Chiudi Kaizen"
                         >
                           <CheckCircle size={16} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => riapriKaizen(k, e)}
+                          className="text-blue-600 hover:bg-blue-50 p-2 rounded-full transition-colors"
+                          title="Riapri Kaizen"
+                        >
+                          <RotateCcw size={16} />
                         </button>
                       )}
                       <button
@@ -310,7 +372,7 @@ export default function KaizenListPage() {
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="bg-primary text-white px-5 py-3 rounded-t-xl flex justify-between items-center">
+            <div className="bg-primary text-white px-5 py-3 rounded-t-xl flex justify-between items-center sticky top-0 z-10">
               <h2 className="text-lg font-bold">Nuovo Kaizen</h2>
               <button onClick={() => setShowModal(false)} className="hover:bg-primary-light p-1 rounded">✕</button>
             </div>
@@ -355,7 +417,7 @@ export default function KaizenListPage() {
                 </div>
               </div>
 
-              {/* Reparto → Linea → Macchina dinamici dal modello reparti */}
+              {/* Reparto → Linea → Macchina */}
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="block text-sm font-medium mb-1">Reparto</label>
@@ -448,6 +510,68 @@ export default function KaizenListPage() {
                     Nessun Pillar configurato. Vai su <strong>Settings → Pillars</strong> per crearli.
                   </div>
                 )}
+              </div>
+
+              {/* TEAM KAIZEN */}
+              <div className="bg-blue-50 rounded-lg p-3 space-y-3 border border-blue-200">
+                <div className="text-xs font-bold uppercase text-blue-800">Team Kaizen</div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Team Leader
+                    {newKaizen.tipo === 'Quick' && (
+                      <span className="text-xs text-gray-500 font-normal ml-1">
+                        (di default: tu come creatore)
+                      </span>
+                    )}
+                  </label>
+                  <UserPicker
+                    value={
+                      newKaizen.team_leader_id
+                        ? { id: newKaizen.team_leader_id, name: newKaizen.team_leader_nome }
+                        : null
+                    }
+                    onChange={(selected) => {
+                      if (selected) {
+                        setNewKaizen({
+                          ...newKaizen,
+                          team_leader_id: selected.id,
+                          team_leader_nome: selected.name,
+                        })
+                      } else {
+                        setNewKaizen({
+                          ...newKaizen,
+                          team_leader_id: null,
+                          team_leader_nome: '',
+                        })
+                      }
+                    }}
+                    mode="single"
+                    placeholder="Cerca team leader..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Team Members
+                    <span className="text-xs text-gray-500 font-normal ml-1">
+                      ({newKaizen.team_members_data?.length || 0})
+                    </span>
+                  </label>
+                  <UserPicker
+                    value={newKaizen.team_members_data || []}
+                    onChange={(selected) => {
+                      setNewKaizen({
+                        ...newKaizen,
+                        team_members_data: selected,
+                        team_members_ids: selected.map(s => s.id),
+                        team_members_nomi: selected.map(s => s.name),
+                      })
+                    }}
+                    mode="multi"
+                    placeholder="Aggiungi membri al team..."
+                  />
+                </div>
               </div>
 
               <div className="flex gap-2 justify-end pt-3 border-t">
