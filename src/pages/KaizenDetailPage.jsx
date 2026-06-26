@@ -617,6 +617,8 @@ export default function KaizenDetailPage() {
         </div>
       )}
 
+      </fieldset>
+      
       {/* Form AP creato da Root Cause dei 5 Perché */}
       {showAPFormFromRootCause && rootCausePrefill && (
         <ActionPlanFormShared
