@@ -636,53 +636,97 @@ function StepContent({ step, data, color, onUpdate, allStepsData, pillar }) {
 }
 
 function Step1Content({ data, color, onUpdate }) {
-  const kpiPrincipale = data.kpi_principale || { label: '', baseline: '', target: '', unit: '%', owner: '', descrizione: '' }
+  const kpiPrincipale = data.kpi_principale || { label: '', baseline: '', target: '', unit: '%', descrizione: '' }
   const kmis = data.kmis || []
+
   function updateKpiPrincipale(field, value) {
     const newKpi = { ...kpiPrincipale }
     newKpi[field] = value
     onUpdate({ kpi_principale: newKpi })
   }
-  function addKmi() { onUpdate({ kmis: [...kmis, { id: Date.now().toString(), label: '', baseline: '', target: '', unit: '%', owner: '' }] }) }
-  function updateKmi(id, updates) { onUpdate({ kmis: kmis.map(k => k.id === id ? { ...k, ...updates } : k) }) }
-  function removeKmi(id) { onUpdate({ kmis: kmis.filter(k => k.id !== id) }) }
+  function addKmi() {
+    onUpdate({
+      kmis: [...kmis, { id: Date.now().toString(), label: '', baseline: '', target: '', unit: '%' }]
+    })
+  }
+  function updateKmi(id, updates) {
+    onUpdate({ kmis: kmis.map(k => k.id === id ? { ...k, ...updates } : k) })
+  }
+  function removeKmi(id) {
+    onUpdate({ kmis: kmis.filter(k => k.id !== id) })
+  }
 
   return (
     <div className="space-y-4 mt-3">
+      {/* Spiegazione semplice */}
       <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-3 text-sm text-blue-800">
-        <strong>Cosa fare:</strong> Definisci il KPI principale (es. OEE, MTBF) con baseline e target. I KMI sono indicatori secondari opzionali di supporto.
+        <strong>Cosa fare:</strong> Definisci il KPI che vuoi migliorare. Inserisci dove sei oggi e dove vuoi arrivare.
       </div>
+
+      {/* KPI PRINCIPALE */}
       <div className="bg-white p-4 rounded-lg border-2" style={{ borderColor: color }}>
-        <h4 className="font-bold text-sm uppercase mb-3" style={{ color }}>KPI Principale (obbligatorio)</h4>
+        <h4 className="font-bold text-sm uppercase mb-1" style={{ color }}>KPI Principale (obbligatorio)</h4>
+        <p className="text-xs text-gray-500 mb-3">Esempio: OEE, MTBF, % Scarti, Tempo Setup</p>
+
         <div className="grid grid-cols-12 gap-2 mb-2">
-          <div className="col-span-4">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Nome KPI <span className="text-red-500">*</span></label>
-            <input className="w-full border rounded px-3 py-2 text-sm font-bold" value={kpiPrincipale.label} onChange={(e) => updateKpiPrincipale('label', e.target.value)} />
+          <div className="col-span-5">
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Nome KPI <span className="text-red-500">*</span>
+            </label>
+            <input
+              className="w-full border rounded px-3 py-2 text-sm font-bold"
+              value={kpiPrincipale.label}
+              onChange={(e) => updateKpiPrincipale('label', e.target.value)}
+              placeholder="Es: OEE"
+            />
           </div>
-          <div className="col-span-2">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Baseline</label>
-            <input className="w-full border rounded px-3 py-2 text-sm" value={kpiPrincipale.baseline} onChange={(e) => updateKpiPrincipale('baseline', e.target.value)} />
+          <div className="col-span-3">
+            <label className="block text-xs font-medium text-gray-600 mb-1" title="Dove sei oggi">
+              Valore attuale (oggi)
+            </label>
+            <input
+              className="w-full border rounded px-3 py-2 text-sm"
+              value={kpiPrincipale.baseline}
+              onChange={(e) => updateKpiPrincipale('baseline', e.target.value)}
+              placeholder="Es: 79"
+            />
           </div>
-          <div className="col-span-2">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Target</label>
-            <input className="w-full border rounded px-3 py-2 text-sm" value={kpiPrincipale.target} onChange={(e) => updateKpiPrincipale('target', e.target.value)} />
+          <div className="col-span-3">
+            <label className="block text-xs font-medium text-gray-600 mb-1" title="Dove vuoi arrivare">
+              Obiettivo (target)
+            </label>
+            <input
+              className="w-full border rounded px-3 py-2 text-sm"
+              value={kpiPrincipale.target}
+              onChange={(e) => updateKpiPrincipale('target', e.target.value)}
+              placeholder="Es: 81"
+            />
           </div>
           <div className="col-span-1">
             <label className="block text-xs font-medium text-gray-600 mb-1">Unità</label>
-            <input className="w-full border rounded px-3 py-2 text-sm" value={kpiPrincipale.unit} onChange={(e) => updateKpiPrincipale('unit', e.target.value)} />
-          </div>
-          <div className="col-span-3">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Owner</label>
-            <input className="w-full border rounded px-3 py-2 text-sm" value={kpiPrincipale.owner} onChange={(e) => updateKpiPrincipale('owner', e.target.value)} />
+            <input
+              className="w-full border rounded px-3 py-2 text-sm"
+              value={kpiPrincipale.unit}
+              onChange={(e) => updateKpiPrincipale('unit', e.target.value)}
+              placeholder="%"
+            />
           </div>
         </div>
+
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Descrizione (opzionale)</label>
-          <input className="w-full border rounded px-3 py-2 text-sm" value={kpiPrincipale.descrizione} onChange={(e) => updateKpiPrincipale('descrizione', e.target.value)} />
+          <input
+            className="w-full border rounded px-3 py-2 text-sm"
+            value={kpiPrincipale.descrizione}
+            onChange={(e) => updateKpiPrincipale('descrizione', e.target.value)}
+            placeholder="Come misuriamo questo KPI?"
+          />
         </div>
+
+        {/* Riepilogo Gap */}
         {kpiPrincipale.baseline && kpiPrincipale.target && (
           <div className="mt-3 pt-3 border-t flex items-center gap-3 text-sm">
-            <span className="text-gray-500">Gap da chiudere:</span>
+            <span className="text-gray-500">Da migliorare:</span>
             <span className="font-mono text-lg font-bold" style={{ color }}>
               {kpiPrincipale.baseline} → {kpiPrincipale.target} {kpiPrincipale.unit}
             </span>
@@ -692,26 +736,59 @@ function Step1Content({ data, color, onUpdate }) {
           </div>
         )}
       </div>
+
+      {/* KMI (opzionali) */}
       <div className="bg-white p-4 rounded-lg border">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h4 className="font-bold text-sm uppercase text-gray-700">KMI — Key Management Indicators</h4>
-            <p className="text-xs text-gray-500">Indicatori secondari opzionali di supporto al KPI principale</p>
+            <h4 className="font-bold text-sm uppercase text-gray-700">Indicatori secondari (opzionali)</h4>
+            <p className="text-xs text-gray-500">
+              Quali variabili influenzano il KPI principale? Aggiungi solo se servono.
+              <br />
+              <span className="italic">Esempio: OEE è composto da Disponibilità, Performance, Qualità.</span>
+            </p>
           </div>
-          <button onClick={addKmi} className="text-xs px-3 py-1 text-white rounded shadow" style={{ backgroundColor: color }}>+ Aggiungi KMI</button>
+          <button onClick={addKmi} className="text-xs px-3 py-1 text-white rounded shadow" style={{ backgroundColor: color }}>
+            + Aggiungi indicatore
+          </button>
         </div>
+
         {kmis.length === 0 ? (
-          <div className="text-center text-xs text-gray-400 italic py-3">Nessun KMI definito. Sono opzionali — aggiungi solo se servono.</div>
+          <div className="text-center text-xs text-gray-400 italic py-4">
+            Nessun indicatore secondario. Sono opzionali — aggiungi solo se servono.
+          </div>
         ) : (
           <div className="space-y-2">
             {kmis.map((kmi, idx) => (
               <div key={kmi.id} className="grid grid-cols-12 gap-2 items-center">
                 <div className="col-span-1 text-center text-xs font-bold text-gray-400">#{idx + 1}</div>
-                <input className="col-span-4 border rounded px-2 py-1 text-sm" value={kmi.label} onChange={(e) => updateKmi(kmi.id, { label: e.target.value })} />
-                <input className="col-span-2 border rounded px-2 py-1 text-sm" value={kmi.baseline} onChange={(e) => updateKmi(kmi.id, { baseline: e.target.value })} placeholder="Baseline" />
-                <input className="col-span-2 border rounded px-2 py-1 text-sm" value={kmi.target} onChange={(e) => updateKmi(kmi.id, { target: e.target.value })} placeholder="Target" />
-                <input className="col-span-2 border rounded px-2 py-1 text-sm" value={kmi.owner} onChange={(e) => updateKmi(kmi.id, { owner: e.target.value })} placeholder="Owner" />
-                <button onClick={() => removeKmi(kmi.id)} className="col-span-1 text-red-500 hover:bg-red-50 p-1 rounded"><Trash2 size={14} /></button>
+                <input
+                  className="col-span-5 border rounded px-2 py-1 text-sm"
+                  value={kmi.label}
+                  onChange={(e) => updateKmi(kmi.id, { label: e.target.value })}
+                  placeholder="Es: Disponibilità"
+                />
+                <input
+                  className="col-span-2 border rounded px-2 py-1 text-sm"
+                  value={kmi.baseline}
+                  onChange={(e) => updateKmi(kmi.id, { baseline: e.target.value })}
+                  placeholder="Oggi"
+                />
+                <input
+                  className="col-span-2 border rounded px-2 py-1 text-sm"
+                  value={kmi.target}
+                  onChange={(e) => updateKmi(kmi.id, { target: e.target.value })}
+                  placeholder="Target"
+                />
+                <input
+                  className="col-span-1 border rounded px-2 py-1 text-sm"
+                  value={kmi.unit}
+                  onChange={(e) => updateKmi(kmi.id, { unit: e.target.value })}
+                  placeholder="%"
+                />
+                <button onClick={() => removeKmi(kmi.id)} className="col-span-1 text-red-500 hover:bg-red-50 p-1 rounded">
+                  <Trash2 size={14} />
+                </button>
               </div>
             ))}
           </div>
