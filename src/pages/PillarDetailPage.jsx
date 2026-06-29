@@ -800,8 +800,9 @@ function Step1Content({ data, color, onUpdate }) {
 
 function Step2Content({ data, color, onUpdate, pillar }) {
   const losses = data.losses || []
-  const unit = data.unit || '%'  // 🆕 unità globale del Pareto
-  const paretoTarget = data.pareto_target_percent ?? pillar?.pareto_target_percent ?? 80  // 🆕 target
+  const unit = data.unit || '%'
+  const { configs } = useAllConfigurations()
+  const clustersConfig = configs.cluster_perdita || []
 
   function addLoss() {
     onUpdate({
@@ -809,128 +810,150 @@ function Step2Content({ data, color, onUpdate, pillar }) {
         id: Date.now().toString(),
         label: '',
         value: '',
-        color: '',
-        magnitude: 'medio',
+        cluster_id: '',
       }]
     })
   }
-  function updateLoss(id, updates) { onUpdate({ losses: losses.map(l => l.id === id ? { ...l, ...updates } : l) }) }
-  function removeLoss(id) { onUpdate({ losses: losses.filter(l => l.id !== id) }) }
+  function updateLoss(id, updates) {
+    onUpdate({ losses: losses.map(l => l.id === id ? { ...l, ...updates } : l) })
+  }
+  function removeLoss(id) {
+    onUpdate({ losses: losses.filter(l => l.id !== id) })
+  }
   function updateUnit(newUnit) { onUpdate({ unit: newUnit }) }
-  function updateTarget(newTarget) { onUpdate({ pareto_target_percent: parseFloat(newTarget) || 80 }) }
 
-  // Sort decrescente per visualizzazione tabella
-  const sortedLosses = [...losses].sort((a, b) => (parseFloat(b.value) || parseFloat(b.percent_impact) || 0) - (parseFloat(a.value) || parseFloat(a.percent_impact) || 0))
+  // Trova il colore del cluster automaticamente
+  function getClusterColor(clusterId) {
+    const cluster = clustersConfig.find(c => c._id === clusterId)
+    return cluster?.color || '#9CA3AF'  // grigio default
+  }
 
-  // Prepara dati per ParetoChart (usa `value` se presente, fallback su `percent_impact` per retrocompat)
+  function getClusterLabel(clusterId) {
+    const cluster = clustersConfig.find(c => c._id === clusterId)
+    return cluster?.label || ''
+  }
+
+  // Sort decrescente
+  const sortedLosses = [...losses].sort((a, b) =>
+    (parseFloat(b.value) || 0) - (parseFloat(a.value) || 0)
+  )
+
+  // Dati per Pareto chart con colore dal cluster
   const lossesForChart = sortedLosses.map(l => ({
     id: l.id,
-    label: l.label || 'Senza nome',
-    value: parseFloat(l.value) || parseFloat(l.percent_impact) || 0,
-    color: l.color,
+    label: l.label || getClusterLabel(l.cluster_id) || 'Senza nome',
+    value: parseFloat(l.value) || 0,
+    color: getClusterColor(l.cluster_id),
   }))
-
-  const UNITS = [
-    { value: '%', label: '% (percentuale)' },
-    { value: 'nr', label: 'nr (numero/pezzi)' },
-    { value: '€', label: '€ (euro/saving)' },
-    { value: 'min', label: 'min (minuti)' },
-    { value: 'h', label: 'h (ore)' },
-    { value: 'kg', label: 'kg (peso)' },
-  ]
 
   return (
     <div className="space-y-3 mt-3">
+      {/* Spiegazione */}
       <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-3 text-sm text-blue-800">
-        <strong>Cosa fare:</strong> Elenca le perdite che impattano il KPI con il loro valore. Le perdite più alte sono il "vital few" su cui focalizzarti. Il grafico Pareto si aggiorna automaticamente.
+        <strong>Cosa fare:</strong> Elenca le perdite che impattano il KPI. Associa ogni perdita a un <strong>cluster</strong> (es. Colatrice, Temperatrice). Il grafico Pareto si colora automaticamente dal cluster.
       </div>
 
-      {/* Config Pareto */}
-      <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3 rounded-lg">
-        <div>
-          <label className="block text-xs font-medium text-gray-600 uppercase mb-1">Unità di misura</label>
-          <select
-            value={unit}
-            onChange={(e) => updateUnit(e.target.value)}
-            className="w-full border rounded-lg px-3 py-1.5 text-sm bg-white"
-          >
-            {UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
-          </select>
+      {/* Alert se nessun cluster configurato */}
+      {clustersConfig.length === 0 && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-r-lg p-3 text-sm text-yellow-800">
+          ⚠️ <strong>Nessun cluster configurato.</strong> Vai in <strong>Settings → Cluster di Perdita</strong> per crearli (es. "Colatrice", "Temperatrice", "ORM"). Solo dopo potrai associare le perdite.
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 uppercase mb-1">Target Pareto (curva cumulativa)</label>
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              min="0"
-              max="100"
-              value={paretoTarget}
-              onChange={(e) => updateTarget(e.target.value)}
-              className="w-full border rounded-lg px-3 py-1.5 text-sm bg-white"
-            />
-            <span className="text-sm text-gray-500">%</span>
-          </div>
-        </div>
+      )}
+
+      {/* Config unità di misura */}
+      <div className="bg-gray-50 p-3 rounded-lg">
+        <label className="block text-xs font-medium text-gray-600 uppercase mb-1">Unità di misura</label>
+        <select
+          value={unit}
+          onChange={(e) => updateUnit(e.target.value)}
+          className="w-full md:w-1/2 border rounded-lg px-3 py-1.5 text-sm bg-white"
+        >
+          {UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+        </select>
       </div>
 
       <div className="flex justify-between items-center">
         <h4 className="font-semibold text-sm uppercase text-gray-700">Top Losses</h4>
-        <button onClick={addLoss} className="text-xs px-3 py-1 text-white rounded shadow" style={{ backgroundColor: color }}>+ Aggiungi Loss</button>
+        <button
+          onClick={addLoss}
+          className="text-xs px-3 py-1 text-white rounded shadow"
+          style={{ backgroundColor: color }}
+        >
+          + Aggiungi Loss
+        </button>
       </div>
 
       {sortedLosses.length === 0 ? (
-        <div className="bg-white p-6 rounded-lg text-center text-sm text-gray-400 italic">Nessuna perdita identificata.</div>
+        <div className="bg-white p-6 rounded-lg text-center text-sm text-gray-400 italic">
+          Nessuna perdita identificata.
+        </div>
       ) : (
         <div className="space-y-2">
           {sortedLosses.map((loss, idx) => {
-            const valueNumber = parseFloat(loss.value) || parseFloat(loss.percent_impact) || 0
+            const valueNumber = parseFloat(loss.value) || 0
+            const clusterColor = getClusterColor(loss.cluster_id)
             return (
               <div key={loss.id} className="bg-white p-3 rounded-lg border">
                 <div className="grid grid-cols-12 gap-2 items-center">
                   <div className="col-span-1 text-center font-bold text-gray-400">#{idx + 1}</div>
+
+                  {/* Nome perdita */}
                   <input
                     className="col-span-4 border rounded px-2 py-1 text-sm font-medium"
                     value={loss.label}
                     onChange={(e) => updateLoss(loss.id, { label: e.target.value })}
-                    placeholder="Nome della perdita"
+                    placeholder="Nome perdita"
                   />
+
+                  {/* Valore */}
                   <input
                     type="number"
                     step="0.1"
                     className="col-span-2 border rounded px-2 py-1 text-sm"
-                    value={loss.value ?? loss.percent_impact ?? ''}
+                    value={loss.value || ''}
                     onChange={(e) => updateLoss(loss.id, { value: e.target.value })}
                     placeholder={`Valore (${unit})`}
                   />
-                  <select
-                    className="col-span-2 border rounded px-2 py-1 text-sm"
-                    value={loss.magnitude || 'medio'}
-                    onChange={(e) => updateLoss(loss.id, { magnitude: e.target.value })}
-                  >
-                    <option value="alto">Alto</option>
-                    <option value="medio">Medio</option>
-                    <option value="basso">Basso</option>
-                  </select>
-                  <div className="col-span-2 flex items-center gap-1">
-                    <input
-                      type="color"
-                      value={loss.color || color || '#6366f1'}
-                      onChange={(e) => updateLoss(loss.id, { color: e.target.value })}
-                      className="w-8 h-8 border rounded cursor-pointer"
-                      title="Colore"
+
+                  {/* Cluster dropdown */}
+                  <div className="col-span-4 flex items-center gap-2">
+                    {/* Indicatore colore cluster */}
+                    <div
+                      className="w-6 h-6 rounded border-2 flex-shrink-0"
+                      style={{ backgroundColor: clusterColor, borderColor: clusterColor }}
+                      title={getClusterLabel(loss.cluster_id) || 'Nessun cluster'}
                     />
+                    <select
+                      className="flex-1 border rounded px-2 py-1 text-sm"
+                      value={loss.cluster_id || ''}
+                      onChange={(e) => updateLoss(loss.id, { cluster_id: e.target.value })}
+                    >
+                      <option value="">— Cluster —</option>
+                      {clustersConfig.filter(c => c.attivo !== false).map(c => (
+                        <option key={c._id} value={c._id}>
+                          {c.icon ? `${c.icon} ` : ''}{c.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <button onClick={() => removeLoss(loss.id)} className="col-span-1 text-red-500 hover:bg-red-50 p-1 rounded">
+
+                  {/* Bottone rimuovi */}
+                  <button
+                    onClick={() => removeLoss(loss.id)}
+                    className="col-span-1 text-red-500 hover:bg-red-50 p-1 rounded"
+                  >
                     <Trash2 size={14} />
                   </button>
                 </div>
+
+                {/* Barra progress (colore del cluster) */}
                 {valueNumber > 0 && (
                   <div className="mt-2 bg-gray-200 rounded-full h-2 overflow-hidden">
                     <div
                       className="h-full"
                       style={{
                         width: `${Math.min(100, valueNumber)}%`,
-                        backgroundColor: loss.color || color,
+                        backgroundColor: clusterColor,
                       }}
                     />
                   </div>
@@ -941,14 +964,14 @@ function Step2Content({ data, color, onUpdate, pillar }) {
         </div>
       )}
 
-      {/* 🆕 PARETO CHART */}
+      {/* PARETO CHART */}
       {lossesForChart.length > 0 && (
         <div className="mt-6">
           <ParetoChart
             losses={lossesForChart}
             title={`${pillar?.sigla || 'Pillar'} Losses Deployment`}
             subtitle={pillar?.label || ''}
-            targetPercent={paretoTarget}
+            targetPercent={80}
             unit={unit}
           />
         </div>
