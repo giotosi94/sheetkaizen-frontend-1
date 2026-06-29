@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
@@ -6,6 +6,7 @@ import {
   ClipboardList, AlertTriangle, Calendar, FileText, Layers,
   User, Briefcase, Factory, MapPin, ChevronRight, CheckCircle2, Clock
 } from 'lucide-react'
+import ActionPlanDetailPanel from '../components/ActionPlanDetailPanel'
 
 export default function HomePage() {
   const { user, isAdmin, isManager, isOffice, isOperator } = useAuth()
@@ -15,6 +16,7 @@ export default function HomePage() {
   const [pillars, setPillars] = useState([])
   const [dashboards, setDashboards] = useState([])
   const [loading, setLoading] = useState(true)
+  const [selectedAP, setSelectedAP] = useState(null)
 
   useEffect(() => { loadData() }, [user])
 
@@ -243,16 +245,16 @@ export default function HomePage() {
         ) : (
           <div className="space-y-4">
             {apOverdue.length > 0 && (
-              <APGroup title="Scaduti" color="red" icon={AlertTriangle} aps={apOverdue.slice(0, 5)} />
+              <APGroup title="Scaduti" color="red" icon={AlertTriangle} aps={apOverdue.slice(0, 5)} onClick={setSelectedAP} />
             )}
             {apToday.length > 0 && (
-              <APGroup title="Da fare oggi" color="orange" icon={Clock} aps={apToday.slice(0, 5)} />
+              <APGroup title="Da fare oggi" color="orange" icon={Clock} aps={apToday.slice(0, 5)} onClick={setSelectedAP} />
             )}
             {apWeek.length > 0 && (
-              <APGroup title="Questa settimana" color="yellow" icon={Calendar} aps={apWeek.slice(0, 5)} />
+              <APGroup title="Questa settimana" color="yellow" icon={Calendar} aps={apWeek.slice(0, 5)} onClick={setSelectedAP} />
             )}
             {apFuture.length > 0 && (
-              <APGroup title="Prossime" color="green" icon={CheckCircle2} aps={apFuture.slice(0, 5)} />
+              <APGroup title="Prossime" color="green" icon={CheckCircle2} aps={apFuture.slice(0, 5)} onClick={setSelectedAP} />
             )}
             {apOverdue.length === 0 && apToday.length === 0 && apWeek.length === 0 && apFuture.length === 0 && (
               <div className="text-center py-4 text-gray-400 text-sm">
@@ -399,6 +401,15 @@ export default function HomePage() {
           </div>
         )}
       </div>
+{/* Pannello dettaglio AP (cliccando una riga) */}
+      {selectedAP && (
+        <ActionPlanDetailPanel
+          plan={selectedAP}
+          onClose={() => setSelectedAP(null)}
+          onUpdated={loadData}
+          onEdit={() => setSelectedAP(null)}
+        />
+      )}
     </div>
   )
 }
@@ -430,7 +441,7 @@ function StatCard({ icon: Icon, label, value, color, link }) {
 // ──────────────────────────────────────────
 // HELPER: Gruppo di AP per categoria scadenza
 // ──────────────────────────────────────────
-function APGroup({ title, color, icon: Icon, aps }) {
+function APGroup({ title, color, icon: Icon, aps, onClick }) {
   const colors = {
     red: 'text-red-700 bg-red-50 border-red-200',
     orange: 'text-orange-700 bg-orange-50 border-orange-200',
@@ -445,7 +456,11 @@ function APGroup({ title, color, icon: Icon, aps }) {
       </div>
       <div className="space-y-1.5">
         {aps.map(ap => (
-          <div key={ap._id} className="flex items-center gap-2 p-2 rounded border hover:bg-gray-50">
+          <div
+            key={ap._id}
+            onClick={() => onClick?.(ap)}
+            className="flex items-center gap-2 p-2 rounded border hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-colors"
+          >
             <span className="font-mono text-xs text-primary font-bold flex-shrink-0">{ap.numero}</span>
             <span className="text-sm flex-1 truncate">{ap.titolo}</span>
             {ap.data_scadenza && (
