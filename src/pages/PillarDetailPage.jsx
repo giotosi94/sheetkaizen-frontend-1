@@ -1415,8 +1415,6 @@ function Step5Content({ data, color, onUpdate, allStepsData, pillar }) {
     </div>
   )
 }
-  const baseline = step3Data.baseline || { label: 'Baseline', value: 0 }
-
 
 function BridgeCell({ label, value, autoValue, isOverridden, onChange, onReset, colSpan = 'col-span-3', suffix = '' }) {
   return (
