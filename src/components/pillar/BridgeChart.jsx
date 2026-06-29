@@ -25,6 +25,8 @@ export default function BridgeChart({
   improvements = [],
   forecast = null,
   target = null,
+  actual = null,            // 🆕 dato Actual (per Step 5)
+  compareMode = false,      // 🆕 se true mostra Planned vs Actual
   unit = '%',
   title = 'Bridge Chart',
   subtitle = '',
@@ -66,36 +68,50 @@ export default function BridgeChart({
       running += impValue
     })
 
-    // Forecast (barra piena dal 0)
+    // Forecast Planned (giallo)
     if (forecast) {
       const fValue = parseFloat(forecast.value) || running
       data.push({
-        name: forecast.label || 'Forecast',
+        name: forecast.label || 'Forecast Planned',
         start: 0,
         gain: fValue,
         total: fValue,
-        color: '#FBBF24',  // giallo/arancio
+        color: '#FBBF24',  // giallo
         isTotal: true,
         displayValue: fValue,
       })
     }
 
-    // Target (barra piena dal 0)
-    if (target) {
+    // 🆕 Actual (arancio) — solo in compareMode
+    if (compareMode && actual) {
+      const aValue = parseFloat(actual.value) || 0
+      data.push({
+        name: actual.label || 'Actual',
+        start: 0,
+        gain: aValue,
+        total: aValue,
+        color: '#F97316',  // arancio
+        isTotal: true,
+        displayValue: aValue,
+      })
+    }
+
+    // Target (verde, ma solo come barra se non c'è linea)
+    if (target && !compareMode) {
       const tValue = parseFloat(target.value) || 0
       data.push({
         name: target.label || 'Target',
         start: 0,
         gain: tValue,
         total: tValue,
-        color: '#F59E0B',  // arancio scuro
+        color: '#F59E0B',
         isTotal: true,
         displayValue: tValue,
       })
     }
 
     return data
-  }, [baseline, improvements, forecast, target])
+  }, [baseline, improvements, forecast, target, actual, compareMode])
 
   // Calcola auto-range Y se non specificato
   const yDomain = useMemo(() => {
