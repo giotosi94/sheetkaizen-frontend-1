@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, Filter, ChevronDown } from 'lucide-react'
 import { useAllConfigurations } from '../hooks/useConfigurations'
 import { usePillars } from '../hooks/usePillars'
 import { useAuth } from '../context/AuthContext'
@@ -21,12 +21,30 @@ const INITIAL_KAIZEN = {
   macchina: '',
   tipo_perdita: '',
   pillar_id: '',
-  // Team
+  dashboard_id: '',
+  dashboard_nome: '',
   team_leader_id: null,
   team_leader_nome: '',
   team_members_ids: [],
   team_members_nomi: [],
   team_members_data: [],
+}
+
+const INITIAL_FILTERS = {
+  search: '',
+  tipo: '',
+  stato: '',
+  pillar_id: '',
+  categoria_perdita: '',
+  reparto: '',
+  linea: '',
+  macchina: '',
+  dashboard_id: '',
+  creatore_id: null,
+  creatore_nome: '',
+  team_leader_id: null,
+  team_leader_nome: '',
+  view: 'all',  // 'all' | 'mine' | 'old30'
 }
 
 function giorniDaApertura(dataApertura) {
@@ -39,11 +57,9 @@ function giorniDaApertura(dataApertura) {
 function GiorniBadge({ giorni, stato }) {
   if (giorni === null) return <span className="text-gray-400">—</span>
   if (stato === 'Chiuso') return <span className="text-xs text-gray-500">Chiuso</span>
-
   let colorClass = 'text-green-700 bg-green-50'
   if (giorni > 30) colorClass = 'text-red-700 bg-red-50'
   else if (giorni > 7) colorClass = 'text-yellow-700 bg-yellow-50'
-
   const label = giorni === 0 ? 'oggi' : `${giorni} giorni`
   return <span className={`text-xs px-2 py-0.5 rounded ${colorClass}`}>{label}</span>
 }
@@ -67,37 +83,66 @@ function CreatorAvatar({ name }) {
   )
 }
 
+function FilterChip({ active, onClick, label }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-full text-xs font-medium border-2 transition-all ${
+        active
+          ? 'bg-primary text-white border-primary'
+          : 'bg-white text-gray-700 border-gray-200 hover:border-primary'
+      }`}
+    >
+      {label}
+    </button>
+  )
+}
+
 export default function KaizenListPage() {
   const [kaizens, setKaizens] = useState([])
-  const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [newKaizen, setNewKaizen] = useState(INITIAL_KAIZEN)
-  const [filterTipo, setFilterTipo] = useState('')
-  const [filterPillar, setFilterPillar] = useState('')
-  const [filterStato, setFilterStato] = useState('')
+  const [filters, setFilters] = useState(INITIAL_FILTERS)
+  const [showFilters, setShowFilters] = useState(false)
+  const [dashboards, setDashboards] = useState([])
 
   const { configs } = useAllConfigurations()
   const { pillars } = usePillars()
   const { user } = useAuth()
 
-  // Carico reparti gerarchici (con linee + macchine annidate)
+  // Reparti per form e filtri
   const [reparti, setReparti] = useState([])
   useEffect(() => {
     api.get('/reparti/').then(res => setReparti(res.data || [])).catch(() => setReparti([]))
+    api.get('/dashboards/').then(res => setDashboards(res.data || [])).catch(() => setDashboards([]))
   }, [])
 
-  // Linee/Macchine filtrate dinamicamente
-  const lineeDisponibili = useMemo(() => {
+  // Linee/Macchine per FORM (in base al reparto del nuovo Kaizen)
+  const lineeFormDisponibili = useMemo(() => {
     if (!newKaizen.reparto) return []
     const rep = reparti.find(r => r.nome === newKaizen.reparto)
     return rep?.linee?.filter(l => l.attivo !== false) || []
   }, [newKaizen.reparto, reparti])
 
-  const macchineDisponibili = useMemo(() => {
+  const macchineFormDisponibili = useMemo(() => {
     if (!newKaizen.linea) return []
-    const linea = lineeDisponibili.find(l => l.nome === newKaizen.linea)
+    const linea = lineeFormDisponibili.find(l => l.nome === newKaizen.linea)
     return linea?.macchine?.filter(m => m.attivo !== false) || []
-  }, [newKaizen.linea, lineeDisponibili])
+  }, [newKaizen.linea, lineeFormDisponibili])
+
+  // Linee/Macchine per FILTRI (in base al reparto del filtro)
+  const lineeFilterDisponibili = useMemo(() => {
+    if (!filters.reparto) return []
+    const rep = reparti.find(r => r.nome === filters.reparto)
+    return rep?.linee?.filter(l => l.attivo !== false) || []
+  }, [filters.reparto, reparti])
+
+  const macchineFilterDisponibili = useMemo(() => {
+    if (!filters.linea) return []
+    const linea = lineeFilterDisponibili.find(l => l.nome === filters.linea)
+    return linea?.macchine?.filter(m => m.attivo !== false) || []
+  }, [filters.linea, lineeFilterDisponibili])
 
   function handleRepartoChange(nuovoReparto) {
     setNewKaizen(k => ({ ...k, reparto: nuovoReparto, linea: '', macchina: '' }))
@@ -119,22 +164,18 @@ export default function KaizenListPage() {
     if (!newKaizen.titolo.trim()) return alert('Inserisci un titolo')
     if (!newKaizen.tipo) return alert('Seleziona una tipologia Kaizen')
     try {
-      // Rimuovi team_members_data dal payload (solo per UI)
       const { team_members_data, ...formClean } = newKaizen
 
-      // Default Leader/Members per Quick Kaizen
       let team_leader_id = newKaizen.team_leader_id
       let team_leader_nome = newKaizen.team_leader_nome
       let team_members_ids = newKaizen.team_members_ids
       let team_members_nomi = newKaizen.team_members_nomi
 
       if (newKaizen.tipo === 'Quick') {
-        // Se non specificato, leader = utente loggato
         if (!team_leader_id && user?.id) {
           team_leader_id = user.id
           team_leader_nome = user.full_name || user.username || ''
         }
-        // Se nessun membro, almeno il creator
         if ((!team_members_ids || team_members_ids.length === 0) && user?.id) {
           team_members_ids = [user.id]
           team_members_nomi = [user.full_name || user.username || '']
@@ -143,12 +184,10 @@ export default function KaizenListPage() {
 
       const payload = {
         ...formClean,
-        livello: newKaizen.tipo,                  // 'Quick' | 'Standard' | 'Major'
-        tipo: `${newKaizen.tipo} Kaizen`,         // 'Quick Kaizen' | ...
-        // Creatore = utente loggato
+        livello: newKaizen.tipo,
+        tipo: `${newKaizen.tipo} Kaizen`,
         creatore_id: user?.id || null,
         creatore_nome: user?.full_name || user?.username || 'Default User',
-        // Team
         team_leader_id,
         team_leader_nome,
         team_members_ids,
@@ -178,15 +217,73 @@ export default function KaizenListPage() {
     }
   }
 
-  const filtered = kaizens.filter(k => {
-    const matchSearch = k.titolo?.toLowerCase().includes(search.toLowerCase()) ||
-                        k.numero?.toLowerCase().includes(search.toLowerCase())
-    const tipoNormalizzato = k.livello || (k.tipo?.includes('Major') ? 'Major' : k.tipo?.includes('Standard') ? 'Standard' : 'Quick')
-    const matchTipo = !filterTipo || tipoNormalizzato === filterTipo
-    const matchPillar = !filterPillar || k.pillar_id === filterPillar
-    const matchStato = !filterStato || k.stato === filterStato
-    return matchSearch && matchTipo && matchPillar && matchStato
-  })
+  // Conteggio filtri attivi (esclude search)
+  const activeFiltersCount = useMemo(() => {
+    return Object.entries(filters).filter(([k, v]) => {
+      if (k === 'search') return false
+      if (k === 'view') return v !== 'all'
+      if (typeof v === 'boolean') return v === true
+      return v !== '' && v !== null && v !== undefined
+    }).length
+  }, [filters])
+
+  function resetFilters() {
+    setFilters({ ...INITIAL_FILTERS, search: filters.search })
+  }
+
+  // Filtraggio kaizen
+  const filtered = useMemo(() => {
+    return kaizens.filter(k => {
+      // Search
+      const matchSearch = !filters.search ||
+        k.titolo?.toLowerCase().includes(filters.search.toLowerCase()) ||
+        k.numero?.toLowerCase().includes(filters.search.toLowerCase())
+
+      // Tipo
+      const tipoNormalizzato = k.livello || (k.tipo?.includes('Major') ? 'Major' : k.tipo?.includes('Standard') ? 'Standard' : 'Quick')
+      const matchTipo = !filters.tipo || tipoNormalizzato === filters.tipo
+
+      // Stato
+      const matchStato = !filters.stato || k.stato === filters.stato
+
+      // Pillar
+      const matchPillar = !filters.pillar_id || k.pillar_id === filters.pillar_id
+
+      // Categoria perdita
+      const matchCategoria = !filters.categoria_perdita ||
+        k.tipo_perdita === filters.categoria_perdita ||
+        k.categoria === filters.categoria_perdita
+
+      // Reparto / Linea / Macchina
+      const matchReparto = !filters.reparto || k.reparto === filters.reparto
+      const matchLinea = !filters.linea || k.linea === filters.linea
+      const matchMacchina = !filters.macchina || k.macchina === filters.macchina
+
+      // Dashboard (Meeting)
+      const matchDashboard = !filters.dashboard_id || k.dashboard_id === filters.dashboard_id
+
+      // Creatore
+      const matchCreatore = !filters.creatore_id || k.creatore_id === filters.creatore_id
+
+      // Team Leader
+      const matchLeader = !filters.team_leader_id || k.team_leader_id === filters.team_leader_id
+
+      // View
+      let matchView = true
+      if (filters.view === 'mine') {
+        matchView = k.creatore_id === user?.id ||
+                    k.team_leader_id === user?.id ||
+                    (k.team_members_ids || []).includes(user?.id)
+      } else if (filters.view === 'old30') {
+        const g = giorniDaApertura(k.data_apertura)
+        matchView = g !== null && g > 30 && k.stato !== 'Chiuso'
+      }
+
+      return matchSearch && matchTipo && matchStato && matchPillar && matchCategoria &&
+             matchReparto && matchLinea && matchMacchina && matchDashboard &&
+             matchCreatore && matchLeader && matchView
+    })
+  }, [kaizens, filters, user])
 
   const getTipoStyle = (tipo) => {
     const t = tipo || ''
@@ -207,37 +304,203 @@ export default function KaizenListPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4">
-        <div className="relative md:col-span-2">
-          <Search className="absolute left-3 top-3 text-gray-400" size={18} />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cerca per titolo o numero..."
-            className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-          />
+      {/* SEARCH + FILTRI AVANZATI */}
+      <div className="bg-white p-3 rounded-lg shadow-sm mb-4">
+        <div className="flex gap-2 items-center">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Cerca per titolo o numero..."
+              value={filters.search}
+              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm"
+            />
+          </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 border-2 transition-all ${
+              showFilters || activeFiltersCount > 0
+                ? 'bg-primary text-white border-primary shadow-md'
+                : 'bg-white border-gray-200 hover:border-primary text-gray-700'
+            }`}
+          >
+            <Filter size={16} />
+            Filtri avanzati
+            {activeFiltersCount > 0 && (
+              <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold ${
+                showFilters ? 'bg-white text-primary' : 'bg-primary text-white'
+              }`}>
+                {activeFiltersCount}
+              </span>
+            )}
+            <ChevronDown size={14} className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+          </button>
+          {activeFiltersCount > 0 && (
+            <button
+              onClick={resetFilters}
+              className="px-3 py-2 rounded-lg text-sm border-2 border-gray-200 text-gray-600 hover:bg-gray-100"
+              title="Reset filtri"
+            >
+              Reset
+            </button>
+          )}
+          <span className="text-sm text-gray-500 ml-2">{filtered.length} kaizen</span>
         </div>
-        <select value={filterTipo} onChange={(e) => setFilterTipo(e.target.value)} className="border rounded-lg px-3 py-2 text-sm">
-          <option value="">Tutte le tipologie</option>
-          {TIPOLOGIE_KAIZEN.map(t => (
-            <option key={t.value} value={t.value}>{t.label}</option>
-          ))}
-        </select>
-        <select value={filterStato} onChange={(e) => setFilterStato(e.target.value)} className="border rounded-lg px-3 py-2 text-sm">
-          <option value="">Tutti gli stati</option>
-          <option value="Aperto">Aperto</option>
-          <option value="In Corso">In Corso</option>
-          <option value="Chiuso">Chiuso</option>
-        </select>
-        <select value={filterPillar} onChange={(e) => setFilterPillar(e.target.value)} className="border rounded-lg px-3 py-2 text-sm">
-          <option value="">Tutti i pillar</option>
-          {pillars.map(p => (
-            <option key={p._id} value={p._id}>{p.sigla} — {p.label}</option>
-          ))}
-        </select>
-        <div className="text-sm text-gray-500 self-center">{filtered.length} kaizen</div>
+
+        {showFilters && (
+          <div className="mt-3 pt-3 border-t space-y-3">
+            {/* Vista rapida */}
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Vista rapida</label>
+              <div className="flex flex-wrap gap-2">
+                <FilterChip
+                  active={filters.view === 'all'}
+                  onClick={() => setFilters({ ...filters, view: 'all' })}
+                  label="Tutti"
+                />
+                <FilterChip
+                  active={filters.view === 'mine'}
+                  onClick={() => setFilters({ ...filters, view: 'mine' })}
+                  label="I miei Kaizen"
+                />
+                <FilterChip
+                  active={filters.view === 'old30'}
+                  onClick={() => setFilters({ ...filters, view: 'old30' })}
+                  label="Vecchi 30+ giorni"
+                />
+              </div>
+            </div>
+
+            {/* Classificazione */}
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Classificazione</label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <select value={filters.tipo} onChange={(e) => setFilters({ ...filters, tipo: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
+                  <option value="">Tutte le tipologie</option>
+                  {TIPOLOGIE_KAIZEN.map(t => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+                <select value={filters.stato} onChange={(e) => setFilters({ ...filters, stato: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
+                  <option value="">Tutti gli stati</option>
+                  <option value="Aperto">Aperto</option>
+                  <option value="In Corso">In Corso</option>
+                  <option value="Chiuso">Chiuso</option>
+                </select>
+                <select value={filters.pillar_id} onChange={(e) => setFilters({ ...filters, pillar_id: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
+                  <option value="">Tutti i pillar</option>
+                  {pillars.map(p => (
+                    <option key={p._id} value={p._id}>{p.sigla} — {p.label}</option>
+                  ))}
+                </select>
+                <select value={filters.categoria_perdita} onChange={(e) => setFilters({ ...filters, categoria_perdita: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
+                  <option value="">Tutte categorie perdita</option>
+                  {(configs.categorie_perdita || []).map(c => (
+                    <option key={c._id} value={c.label}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Struttura aziendale */}
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Struttura aziendale</label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                <select
+                  value={filters.reparto}
+                  onChange={(e) => setFilters({ ...filters, reparto: e.target.value, linea: '', macchina: '' })}
+                  className="border rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">Tutti i reparti</option>
+                  {reparti.filter(r => r.attivo !== false).map(r => (
+                    <option key={r._id} value={r.nome}>{r.nome}{r.codice ? ` [${r.codice}]` : ''}</option>
+                  ))}
+                </select>
+                <select
+                  value={filters.linea}
+                  onChange={(e) => setFilters({ ...filters, linea: e.target.value, macchina: '' })}
+                  disabled={!filters.reparto}
+                  className="border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100"
+                >
+                  <option value="">{filters.reparto ? 'Tutte le linee' : '— prima il reparto —'}</option>
+                  {lineeFilterDisponibili.map(l => (
+                    <option key={l.id} value={l.nome}>{l.nome}{l.codice ? ` [${l.codice}]` : ''}</option>
+                  ))}
+                </select>
+                <select
+                  value={filters.macchina}
+                  onChange={(e) => setFilters({ ...filters, macchina: e.target.value })}
+                  disabled={!filters.linea}
+                  className="border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100"
+                >
+                  <option value="">{filters.linea ? 'Tutte le macchine' : '— prima la linea —'}</option>
+                  {macchineFilterDisponibili.map(m => (
+                    <option key={m.id} value={m.nome}>{m.nome}{m.codice ? ` [${m.codice}]` : ''}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Contesto */}
+            <div>
+              <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Contesto</label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <select
+                  value={filters.dashboard_id}
+                  onChange={(e) => setFilters({ ...filters, dashboard_id: e.target.value })}
+                  className="border rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">Tutti i meeting</option>
+                  {dashboards.map(d => (
+                    <option key={d._id} value={d._id}>
+                      {d.nome || d.label || d.titolo || 'Meeting'}
+                    </option>
+                  ))}
+                </select>
+                <div>
+                  <UserPicker
+                    value={
+                      filters.creatore_id
+                        ? { id: filters.creatore_id, name: filters.creatore_nome }
+                        : null
+                    }
+                    onChange={(selected) => {
+                      if (selected) {
+                        setFilters({ ...filters, creatore_id: selected.id, creatore_nome: selected.name })
+                      } else {
+                        setFilters({ ...filters, creatore_id: null, creatore_nome: '' })
+                      }
+                    }}
+                    mode="single"
+                    placeholder="Cerca creatore..."
+                  />
+                </div>
+                <div>
+                  <UserPicker
+                    value={
+                      filters.team_leader_id
+                        ? { id: filters.team_leader_id, name: filters.team_leader_nome }
+                        : null
+                    }
+                    onChange={(selected) => {
+                      if (selected) {
+                        setFilters({ ...filters, team_leader_id: selected.id, team_leader_nome: selected.name })
+                      } else {
+                        setFilters({ ...filters, team_leader_id: null, team_leader_nome: '' })
+                      }
+                    }}
+                    mode="single"
+                    placeholder="Cerca team leader..."
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* TABELLA */}
       <div className="bg-white rounded-xl shadow overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
@@ -249,6 +512,7 @@ export default function KaizenListPage() {
               <th className="p-4">Stato</th>
               <th className="p-4">Reparto</th>
               <th className="p-4">Linea</th>
+              <th className="p-4">Meeting</th>
               <th className="p-4">Aperto da</th>
               <th className="p-4">Creatore</th>
             </tr>
@@ -287,6 +551,19 @@ export default function KaizenListPage() {
                   </td>
                   <td className="p-4 text-xs">{k.reparto || '—'}</td>
                   <td className="p-4 text-xs">{k.linea || '—'}</td>
+                  <td className="p-4 text-xs">
+                    {k.dashboard_id && k.dashboard_nome ? (
+                      <Link
+                        to={`/dashboard/${k.dashboard_id}`}
+                        className="px-2 py-0.5 rounded bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"
+                        title="Vai al meeting"
+                      >
+                        {k.dashboard_nome}
+                      </Link>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </td>
                   <td className="p-4">
                     <GiorniBadge giorni={giorni} stato={k.stato} />
                   </td>
@@ -367,15 +644,11 @@ export default function KaizenListPage() {
                     className="w-full border rounded-lg px-2 py-2 text-sm"
                   >
                     <option value="">Seleziona</option>
-                    {reparti.length === 0 ? (
-                      <option disabled>Configura in Settings → Reparti</option>
-                    ) : (
-                      reparti.filter(r => r.attivo !== false).map(r => (
-                        <option key={r._id} value={r.nome}>
-                          {r.nome}{r.codice ? ` [${r.codice}]` : ''}
-                        </option>
-                      ))
-                    )}
+                    {reparti.filter(r => r.attivo !== false).map(r => (
+                      <option key={r._id} value={r.nome}>
+                        {r.nome}{r.codice ? ` [${r.codice}]` : ''}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -386,10 +659,8 @@ export default function KaizenListPage() {
                     disabled={!newKaizen.reparto}
                     className="w-full border rounded-lg px-2 py-2 text-sm disabled:bg-gray-100"
                   >
-                    <option value="">
-                      {!newKaizen.reparto ? 'Prima il reparto' : 'Seleziona'}
-                    </option>
-                    {lineeDisponibili.map(l => (
+                    <option value="">{!newKaizen.reparto ? 'Prima il reparto' : 'Seleziona'}</option>
+                    {lineeFormDisponibili.map(l => (
                       <option key={l.id} value={l.nome}>
                         {l.nome}{l.codice ? ` [${l.codice}]` : ''}
                       </option>
@@ -404,10 +675,8 @@ export default function KaizenListPage() {
                     disabled={!newKaizen.linea}
                     className="w-full border rounded-lg px-2 py-2 text-sm disabled:bg-gray-100"
                   >
-                    <option value="">
-                      {!newKaizen.linea ? 'Prima la linea' : 'Seleziona'}
-                    </option>
-                    {macchineDisponibili.map(m => (
+                    <option value="">{!newKaizen.linea ? 'Prima la linea' : 'Seleziona'}</option>
+                    {macchineFormDisponibili.map(m => (
                       <option key={m.id} value={m.nome}>
                         {m.nome}{m.codice ? ` [${m.codice}]` : ''}
                       </option>
@@ -440,14 +709,41 @@ export default function KaizenListPage() {
                   <option value="">Nessuno (kaizen autonomo)</option>
                   {pillars.map(p => (
                     <option key={p._id} value={p._id}>
-                      {p.sigla} — {p.label}
-                      {p.leader ? ` (${p.leader})` : ''}
+                      {p.sigla} — {p.label}{p.leader ? ` (${p.leader})` : ''}
                     </option>
                   ))}
                 </select>
-                {pillars.length === 0 && (
+              </div>
+
+              {/* 🆕 Meeting di origine */}
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Meeting di origine
+                  <span className="text-xs text-gray-500 font-normal ml-1">(opzionale — es. PCS Daily da cui nasce)</span>
+                </label>
+                <select
+                  value={newKaizen.dashboard_id}
+                  onChange={(e) => {
+                    const selectedId = e.target.value
+                    const selected = dashboards.find(d => d._id === selectedId)
+                    setNewKaizen({
+                      ...newKaizen,
+                      dashboard_id: selectedId,
+                      dashboard_nome: selected ? (selected.nome || selected.label || selected.titolo || 'Meeting') : '',
+                    })
+                  }}
+                  className="w-full border rounded-lg px-3 py-2"
+                >
+                  <option value="">Nessuno</option>
+                  {dashboards.map(d => (
+                    <option key={d._id} value={d._id}>
+                      {d.nome || d.label || d.titolo || 'Meeting'}
+                    </option>
+                  ))}
+                </select>
+                {dashboards.length === 0 && (
                   <div className="text-xs text-orange-600 mt-1">
-                    Nessun Pillar configurato. Vai su <strong>Settings → Pillars</strong> per crearli.
+                    Nessun meeting configurato. Vai su <strong>Meetings</strong> per crearne uno.
                   </div>
                 )}
               </div>
@@ -473,17 +769,9 @@ export default function KaizenListPage() {
                     }
                     onChange={(selected) => {
                       if (selected) {
-                        setNewKaizen({
-                          ...newKaizen,
-                          team_leader_id: selected.id,
-                          team_leader_nome: selected.name,
-                        })
+                        setNewKaizen({ ...newKaizen, team_leader_id: selected.id, team_leader_nome: selected.name })
                       } else {
-                        setNewKaizen({
-                          ...newKaizen,
-                          team_leader_id: null,
-                          team_leader_nome: '',
-                        })
+                        setNewKaizen({ ...newKaizen, team_leader_id: null, team_leader_nome: '' })
                       }
                     }}
                     mode="single"
