@@ -1,126 +1,122 @@
 import { useMemo } from 'react'
 import {
-  ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, ReferenceLine, LabelList,
 } from 'recharts'
 
 /**
- * Bridge Chart — Lindt Step 3 (Target Definition)
- *
- * Mostra come dal baseline (es. OEE 79%) si arriva al forecast/target
- * attraverso i contributi di ogni progetto Kaizen.
- *
- * Props:
- *   baseline: { label, value } — es. { label: '2025 Estimation', value: 79 }
- *   improvements: Array di { id, label, value, color? } — gain di ogni progetto
- *   forecast: { label, value } — es. { label: 'Forecast after improvements', value: 81.5 }
- *   target: { label, value } — es. { label: '2026 Target', value: 81 }
- *   unit: '%' | 'nr' | '€' | ...
- *   title: titolo grafico
- *   subtitle: sottotitolo
- *   yAxisMin, yAxisMax: range Y opzionale
+ * Bridge Chart con supporto:
+ * - Side-by-side: improvementsPlanned a sinistra, improvementsActual a destra
+ * - Zoom asse Y manuale (yAxisMin, yAxisMax)
+ * - Linea target orizzontale
  */
 export default function BridgeChart({
   baseline = { label: 'Baseline', value: 0 },
-  improvements = [],
+  improvements = [],          // usati come improvements pianificati (compatibile col passato)
+  improvementsActual = null,  // se passato, attiva side-by-side
   forecast = null,
+  actual = null,
   target = null,
-  actual = null,            // 🆕 dato Actual (per Step 5)
-  compareMode = false,      // 🆕 se true mostra Planned vs Actual
   unit = '%',
   title = 'Bridge Chart',
   subtitle = '',
   yAxisMin = null,
   yAxisMax = null,
 }) {
-  // Prepara dati per grafico
-  // Ogni barra ha: name, start, value (gain), color, isTotal (true per baseline/forecast/target)
   const chartData = useMemo(() => {
     const data = []
-
-    // Baseline (barra piena dal 0)
     const baseValue = parseFloat(baseline.value) || 0
+
+    // 1) Baseline iniziale
     data.push({
       name: baseline.label || 'Baseline',
       start: 0,
       gain: baseValue,
       total: baseValue,
-      color: '#9CA3AF',  // grigio
+      color: '#9CA3AF',
       isTotal: true,
       displayValue: baseValue,
     })
 
-    // Improvements (barre flottanti)
-    let running = baseValue
+    // 2) Improvements PIANIFICATI (a sinistra)
+    let runningPlanned = baseValue
     improvements.forEach((imp, idx) => {
       const impValue = parseFloat(imp.value) || 0
-      if (impValue === 0) return  // skip zero
+      if (impValue === 0) return
       const isGain = impValue > 0
       data.push({
-        name: imp.label || `Improvement ${idx + 1}`,
-        start: isGain ? running : running + impValue,
+        name: imp.label || `P${idx + 1}`,
+        start: isGain ? runningPlanned : runningPlanned + impValue,
         gain: Math.abs(impValue),
-        total: running + impValue,
-        color: imp.color || (isGain ? '#60A5FA' : '#F87171'),
+        total: runningPlanned + impValue,
+        color: imp.color || '#FBBF24',
         isTotal: false,
         displayValue: impValue,
       })
-      running += impValue
+      runningPlanned += impValue
     })
 
-    // Forecast Planned (giallo)
+    // 3) Forecast Pianificato
     if (forecast) {
-      const fValue = parseFloat(forecast.value) || running
+      const fValue = parseFloat(forecast.value) || runningPlanned
       data.push({
-        name: forecast.label || 'Forecast Planned',
+        name: forecast.label || 'Pianificato',
         start: 0,
         gain: fValue,
         total: fValue,
-        color: '#FBBF24',  // giallo
+        color: '#FBBF24',
         isTotal: true,
         displayValue: fValue,
       })
     }
 
-    // 🆕 Actual (arancio) — solo in compareMode
-    if (compareMode && actual) {
+    // 4) Improvements REALI (a destra) — solo se passati
+    if (improvementsActual && improvementsActual.length > 0) {
+      let runningActual = baseValue
+      improvementsActual.forEach((imp, idx) => {
+        const impValue = parseFloat(imp.value) || 0
+        if (impValue === 0) return
+        const isGain = impValue > 0
+        data.push({
+          name: imp.label || `A${idx + 1}`,
+          start: isGain ? runningActual : runningActual + impValue,
+          gain: Math.abs(impValue),
+          total: runningActual + impValue,
+          color: imp.color || '#F97316',
+          isTotal: false,
+          displayValue: impValue,
+        })
+        runningActual += impValue
+      })
+    }
+
+    // 5) Actual finale
+    if (actual) {
       const aValue = parseFloat(actual.value) || 0
       data.push({
-        name: actual.label || 'Actual',
+        name: actual.label || 'Reale',
         start: 0,
         gain: aValue,
         total: aValue,
-        color: '#F97316',  // arancio
+        color: '#F97316',
         isTotal: true,
         displayValue: aValue,
       })
     }
 
-    // Target (verde, ma solo come barra se non c'è linea)
-    if (target && !compareMode) {
-      const tValue = parseFloat(target.value) || 0
-      data.push({
-        name: target.label || 'Target',
-        start: 0,
-        gain: tValue,
-        total: tValue,
-        color: '#F59E0B',
-        isTotal: true,
-        displayValue: tValue,
-      })
-    }
-
     return data
-  }, [baseline, improvements, forecast, target, actual, compareMode])
+  }, [baseline, improvements, improvementsActual, forecast, actual])
 
-  // Calcola auto-range Y se non specificato
+  // Domain Y: usa min/max manuali se forniti, altrimenti auto
   const yDomain = useMemo(() => {
-    if (yAxisMin !== null && yAxisMax !== null) return [yAxisMin, yAxisMax]
-    const allValues = chartData.map(d => d.total)
+    if (yAxisMin !== null && yAxisMax !== null && !isNaN(yAxisMin) && !isNaN(yAxisMax)) {
+      return [Number(yAxisMin), Number(yAxisMax)]
+    }
+    const allValues = chartData.map(d => d.total).filter(v => !isNaN(v))
     if (allValues.length === 0) return [0, 100]
     const max = Math.max(...allValues)
     const min = Math.min(...allValues)
-    const range = max - min
+    const range = max - min || 1
     return [
       Math.max(0, Math.floor(min - range * 0.3)),
       Math.ceil(max + range * 0.2),
@@ -132,24 +128,21 @@ export default function BridgeChart({
   if (chartData.length === 0) {
     return (
       <div className="bg-white rounded-xl border-2 border-dashed border-gray-300 p-8 text-center text-gray-400">
-        <div className="text-4xl mb-2">📊</div>
-        <p className="text-sm">Aggiungi una baseline e dei progetti per visualizzare il Bridge chart</p>
+        <p className="text-sm">Nessun dato disponibile</p>
       </div>
     )
   }
 
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden border">
-      {/* Header */}
       <div className="bg-blue-600 text-white px-4 py-3 text-center">
         <div className="font-bold text-lg">{title}</div>
         {subtitle && <div className="text-xs opacity-90 mt-0.5">{subtitle}</div>}
       </div>
 
-      {/* Chart */}
       <div className="p-4">
         <ResponsiveContainer width="100%" height={450}>
-          <ComposedChart data={chartData} margin={{ top: 30, right: 40, left: 20, bottom: 100 }}>
+          <ComposedChart data={chartData} margin={{ top: 30, right: 60, left: 20, bottom: 100 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis
               dataKey="name"
@@ -160,29 +153,23 @@ export default function BridgeChart({
               interval={0}
             />
             <YAxis
+              type="number"
               domain={yDomain}
+              allowDataOverflow={true}
               label={{ value: unit, angle: -90, position: 'insideLeft', style: { fontSize: 12 } }}
               tick={{ fontSize: 11 }}
             />
             <Tooltip
               contentStyle={{ backgroundColor: '#fff', border: '1px solid #ddd', borderRadius: 8 }}
               formatter={(value, name, props) => {
-                if (name === 'start') return null  // nascondi
-                const data = props.payload
-                if (data.isTotal) {
-                  return [`${data.displayValue} ${unit}`, 'Valore']
-                }
-                return [
-                  `${data.displayValue > 0 ? '+' : ''}${data.displayValue} ${unit}`,
-                  'Δ Improvement'
-                ]
+                if (name === 'start') return null
+                const d = props.payload
+                if (d.isTotal) return [`${d.displayValue} ${unit}`, 'Valore']
+                return [`${d.displayValue > 0 ? '+' : ''}${d.displayValue} ${unit}`, 'Δ']
               }}
             />
 
-            {/* Barra invisibile per offset (stacked) */}
             <Bar dataKey="start" stackId="bridge" fill="transparent" />
-
-            {/* Barra colorata visibile */}
             <Bar dataKey="gain" stackId="bridge" radius={[4, 4, 0, 0]}>
               {chartData.map((entry, idx) => (
                 <Cell key={idx} fill={entry.color} stroke={entry.isTotal ? '#444' : 'none'} strokeWidth={entry.isTotal ? 1 : 0} />
@@ -190,12 +177,11 @@ export default function BridgeChart({
               <LabelList
                 dataKey="displayValue"
                 position="top"
-                formatter={(val) => val !== 0 ? `${val > 0 && chartData.find(d => d.displayValue === val && !d.isTotal) ? '+' : ''}${val}` : ''}
+                formatter={(val) => val !== 0 ? `${val > 0 && val < 10 ? '+' : ''}${val}` : ''}
                 style={{ fontSize: 11, fontWeight: 600 }}
               />
             </Bar>
 
-            {/* Linea target verde orizzontale */}
             {targetValue !== null && (
               <ReferenceLine
                 y={targetValue}
@@ -218,28 +204,24 @@ export default function BridgeChart({
       <div className="border-t bg-gray-50 px-4 py-2 flex flex-wrap gap-3 text-xs">
         <div className="flex items-center gap-1">
           <div className="w-4 h-4 rounded" style={{ backgroundColor: '#9CA3AF' }} />
-          <span>Baseline</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 rounded bg-blue-400" />
-          <span>Improvement (gain)</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 rounded bg-red-400" />
-          <span>Loss (perdita)</span>
+          <span>Punto di partenza</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-4 h-4 rounded" style={{ backgroundColor: '#FBBF24' }} />
-          <span>Forecast</span>
+          <span>Pianificato</span>
         </div>
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 rounded" style={{ backgroundColor: '#F59E0B' }} />
-          <span>Target</span>
-        </div>
-        <div className="flex items-center gap-1 ml-auto">
-          <div className="w-4 h-1 bg-green-500" />
-          <span>Linea target</span>
-        </div>
+        {improvementsActual && improvementsActual.length > 0 && (
+          <div className="flex items-center gap-1">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#F97316' }} />
+            <span>Reale (Actual)</span>
+          </div>
+        )}
+        {targetValue !== null && (
+          <div className="flex items-center gap-1 ml-auto">
+            <div className="w-4 h-1 bg-green-500" />
+            <span>Target</span>
+          </div>
+        )}
       </div>
     </div>
   )
