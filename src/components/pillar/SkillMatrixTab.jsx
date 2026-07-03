@@ -263,6 +263,12 @@ export default function SkillMatrixTab({ pillar, color }) {
         </div>
       )}
 
+      {matrix.starting_locked && matrix.inherited_from && (
+        <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-3 text-sm text-blue-800">
+          <strong>Starting ereditato dall'anno {matrix.inherited_from}.</strong> La colonna <span className="font-mono">S</span> non è modificabile: corrisponde al Current di fine {matrix.inherited_from}.
+        </div>
+      )}
+
       {members.length === 0 && competenze.length > 0 && (
         <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-r-lg p-4 text-sm text-yellow-800">
           <strong>Nessun membro nella matrice.</strong>{' '}
@@ -354,7 +360,7 @@ export default function SkillMatrixTab({ pillar, color }) {
                       const cell = matrix.valori?.[key] || {}
                       return (
                         <Fragment key={key}>
-                          <LevelCell value={cell.starting} onChange={(v) => updateCella(m.user_id, comp._id, 'starting', v)} bg="bg-red-50" />
+                          <LevelCell value={cell.starting} onChange={(v) => updateCella(m.user_id, comp._id, 'starting', v)} bg="bg-red-50" disabled={matrix.starting_locked} />
                           <LevelCell value={cell.current} onChange={(v) => updateCella(m.user_id, comp._id, 'current', v)} bg="bg-amber-50" />
                           <LevelCell value={cell.target} onChange={(v) => updateCella(m.user_id, comp._id, 'target', v)} bg="bg-emerald-50" borderR />
                         </Fragment>
@@ -436,18 +442,20 @@ export default function SkillMatrixTab({ pillar, color }) {
   )
 }
 
-function LevelCell({ value, onChange, bg = '', borderR = false }) {
+function LevelCell({ value, onChange, bg = '', borderR = false, disabled = false }) {
   const numValue = Number(value)
   const livello = LIVELLI.find(l => l.v === numValue)
   return (
     <td
       className={`border-b p-0 ${borderR ? 'border-r' : ''} ${bg}`}
       style={{ minWidth: 30, width: 30 }}
+      title={disabled ? 'Valore ereditato dall\'anno precedente (non modificabile)' : ''}
     >
       <select
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full h-full px-1 py-1 text-center text-xs font-bold border-0 bg-transparent cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400"
+        disabled={disabled}
+        className={`w-full h-full px-1 py-1 text-center text-xs font-bold border-0 bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-400 ${disabled ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
         style={{
           backgroundColor: livello?.color || 'transparent',
           color: livello?.text || '#6b7280',
@@ -461,6 +469,7 @@ function LevelCell({ value, onChange, bg = '', borderR = false }) {
     </td>
   )
 }
+`
 
 function ConfigCompetenzeModal({ pillar, color, competenze, onClose, onSaved }) {
   const [items, setItems] = useState(competenze)
