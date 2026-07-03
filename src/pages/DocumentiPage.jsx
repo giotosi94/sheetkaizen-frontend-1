@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import api from '../services/api'
 import { FileText, Upload, Download, Search, Trash2, Edit2, Eye, X } from 'lucide-react'
+import * as XLSX from 'xlsx'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -12,7 +13,8 @@ function getFileType(filename) {
   const ext = filename.split('.').pop().toLowerCase()
   if (['pdf'].includes(ext)) return 'pdf'
   if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) return 'image'
-  if (['xlsx', 'xls', 'docx', 'doc', 'pptx', 'ppt'].includes(ext)) return 'office'
+  if (['xlsx', 'xls'].includes(ext)) return 'excel'
+  if (['docx', 'doc', 'pptx', 'ppt'].includes(ext)) return 'office'
   if (['txt', 'csv', 'log', 'json', 'xml'].includes(ext)) return 'text'
   return 'unknown'
 }
@@ -237,10 +239,12 @@ function PreviewModal({ doc, onClose }) {
   const fileType = getFileType(doc.file_name)
   const [blobUrl, setBlobUrl] = useState(null)
   const [textContent, setTextContent] = useState('')
+  const [excelSheets, setExcelSheets] = useState([])
+  const [activeSheet, setActiveSheet] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // Bottone "Scarica": genera al volo un blob e forza il download (con JWT)
+  // Bottone Scarica: genera al volo un blob e forza il download (con JWT)
   async function handleDownload() {
     try {
       const res = await api.get(`/documenti/${doc._id}/file`, { responseType: 'blob' })
@@ -257,13 +261,18 @@ function PreviewModal({ doc, onClose }) {
     }
   }
 
-  // Carica il file come blob (usa JWT via api) per PDF, immagini, testo
+  // Carica il file dal backend (JWT) per anteprima
   useEffect(() => {
     let currentUrl = null
     let cancelled = false
 
     async function loadFile() {
-      if (fileType !== 'pdf' && fileType !== 'image' && fileType !== 'text') {
+      if (
+        fileType !== 'pdf' &&
+        fileType !== 'image' &&
+        fileType !== 'text' &&
+        fileType !== 'excel'
+      ) {
         setLoading(false)
         return
       }
@@ -275,6 +284,18 @@ function PreviewModal({ doc, onClose }) {
           const text = await res.data.text()
           if (!cancelled) {
             setTextContent(text)
+            setLoading(false)
+          }
+        } else if (fileType === 'excel') {
+          const arrayBuf = await res.data.arrayBuffer()
+          if (!cancelled) {
+            const wb = XLSX.read(arrayBuf, { type: 'array' })
+            const sheets = wb.SheetNames.map(name => {
+              const ws = wb.Sheets[name]
+              const html = XLSX.utils.sheet_to_html(ws, { editable: false })
+              return { name, html }
+            })
+            setExcelSheets(sheets)
             setLoading(false)
           }
         } else {
@@ -315,7 +336,10 @@ function PreviewModal({ doc, onClose }) {
           <div className="text-6xl mb-4">⚠️</div>
           <div className="text-lg mb-2 font-medium">Errore caricamento</div>
           <div className="text-sm text-gray-400 mb-6">{error}</div>
-          <button onClick={handleDownload} className="bg-primary text-white px-5 py-2 rounded-lg hover:bg-primary-light flex items-center gap-2">
+          <button
+            onClick={handleDownload}
+            className="bg-primary text-white px-5 py-2 rounded-lg hover:bg-primary-light flex items-center gap-2"
+          >
             <Download size={18} /> Scarica
           </button>
         </div>
@@ -342,7 +366,6 @@ function PreviewModal({ doc, onClose }) {
       )
     }
 
-
     if (fileType === 'text') {
       return (
         <pre className="w-full h-full overflow-auto p-6 bg-gray-50 text-sm font-mono whitespace-pre-wrap">
@@ -351,7 +374,36 @@ function PreviewModal({ doc, onClose }) {
       )
     }
 
-    // Office (xlsx, docx, pptx) e altri: no preview, solo download
+    if (fileType === 'excel' && excelSheets.length > 0) {
+      const sheet = excelSheets[activeSheet] || excelSheets[0]
+      return (
+        <div className="w-full h-full flex flex-col bg-white">
+          {excelSheets.length > 1 && (
+            <div className="flex gap-1 border-b bg-gray-50 px-3 py-2 overflow-x-auto flex-shrink-0">
+              {excelSheets.map((s, i) => (
+                <button
+                  key={i}
+                  onClick={() => setActiveSheet(i)}
+                  className={`px-3 py-1 text-xs font-medium rounded whitespace-nowrap ${
+                    i === activeSheet
+                      ? 'bg-primary text-white'
+                      : 'bg-white border hover:bg-gray-100'
+                  }`}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          )}
+          <div
+            className="flex-1 overflow-auto p-4 excel-preview"
+            dangerouslySetInnerHTML={{ __html: sheet.html }}
+          />
+        </div>
+      )
+    }
+
+    // Office (docx, pptx) e altri: no preview, solo download
     const isOffice = fileType === 'office'
     return (
       <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 p-8">
@@ -362,10 +414,13 @@ function PreviewModal({ doc, onClose }) {
         <div className="text-sm mb-2 text-gray-400">{doc.file_name}</div>
         {isOffice && (
           <div className="text-xs mb-6 text-gray-400 max-w-md text-center">
-            I file Excel, Word e PowerPoint richiedono di essere scaricati per essere visualizzati.
+            I file Word e PowerPoint richiedono di essere scaricati per essere visualizzati.
           </div>
         )}
-        <button onClick={handleDownload} className="bg-primary text-white px-5 py-2 rounded-lg hover:bg-primary-light flex items-center gap-2">
+        <button
+          onClick={handleDownload}
+          className="bg-primary text-white px-5 py-2 rounded-lg hover:bg-primary-light flex items-center gap-2"
+        >
           <Download size={18} /> Scarica per visualizzare
         </button>
       </div>
@@ -384,7 +439,10 @@ function PreviewModal({ doc, onClose }) {
             </div>
           </div>
           <div className="flex gap-2 items-center flex-shrink-0">
-            <button onClick={handleDownload} className="bg-white text-primary px-3 py-1.5 rounded text-sm flex items-center gap-1 hover:bg-gray-100">
+            <button
+              onClick={handleDownload}
+              className="bg-white text-primary px-3 py-1.5 rounded text-sm flex items-center gap-1 hover:bg-gray-100"
+            >
               <Download size={16} /> Scarica
             </button>
             <button onClick={onClose} className="hover:bg-primary-light p-1.5 rounded">
@@ -1008,4 +1066,21 @@ function BulkUploadModal({ onClose, onSaved }) {
       </div>
     </div>
   )
+}
+/* Excel preview */
+.excel-preview table {
+  border-collapse: collapse;
+  font-size: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.excel-preview table td,
+.excel-preview table th {
+  border: 1px solid #d1d5db;
+  padding: 4px 8px;
+  min-width: 60px;
+  white-space: nowrap;
+}
+.excel-preview table th {
+  background-color: #f3f4f6;
+  font-weight: 600;
 }
