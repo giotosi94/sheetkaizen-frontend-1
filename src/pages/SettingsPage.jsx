@@ -98,7 +98,6 @@ const SECTIONS = [
     ],
   },
   {
-    {
     id: 'meetings',
     label: 'Meetings',
     color: 'orange',
