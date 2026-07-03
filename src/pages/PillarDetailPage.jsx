@@ -11,6 +11,7 @@ import ParetoChart from '../components/pillar/ParetoChart'
 import BridgeChart from '../components/pillar/BridgeChart'
 import CloseTheLoopChart from '../components/pillar/CloseTheLoopChart'
 import SkillMatrixTab from '../components/pillar/SkillMatrixTab'
+import StoricoAnalisiModal from '../components/pillar/StoricoAnalisiModal'
 
 export default function PillarDetailPage() {
   const { id } = useParams()
@@ -965,95 +966,21 @@ function KpiManagementTab({ pillar, color, onSaved }) {
         </div>
       )}
 
-      {/* Modal Storico */}
+      {/* Modal Storico con cartelle */}
       {showHistoryModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="px-5 py-3 border-b flex justify-between items-center sticky top-0 z-10" style={{ backgroundColor: color, color: 'white' }}>
-              <h3 className="font-bold">Storico Analisi</h3>
-              <button onClick={() => setShowHistoryModal(false)} className="text-white hover:bg-white hover:bg-opacity-20 p-1 rounded">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="p-5 space-y-4">
-              {/* Attive */}
-              <div>
-                <div className="text-xs font-bold uppercase text-gray-500 mb-2">
-                  Attive ({activeAnalyses.length})
-                </div>
-                {activeAnalyses.length === 0 ? (
-                  <div className="text-sm text-gray-400 italic py-2">Nessuna analisi attiva.</div>
-                ) : (
-                  <div className="space-y-2">
-                    {activeAnalyses.map(a => (
-                      <div key={a.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50">
-                        <div className="flex-1">
-                          <div className="font-medium text-sm">{a.label}</div>
-                          <div className="text-xs text-gray-500">
-                            Creata il {new Date(a.created_at).toLocaleDateString('it-IT')}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => openFromHistory(a.id)}
-                          className="px-3 py-1 text-xs rounded text-white shadow"
-                          style={{ backgroundColor: color }}
-                        >
-                          Apri
-                        </button>
-                        <button
-                          onClick={() => deletePermanently(a.id)}
-                          className="px-3 py-1 text-xs rounded border border-red-300 text-red-600 hover:bg-red-50"
-                        >
-                          Elimina
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Archiviate */}
-              {archivedAnalyses.length > 0 && (
-                <div>
-                  <div className="text-xs font-bold uppercase text-gray-500 mb-2">
-                    Archiviate ({archivedAnalyses.length})
-                  </div>
-                  <div className="space-y-2">
-                    {archivedAnalyses.map(a => (
-                      <div key={a.id} className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50">
-                        <div className="flex-1">
-                          <div className="font-medium text-sm text-gray-600">{a.label}</div>
-                          <div className="text-xs text-gray-400">
-                            Archiviata il {a.archived_at ? new Date(a.archived_at).toLocaleDateString('it-IT') : '—'}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => openFromHistory(a.id)}
-                          className="px-3 py-1 text-xs border-2 rounded hover:bg-white"
-                          style={{ borderColor: color, color }}
-                        >
-                          Apri
-                        </button>
-                        <button
-                          onClick={() => restoreAnalysis(a.id)}
-                          className="px-3 py-1 text-xs border border-gray-400 text-gray-700 rounded hover:bg-white"
-                        >
-                          Ripristina
-                        </button>
-                        <button
-                          onClick={() => deletePermanently(a.id)}
-                          className="px-3 py-1 text-xs rounded border border-red-300 text-red-600 hover:bg-red-50"
-                        >
-                          Elimina
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <StoricoAnalisiModal
+          pillar={pillar}
+          color={color}
+          analyses={analyses}
+          onClose={() => setShowHistoryModal(false)}
+          onOpen={openFromHistory}
+          onRestore={restoreAnalysis}
+          onDelete={deletePermanently}
+          onReloadAnalyses={async () => {
+            const res = await api.get(`/pillars/${pillar._id}/analyses`)
+            setAnalyses(res.data || [])
+          }}
+        />
       )}
     </div>
   )
