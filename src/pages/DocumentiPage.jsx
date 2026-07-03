@@ -156,8 +156,21 @@ export default function DocumentiPage() {
               <tr><td colSpan="8" className="text-center text-gray-400 py-8">Nessun documento. Caricane uno!</td></tr>
             ) : (
               documenti.map(doc => {
-                const fileUrl = `${API_BASE}/api/documenti/${doc._id}/file`
-                const downloadUrl = `${fileUrl}?download=true`
+                const handleTableDownload = async () => {
+                  try {
+                    const res = await api.get(`/documenti/${doc._id}/file`, { responseType: 'blob' })
+                    const url = URL.createObjectURL(res.data)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = doc.file_name || 'documento'
+                    document.body.appendChild(a)
+                    a.click()
+                    document.body.removeChild(a)
+                    setTimeout(() => URL.revokeObjectURL(url), 1000)
+                  } catch (err) {
+                    alert('Errore download: ' + (err.response?.data?.detail || err.message))
+                  }
+                }
                 return (
                   <tr key={doc._id} className="border-t hover:bg-gray-50">
                     <td className="p-4 font-mono text-primary font-bold">{doc.numero}</td>
@@ -189,9 +202,9 @@ export default function DocumentiPage() {
                         <button onClick={() => setPreviewDoc(doc)} className="text-blue-600 hover:bg-blue-50 p-1 rounded" title="Anteprima">
                           <Eye size={16} />
                         </button>
-                        <a href={downloadUrl} download={doc.file_name} className="text-green-600 hover:bg-green-50 p-1 rounded" title="Scarica">
+                        <button onClick={handleTableDownload} className="text-green-600 hover:bg-green-50 p-1 rounded" title="Scarica">
                           <Download size={16} />
-                        </a>
+                        </button>
                         <button onClick={() => setEditingDoc(doc)} className="text-yellow-600 hover:bg-yellow-50 p-1 rounded" title="Modifica">
                           <Edit2 size={16} />
                         </button>
@@ -222,57 +235,134 @@ export default function DocumentiPage() {
 
 function PreviewModal({ doc, onClose }) {
   const fileType = getFileType(doc.file_name)
-  const fileUrl = `${API_BASE}/api/documenti/${doc._id}/file`
-  const downloadUrl = `${fileUrl}?download=true`
-  const publicFileUrl = `${API_BASE}/api/documenti/${doc._id}/preview`
-  const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(publicFileUrl)}`
+  const [blobUrl, setBlobUrl] = useState(null)
+  const [textContent, setTextContent] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  // Renderizzo iframe/img con React.createElement per evitare bug copia-incolla
-  const previewContent = (() => {
-    if (fileType === 'pdf') {
-      return React.createElement('iframe', {
-        src: publicFileUrl,
-        className: 'w-full h-full border-0',
-        title: doc.titolo,
-      })
+  // Bottone "Scarica": genera al volo un blob e forza il download (con JWT)
+  async function handleDownload() {
+    try {
+      const res = await api.get(`/documenti/${doc._id}/file`, { responseType: 'blob' })
+      const url = URL.createObjectURL(res.data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = doc.file_name || 'documento'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (err) {
+      alert('Errore download: ' + (err.response?.data?.detail || err.message))
     }
-    if (fileType === 'image') {
+  }
+
+  // Carica il file come blob (usa JWT via api) per PDF, immagini, testo
+  useEffect(() => {
+    let currentUrl = null
+    let cancelled = false
+
+    async function loadFile() {
+      if (fileType !== 'pdf' && fileType !== 'image' && fileType !== 'text') {
+        setLoading(false)
+        return
+      }
+      try {
+        const res = await api.get(`/documenti/${doc._id}/file`, { responseType: 'blob' })
+        if (cancelled) return
+
+        if (fileType === 'text') {
+          const text = await res.data.text()
+          if (!cancelled) {
+            setTextContent(text)
+            setLoading(false)
+          }
+        } else {
+          currentUrl = URL.createObjectURL(res.data)
+          if (!cancelled) {
+            setBlobUrl(currentUrl)
+            setLoading(false)
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.response?.data?.detail || err.message || 'Errore caricamento')
+          setLoading(false)
+        }
+      }
+    }
+
+    loadFile()
+
+    return () => {
+      cancelled = true
+      if (currentUrl) URL.revokeObjectURL(currentUrl)
+    }
+  }, [doc._id, fileType])
+
+  const previewContent = (() => {
+    if (loading) {
       return (
-        <div className="w-full h-full flex items-center justify-center p-4 overflow-auto">
-          {React.createElement('img', {
-            src: publicFileUrl,
-            alt: doc.titolo,
-            className: 'max-w-full max-h-full object-contain shadow-lg',
-          })}
+        <div className="w-full h-full flex items-center justify-center text-gray-500">
+          Caricamento anteprima...
         </div>
       )
     }
-    if (fileType === 'office') {
+
+    if (error) {
       return (
-        <>
-          {React.createElement('iframe', {
-            src: officeViewerUrl,
-            className: 'w-full h-full border-0',
-            title: doc.titolo,
-            frameBorder: '0',
-          })}
-          <div className="absolute bottom-3 right-3 bg-white shadow-lg rounded px-3 py-2 text-xs text-gray-600 max-w-xs">
-            Se l'anteprima non si carica, usa <strong>Scarica</strong> per aprirlo.
-          </div>
-        </>
+        <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 p-8">
+          <div className="text-6xl mb-4">⚠️</div>
+          <div className="text-lg mb-2 font-medium">Errore caricamento</div>
+          <div className="text-sm text-gray-400 mb-6">{error}</div>
+          <button onClick={handleDownload} className="bg-primary text-white px-5 py-2 rounded-lg hover:bg-primary-light flex items-center gap-2">
+            <Download size={18} /> Scarica
+          </button>
+        </div>
       )
     }
-    if (fileType === 'text') {
-      return <TextPreview url={publicFileUrl} />
+
+    if (fileType === 'pdf' && blobUrl) {
+      return (
+        {blobUrl}
+      )
     }
+
+    if (fileType === 'image' && blobUrl) {
+
+      return (
+        <div className="w-full h-full flex items-center justify-center p-4 overflow-auto">
+          {blobUrl}-w-full max-h-full object-contain shadow-lg"
+          />
+        </div>
+      )
+    }
+
+    if (fileType === 'text') {
+      return (
+        <pre className="w-full h-full overflow-auto p-6 bg-gray-50 text-sm font-mono whitespace-pre-wrap">
+          {textContent}
+        </pre>
+      )
+    }
+
+    // Office (xlsx, docx, pptx) e altri: no preview, solo download
+    const isOffice = fileType === 'office'
     return (
       <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 p-8">
-        <div className="text-7xl mb-4">📄</div>
-        <div className="text-lg mb-2 font-medium">Anteprima non disponibile</div>
-        <div className="text-sm mb-6 text-gray-400">{doc.file_name}</div>
-        <a href={downloadUrl} download={doc.file_name} className="bg-primary text-white px-5 py-2 rounded-lg hover:bg-primary-light flex items-center gap-2">
+        <div className="text-7xl mb-4">{isOffice ? '📊' : '📄'}</div>
+        <div className="text-lg mb-2 font-medium">
+          {isOffice ? 'Anteprima file Office non disponibile' : 'Anteprima non disponibile'}
+        </div>
+        <div className="text-sm mb-2 text-gray-400">{doc.file_name}</div>
+        {isOffice && (
+          <div className="text-xs mb-6 text-gray-400 max-w-md text-center">
+            I file Excel, Word e PowerPoint richiedono di essere scaricati per essere visualizzati.
+          </div>
+        )}
+        <button onClick={handleDownload} className="bg-primary text-white px-5 py-2 rounded-lg hover:bg-primary-light flex items-center gap-2">
           <Download size={18} /> Scarica per visualizzare
-        </a>
+        </button>
       </div>
     )
   })()
@@ -289,9 +379,9 @@ function PreviewModal({ doc, onClose }) {
             </div>
           </div>
           <div className="flex gap-2 items-center flex-shrink-0">
-            <a href={downloadUrl} download={doc.file_name} className="bg-white text-primary px-3 py-1.5 rounded text-sm flex items-center gap-1 hover:bg-gray-100">
+            <button onClick={handleDownload} className="bg-white text-primary px-3 py-1.5 rounded text-sm flex items-center gap-1 hover:bg-gray-100">
               <Download size={16} /> Scarica
-            </a>
+            </button>
             <button onClick={onClose} className="hover:bg-primary-light p-1.5 rounded">
               <X size={20} />
             </button>
@@ -311,16 +401,6 @@ function PreviewModal({ doc, onClose }) {
         )}
       </div>
     </div>
-  )
-}
-
-function TextPreview({ url }) {
-  const [content, setContent] = useState('Caricamento...')
-  useEffect(() => {
-    fetch(url).then(r => r.text()).then(setContent).catch(() => setContent('Errore caricamento file'))
-  }, [url])
-  return (
-    <pre className="w-full h-full overflow-auto p-6 bg-gray-50 text-sm font-mono whitespace-pre-wrap">{content}</pre>
   )
 }
 
