@@ -323,15 +323,21 @@ function PreviewModal({ doc, onClose }) {
     }
 
     if (fileType === 'pdf' && blobUrl) {
-      return (
-        {blobUrl}
-      )
+      return React.createElement('iframe', {
+        src: blobUrl,
+        className: 'w-full h-full border-0',
+        title: doc.titolo,
+      })
     }
 
     if (fileType === 'image' && blobUrl) {
       return (
         <div className="w-full h-full flex items-center justify-center p-4 overflow-auto">
-          <imgbUrl}
+          {React.createElement('img', {
+            src: blobUrl,
+            alt: doc.titolo,
+            className: 'max-w-full max-h-full object-contain shadow-lg',
+          })}
         </div>
       )
     }
