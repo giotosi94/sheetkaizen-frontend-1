@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react'
-import { Plus, Trash2, Users, Calendar, Copy, Settings as SettingsIcon, X, Save } from 'lucide-react'
+import { useState, useEffect, useMemo, Fragment } from 'react'
+import { Plus, Trash2, Users, Calendar, Copy, Settings as SettingsIcon, X } from 'lucide-react'
 import api from '../../services/api'
 import { useAllConfigurations } from '../../hooks/useConfigurations'
 import UserPicker from '../UserPicker'
@@ -30,6 +30,7 @@ export default function SkillMatrixTab({ pillar, color }) {
   useEffect(() => {
     loadYears()
     loadCompetenze()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pillar._id])
 
   useEffect(() => {
@@ -100,15 +101,14 @@ export default function SkillMatrixTab({ pillar, color }) {
   function updateCella(memberId, competenzaId, field, value) {
     const key = `${memberId}_${competenzaId}`
     const currentVal = matrix.valori?.[key] || {}
-    const newValori = {
-      ...(matrix.valori || {}),
-      {
-        ...currentVal,
-        value === '' ? null : parseInt(value),
-      },
-    }
+    const newCell = { ...currentVal }
+    newCell[field] = value === '' ? null : parseInt(value)
+
+    const newValori = { ...(matrix.valori || {}) }
+    newValori[key] = newCell
+
     setMatrix({ ...matrix, valori: newValori })
-    // Debounce salvataggio: salviamo dopo 500ms senza modifiche
+
     if (window._skillMatrixSaveTimer) clearTimeout(window._skillMatrixSaveTimer)
     window._skillMatrixSaveTimer = setTimeout(() => {
       saveMatrix({ valori: newValori })
@@ -130,7 +130,6 @@ export default function SkillMatrixTab({ pillar, color }) {
   function removeMember(userId) {
     if (!confirm('Rimuovere questo utente dalla matrice?')) return
     const newMembers = (matrix?.members || []).filter(m => m.user_id !== userId)
-    // Rimuovi anche i valori associati
     const newValori = { ...(matrix?.valori || {}) }
     Object.keys(newValori).forEach(k => {
       if (k.startsWith(`${userId}_`)) delete newValori[k]
@@ -138,33 +137,31 @@ export default function SkillMatrixTab({ pillar, color }) {
     saveMatrix({ members: newMembers, valori: newValori })
   }
 
-  // Calcola dati radar per una persona
   const radarDataForMember = useMemo(() => {
     if (!matrix || !selectedMemberId) return []
     return categorieConfig.filter(c => c.attivo !== false).map(cat => {
       const catId = cat._id
       const catCompetenze = competenze.filter(c => c.categoria_id === catId)
-      let s = 0, c = 0, t = 0, count = 0
+      let sSum = 0, cSum = 0, tSum = 0, count = 0
       catCompetenze.forEach(comp => {
         const key = `${selectedMemberId}_${comp._id}`
         const cell = matrix.valori?.[key]
         if (cell) {
-          if (cell.starting !== null && cell.starting !== undefined) s += cell.starting
-          if (cell.current !== null && cell.current !== undefined) c += cell.current
-          if (cell.target !== null && cell.target !== undefined) t += cell.target
+          if (cell.starting !== null && cell.starting !== undefined) sSum += cell.starting
+          if (cell.current !== null && cell.current !== undefined) cSum += cell.current
+          if (cell.target !== null && cell.target !== undefined) tSum += cell.target
           count++
         }
       })
       return {
         categoria: cat.label,
-        starting: count > 0 ? s / count : 0,
-        current: count > 0 ? c / count : 0,
-        target: count > 0 ? t / count : 0,
+        starting: count > 0 ? sSum / count : 0,
+        current: count > 0 ? cSum / count : 0,
+        target: count > 0 ? tSum / count : 0,
       }
     })
   }, [matrix, selectedMemberId, competenze, categorieConfig])
 
-  // Calcola dati radar aggregato pillar (media di tutti i member)
   const radarDataForPillar = useMemo(() => {
     if (!matrix || !matrix.members || matrix.members.length === 0) return []
     return categorieConfig.filter(c => c.attivo !== false).map(cat => {
@@ -197,24 +194,18 @@ export default function SkillMatrixTab({ pillar, color }) {
   }
 
   const members = matrix.members || []
-  const competenzeConCategoria = competenze.map(c => ({
-    ...c,
-    categoria_label: categorieConfig.find(cat => cat._id === c.categoria_id)?.label || 'Senza categoria',
-    categoria_color: categorieConfig.find(cat => cat._id === c.categoria_id)?.color || '#9ca3af',
-  }))
 
-  // Raggruppa competenze per categoria
   const competenzePerCategoria = {}
   categorieConfig.filter(c => c.attivo !== false).forEach(cat => {
     competenzePerCategoria[cat._id] = {
       categoria: cat,
-      items: competenzeConCategoria.filter(c => c.categoria_id === cat._id),
+      items: competenze.filter(c => c.categoria_id === cat._id),
     }
   })
 
   return (
     <div className="space-y-4">
-      {/* HEADER con selettore anno e azioni */}
+      {/* HEADER */}
       <div className="bg-white rounded-xl shadow p-4">
         <div className="flex flex-wrap items-center gap-3 justify-between">
           <div className="flex items-center gap-3">
@@ -271,14 +262,12 @@ export default function SkillMatrixTab({ pillar, color }) {
         </div>
       </div>
 
-      {/* Se non ci sono competenze */}
       {competenze.length === 0 && (
         <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-r-lg p-4 text-sm text-yellow-800">
           <strong>Nessuna competenza configurata.</strong> Clicca "Configura Competenze" per definire le skill di questo pillar.
         </div>
       )}
 
-      {/* Se nessun member */}
       {members.length === 0 && competenze.length > 0 && (
         <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-r-lg p-4 text-sm text-yellow-800">
           <strong>Nessun membro nella matrice.</strong>{' '}
@@ -315,7 +304,7 @@ export default function SkillMatrixTab({ pillar, color }) {
               </tr>
               <tr>
                 <th className="sticky left-0 bg-gray-50 z-10 border-b border-r p-2"></th>
-                {Object.values(competenzePerCategoria).map(({ categoria, items }) => (
+                {Object.values(competenzePerCategoria).map(({ items }) => (
                   items.map(comp => (
                     <th
                       key={comp._id}
@@ -334,11 +323,11 @@ export default function SkillMatrixTab({ pillar, color }) {
                 <th className="sticky left-0 bg-gray-100 z-10 border-b border-r p-1 text-left">Nome</th>
                 {Object.values(competenzePerCategoria).map(({ items }) => (
                   items.map(comp => (
-                    <>
-                      <th key={`${comp._id}_s`} className="border-b p-1 text-center bg-red-50 text-red-700">S</th>
-                      <th key={`${comp._id}_c`} className="border-b p-1 text-center bg-amber-50 text-amber-700">C</th>
-                      <th key={`${comp._id}_t`} className="border-b border-r p-1 text-center bg-emerald-50 text-emerald-700">T</th>
-                    </>
+                    <Fragment key={`${comp._id}_head_sct`}>
+                      <th className="border-b p-1 text-center bg-red-50 text-red-700">S</th>
+                      <th className="border-b p-1 text-center bg-amber-50 text-amber-700">C</th>
+                      <th className="border-b border-r p-1 text-center bg-emerald-50 text-emerald-700">T</th>
+                    </Fragment>
                   ))
                 ))}
               </tr>
@@ -369,11 +358,11 @@ export default function SkillMatrixTab({ pillar, color }) {
                       const key = `${m.user_id}_${comp._id}`
                       const cell = matrix.valori?.[key] || {}
                       return (
-                        <>
-                          <LevelCell key={`${key}_s`} value={cell.starting} onChange={(v) => updateCella(m.user_id, comp._id, 'starting', v)} bg="bg-red-50" />
-                          <LevelCell key={`${key}_c`} value={cell.current} onChange={(v) => updateCella(m.user_id, comp._id, 'current', v)} bg="bg-amber-50" />
-                          <LevelCell key={`${key}_t`} value={cell.target} onChange={(v) => updateCella(m.user_id, comp._id, 'target', v)} bg="bg-emerald-50" borderR />
-                        </>
+                        <Fragment key={key}>
+                          <LevelCell value={cell.starting} onChange={(v) => updateCella(m.user_id, comp._id, 'starting', v)} bg="bg-red-50" />
+                          <LevelCell value={cell.current} onChange={(v) => updateCella(m.user_id, comp._id, 'current', v)} bg="bg-amber-50" />
+                          <LevelCell value={cell.target} onChange={(v) => updateCella(m.user_id, comp._id, 'target', v)} bg="bg-emerald-50" borderR />
+                        </Fragment>
                       )
                     })
                   ))}
@@ -382,7 +371,6 @@ export default function SkillMatrixTab({ pillar, color }) {
             </tbody>
           </table>
 
-          {/* Pulsante aggiungi membro */}
           <div className="p-3 border-t bg-gray-50">
             <button
               onClick={() => setShowAddMember(true)}
@@ -458,7 +446,7 @@ export default function SkillMatrixTab({ pillar, color }) {
 }
 
 // ─────────────────────────────────────────────
-// COMPONENTE CELLA LIVELLO
+// LEVEL CELL
 // ─────────────────────────────────────────────
 
 function LevelCell({ value, onChange, bg = '', borderR = false }) {
@@ -487,12 +475,11 @@ function LevelCell({ value, onChange, bg = '', borderR = false }) {
 }
 
 // ─────────────────────────────────────────────
-// MODAL CONFIGURAZIONE COMPETENZE
+// CONFIG COMPETENZE MODAL
 // ─────────────────────────────────────────────
 
 function ConfigCompetenzeModal({ pillar, color, competenze, categorieConfig, onClose, onSaved }) {
   const [items, setItems] = useState(competenze)
-  const [saving, setSaving] = useState(false)
 
   async function addCompetenza(categoria_id) {
     try {
