@@ -311,12 +311,12 @@ export default function SkillMatrixTab({ pillar, color }) {
                     <th
                       key={comp._id}
                       colSpan={3}
-                      className="border-b border-r p-1 text-[10px] font-medium text-gray-700 bg-gray-50"
-                      style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', height: 120, minWidth: 90 }}
+                      className="border-b border-r p-2 text-[10px] font-medium text-gray-700 bg-gray-50 text-center align-middle"
+                      style={{ minWidth: 110, maxWidth: 160, whiteSpace: 'normal', lineHeight: 1.2 }}
                       title={comp.label}
                     >
-                      {comp.codice && <span className="text-gray-400 font-mono">{comp.codice} </span>}
-                      {comp.label}
+                      {comp.codice && <div className="text-gray-400 font-mono text-[9px] mb-0.5">{comp.codice}</div>}
+                      <div>{comp.label}</div>
                     </th>
                   ))
                 ))}
