@@ -161,12 +161,14 @@ export default function SkillMatrixTab({ pillar, color }) {
       })
       return {
         categoria: cat.label,
+        color: cat.color || '#6366f1',
+        icon: cat.icon || '',
         starting: acc.sCount > 0 ? acc.sSum / acc.sCount : 0,
         current: acc.cCount > 0 ? acc.cSum / acc.cCount : 0,
         target: acc.tCount > 0 ? acc.tSum / acc.tCount : 0,
       }
     })
-  }, [matrix, selectedMemberId, competenze, categorieConfig])
+  }, [matrix, competenze, categorieConfig])
 
   // Radar per tutto il pillar (media)
   const radarDataForPillar = useMemo(() => {
