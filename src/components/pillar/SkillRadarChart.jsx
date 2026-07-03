@@ -4,24 +4,66 @@ import {
   ResponsiveContainer, Tooltip, Legend,
 } from 'recharts'
 
-/**
- * SkillRadarChart
- * Mostra 3 poligoni sovrapposti: Starting / Current / Target
- *
- * Props:
- *   data: array di { categoria: 'LPW Concetti Base', starting: 3.2, current: 3.8, target: 4.5 }
- *   title: titolo del grafico
- *   subtitle: sottotitolo opzionale
- *   height: altezza (default 400)
- *   showStarting: default true
- *   showCurrent: default true
- *   showTarget: default true
- */
+// Custom tick per colorare le label dei vertici
+function ColoredAxisTick(props) {
+  const { payload, x, y, cx, cy, data } = props
+  const entry = data.find(d => d.categoria === payload.value)
+  const color = entry?.color || '#374151'
+  const icon = entry?.icon || ''
+
+  // Calcolo la direzione del testo per non farlo sovrapporre al centro
+  const dx = x - cx
+  const dy = y - cy
+  let textAnchor = 'middle'
+  if (dx > 10) textAnchor = 'start'
+  else if (dx < -10) textAnchor = 'end'
+
+  // Spezzo il testo se troppo lungo
+  const words = String(payload.value).split(' ')
+  const lines = []
+  let currentLine = ''
+  words.forEach(w => {
+    if ((currentLine + ' ' + w).trim().length > 22) {
+      if (currentLine) lines.push(currentLine.trim())
+      currentLine = w
+    } else {
+      currentLine += ' ' + w
+    }
+  })
+  if (currentLine) lines.push(currentLine.trim())
+
+  return (
+    <g>
+      {/* Pallino colorato accanto al testo */}
+      <circle
+        cx={x + (textAnchor === 'end' ? -6 : textAnchor === 'start' ? 6 : 0)}
+        cy={y - (lines.length - 1) * 6 - 4}
+        r={4}
+        fill={color}
+      />
+      <text
+        x={x + (textAnchor === 'end' ? -14 : textAnchor === 'start' ? 14 : 0)}
+        y={y - (lines.length - 1) * 6}
+        textAnchor={textAnchor}
+        fill={color}
+        fontWeight="bold"
+        fontSize={11}
+      >
+        {lines.map((line, i) => (
+          <tspan key={i} x={x + (textAnchor === 'end' ? -14 : textAnchor === 'start' ? 14 : 0)} dy={i === 0 ? 0 : 13}>
+            {i === 0 && icon ? `${icon} ${line}` : line}
+          </tspan>
+        ))}
+      </text>
+    </g>
+  )
+}
+
 export default function SkillRadarChart({
   data = [],
   title = 'Skill Radar',
   subtitle = '',
-  height = 400,
+  height = 450,
   showStarting = true,
   showCurrent = true,
   showTarget = true,
@@ -43,11 +85,11 @@ export default function SkillRadarChart({
 
       <div className="p-4">
         <ResponsiveContainer width="100%" height={height}>
-          <RadarChart data={data} outerRadius="70%">
+          <RadarChart data={data} outerRadius="65%">
             <PolarGrid stroke="#e5e7eb" />
             <PolarAngleAxis
               dataKey="categoria"
-              tick={{ fontSize: 11, fill: '#374151' }}
+              tick={(props) => <ColoredAxisTick {...props} data={data} />}
             />
             <PolarRadiusAxis
               angle={90}
@@ -97,14 +139,13 @@ export default function SkillRadarChart({
                 borderRadius: 8,
                 fontSize: 12,
               }}
-              formatter={(value) => value !== null && value !== undefined ? value.toFixed(2) : '—'}
+              formatter={(value) => value !== null && value !== undefined ? Number(value).toFixed(2) : '—'}
             />
             <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
           </RadarChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Legenda livelli */}
       <div className="border-t bg-gray-50 px-4 py-3">
         <div className="text-xs font-bold uppercase text-gray-600 mb-2">Legenda livelli</div>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-2 text-[11px] text-gray-600">
