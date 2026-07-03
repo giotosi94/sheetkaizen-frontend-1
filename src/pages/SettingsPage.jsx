@@ -111,20 +111,6 @@ const SECTIONS = [
       },
     ],
   },
-  {
-    id: 'skill_matrix',
-    label: 'Skill Matrix',
-    color: 'pink',
-    tabs: [
-      {
-        id: 'categoria_skill',
-        label: 'Categorie Competenze',
-        color: 'pink',
-        description: 'Categorie standard LPW (es. LPW Concetti Base, Steps Pilastro, Team Management). Sono condivise tra tutti i Pillar.',
-        usedIn: ['Pillar → tab Skill Matrix', 'Radar Chart Skill Matrix'],
-      },
-    ],
-  },
 ]
 
 const TAB_COLORS = {
