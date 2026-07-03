@@ -1067,20 +1067,3 @@ function BulkUploadModal({ onClose, onSaved }) {
     </div>
   )
 }
-/* Excel preview */
-.excel-preview table {
-  border-collapse: collapse;
-  font-size: 12px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-.excel-preview table td,
-.excel-preview table th {
-  border: 1px solid #d1d5db;
-  padding: 4px 8px;
-  min-width: 60px;
-  white-space: nowrap;
-}
-.excel-preview table th {
-  background-color: #f3f4f6;
-  font-weight: 600;
-}
