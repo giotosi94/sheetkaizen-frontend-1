@@ -156,14 +156,16 @@ export default function SkillMatrixTab({ pillar, color }) {
           if (!isNaN(s) || !isNaN(c) || !isNaN(t)) count++
         }
       })
-      return {
+      const result = {
         categoria: cat.label,
-        starting: count > 0 ? sSum / count : 0,
-        current: count > 0 ? cSum / count : 0,
-        target: count > 0 ? tSum / count : 0,
+        starting: count > 0 ? totS / count : 0,
+        current: count > 0 ? totC / count : 0,
+        target: count > 0 ? totT / count : 0,
       }
+      console.log('RADAR PILLAR', cat.label, '→ count:', count, 'S:', totS, 'C:', totC, 'T:', totT, 'catCompetenze:', catCompetenze.length)
+      return result
     })
-  }, [matrix, selectedMemberId, competenze, categorieConfig])
+  }, [matrix, competenze, categorieConfig])
 
   const radarDataForPillar = useMemo(() => {
     if (!matrix || !matrix.members || matrix.members.length === 0) return []
