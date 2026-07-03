@@ -573,9 +573,19 @@ function ConfigCompetenzeModal({ pillar, color, competenze, categorieConfig, onC
                         <input
                           value={item.label}
                           onChange={(e) => updateCompetenza(item._id, { label: e.target.value })}
-                          className="col-span-8 border rounded px-2 py-1 text-sm"
+                          className="col-span-5 border rounded px-2 py-1 text-sm"
                           placeholder="Nome competenza"
                         />
+                        <select
+                          value={item.categoria_id || ''}
+                          onChange={(e) => updateCompetenza(item._id, { categoria_id: e.target.value })}
+                          className="col-span-3 border rounded px-2 py-1 text-xs"
+                          title="Sposta in altra categoria"
+                        >
+                          {categorieConfig.filter(c => c.attivo !== false).map(c => (
+                            <option key={c._id} value={c._id}>{c.label}</option>
+                          ))}
+                        </select>
                         <input
                           type="number"
                           min="1"
