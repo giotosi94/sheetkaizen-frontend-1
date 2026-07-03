@@ -113,24 +113,9 @@ const SECTIONS = [
   },
 ]
 
-const TAB_COLORS = {
-  blue: 'bg-blue-100 text-blue-700 border-blue-300',
-  green: 'bg-green-100 text-green-700 border-green-300',
-  purple: 'bg-purple-100 text-purple-700 border-purple-300',
-  red: 'bg-red-100 text-red-700 border-red-300',
-  orange: 'bg-orange-100 text-orange-700 border-orange-300',
-  indigo: 'bg-indigo-100 text-indigo-700 border-indigo-300',
-  pink: 'bg-pink-100 text-pink-700 border-pink-300',
-}
+const TAB_ACTIVE = 'bg-primary bg-opacity-10 text-primary border-primary'
 
-const SECTION_BG = {
-  indigo: 'bg-indigo-50',
-  green: 'bg-green-50',
-  red: 'bg-red-50',
-  purple: 'bg-purple-50',
-  orange: 'bg-orange-50',
-  pink: 'bg-pink-50',
-}
+const SECTION_BG = 'bg-gray-50'
 
 const ALL_TABS = SECTIONS.flatMap(s => s.tabs)
 
@@ -165,12 +150,7 @@ export default function SettingsPage() {
           <div className="bg-white rounded-lg shadow-sm overflow-hidden sticky top-4">
             {SECTIONS.map(section => (
               <div key={section.id} className="border-b last:border-b-0">
-                <div className={`px-3 py-2 ${SECTION_BG[section.color]}`}
-                 style={{ borderLeft: `4px solid ${section.color === 'indigo' ? '#6366f1' :
-                            section.color === 'green' ? '#10b981' :
-                            section.color === 'red' ? '#ef4444' :
-                            section.color === 'orange' ? '#f97316' :
-                            section.color === 'pink' ? '#ec4899' : '#a855f7'}` }}>
+                <div className={`px-3 py-2 ${SECTION_BG} border-l-4 border-gray-300`}>
                   <div className="text-xs font-bold uppercase tracking-wide text-gray-600">
                     {section.label}
                   </div>
@@ -186,7 +166,7 @@ export default function SettingsPage() {
                         onClick={() => setActiveTabId(tab.id)}
                         className={`w-full px-3 py-2 flex items-center justify-between gap-2 text-sm transition-all ${
                           isActive
-                            ? `${TAB_COLORS[tab.color]} font-semibold border-l-2`
+                            ? `${TAB_ACTIVE} font-semibold border-l-2`
                             : 'text-gray-600 hover:bg-gray-50 border-l-2 border-transparent'
                         }`}
                       >
@@ -211,7 +191,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="col-span-12 md:col-span-9 lg:col-span-9 space-y-4">
-          <div className={`p-4 rounded-lg border-l-4 ${TAB_COLORS[currentTab.color]}`}>
+          <div className="p-4 rounded-lg border-l-4 bg-primary bg-opacity-10 border-primary text-gray-700">
             <div className="flex items-start gap-3">
               <Info size={20} className="flex-shrink-0 mt-0.5" />
               <div className="flex-1">
