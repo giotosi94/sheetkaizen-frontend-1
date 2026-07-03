@@ -265,7 +265,7 @@ export default function SkillMatrixTab({ pillar, color }) {
 
       {matrix.starting_locked && matrix.inherited_from && (
         <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-3 text-sm text-blue-800">
-          <strong>Starting ereditato dall'anno {matrix.inherited_from}.</strong> La colonna <span className="font-mono">S</span> non è modificabile: corrisponde al Current di fine {matrix.inherited_from}.
+          <strong>Starting ereditato dall anno {matrix.inherited_from}.</strong> La colonna <span className="font-mono">S</span> non è modificabile: corrisponde al Current di fine {matrix.inherited_from}.
         </div>
       )}
 
