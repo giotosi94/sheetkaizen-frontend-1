@@ -108,7 +108,6 @@ export default function SkillMatrixTab({ pillar, color }) {
       },
     }
     setMatrix({ ...matrix, valori: newValori })
-
     // Debounce salvataggio: salviamo dopo 500ms senza modifiche
     if (window._skillMatrixSaveTimer) clearTimeout(window._skillMatrixSaveTimer)
     window._skillMatrixSaveTimer = setTimeout(() => {
