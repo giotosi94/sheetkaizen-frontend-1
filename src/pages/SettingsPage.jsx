@@ -279,9 +279,15 @@ function RepartiTreePlaceholder() {
     try {
       const res = await api.get('/reparti/')
       setReparti(res.data)
-    } catch (err) { console.error(err) }
-    finally { setLoading(false) }
-  }
+    } catch (err) {
+      const detail = err.response?.data?.detail
+      let msg = err.message
+      if (typeof detail === 'string') msg = detail
+      else if (Array.isArray(detail)) msg = detail.map(d => `${d.loc?.join('.')}: ${d.msg}`).join('\n')
+      else if (detail) msg = JSON.stringify(detail)
+      alert('Errore: ' + msg)
+      console.error('Errore completo:', err.response?.data)
+    } finally {
 
   function toggleReparto(id) {
     setExpandedReparti(prev => {
