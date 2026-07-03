@@ -10,6 +10,7 @@ import PresenzeWidget from '../components/widgets/PresenzeWidget'
 import ParetoChart from '../components/pillar/ParetoChart'
 import BridgeChart from '../components/pillar/BridgeChart'
 import CloseTheLoopChart from '../components/pillar/CloseTheLoopChart'
+import SkillMatrixTab from '../components/pillar/SkillMatrixTab'
 
 export default function PillarDetailPage() {
   const { id } = useParams()
@@ -64,6 +65,7 @@ export default function PillarDetailPage() {
     { id: 'masterplan', label: 'Master Plan' },
     { id: 'kaizen', label: `Kaizen (${kaizens.length})` },
     { id: 'action_plan', label: `Action Plan (${actionPlans.length})` },
+    { id: 'skill_matrix', label: 'Skill Matrix' },
     { id: 'maturity', label: 'Maturity Grid' },
   ]
 
@@ -150,6 +152,7 @@ export default function PillarDetailPage() {
       {activeTab === 'masterplan' && <MasterPlanTab pillar={pillar} color={color} onSaved={loadAll} />}
       {activeTab === 'kaizen' && <KaizenList kaizens={kaizens} pillar={pillar} />}
       {activeTab === 'action_plan' && <ActionPlanTab actionPlans={actionPlans} pillar={pillar} color={color} onReload={loadAll} />}
+      {activeTab === 'skill_matrix' && <SkillMatrixTab pillar={pillar} color={color} />}
       {activeTab === 'maturity' && <MaturityPlaceholder color={color} />}
     </div>
   )
