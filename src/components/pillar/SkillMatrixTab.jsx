@@ -449,7 +449,7 @@ function LevelCell({ value, onChange, bg = '', borderR = false, disabled = false
     <td
       className={`border-b p-0 ${borderR ? 'border-r' : ''} ${bg}`}
       style={{ minWidth: 30, width: 30 }}
-      title={disabled ? 'Valore ereditato dall\'anno precedente (non modificabile)' : ''}
+      title={disabled ? "Valore ereditato dall'anno precedente (non modificabile)" : ""}
     >
       <select
         value={value ?? ''}
