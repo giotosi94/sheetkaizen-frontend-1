@@ -329,14 +329,13 @@ function PreviewModal({ doc, onClose }) {
     }
 
     if (fileType === 'image' && blobUrl) {
-
       return (
         <div className="w-full h-full flex items-center justify-center p-4 overflow-auto">
-          {blobUrl}-w-full max-h-full object-contain shadow-lg"
-          />
+          <imgbUrl}
         </div>
       )
     }
+
 
     if (fileType === 'text') {
       return (
