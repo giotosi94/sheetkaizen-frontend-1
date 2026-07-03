@@ -147,10 +147,13 @@ export default function SkillMatrixTab({ pillar, color }) {
         const key = `${selectedMemberId}_${comp._id}`
         const cell = matrix.valori?.[key]
         if (cell) {
-          if (cell.starting !== null && cell.starting !== undefined) sSum += cell.starting
-          if (cell.current !== null && cell.current !== undefined) cSum += cell.current
-          if (cell.target !== null && cell.target !== undefined) tSum += cell.target
-          count++
+          const s = Number(cell.starting)
+          const c = Number(cell.current)
+          const t = Number(cell.target)
+          if (!isNaN(s) && s > 0) sSum += s
+          if (!isNaN(c) && c > 0) cSum += c
+          if (!isNaN(t) && t > 0) tSum += t
+          if (!isNaN(s) || !isNaN(c) || !isNaN(t)) count++
         }
       })
       return {
