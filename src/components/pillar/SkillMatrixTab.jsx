@@ -13,6 +13,18 @@ const LIVELLI = [
   { v: 5, label: 'Saper insegnare', color: '#a7f3d0', text: '#064e3b' },
 ]
 
+// Somma i valori S/C/T di un cell rispettando null/undefined/stringhe
+function accumulate(cell, acc) {
+  if (!cell) return acc
+  const s = Number(cell.starting)
+  const c = Number(cell.current)
+  const t = Number(cell.target)
+  if (!isNaN(s) && s > 0) { acc.sSum += s; acc.sCount++ }
+  if (!isNaN(c) && c > 0) { acc.cSum += c; acc.cCount++ }
+  if (!isNaN(t) && t > 0) { acc.tSum += t; acc.tCount++ }
+  return acc
+}
+
 export default function SkillMatrixTab({ pillar, color }) {
   const { configs } = useAllConfigurations()
   const categorieConfig = configs.categoria_skill || []
@@ -137,62 +149,42 @@ export default function SkillMatrixTab({ pillar, color }) {
     saveMatrix({ members: newMembers, valori: newValori })
   }
 
+  // Radar per un singolo membro
   const radarDataForMember = useMemo(() => {
     if (!matrix || !selectedMemberId) return []
     return categorieConfig.filter(c => c.attivo !== false).map(cat => {
-      const catId = cat._id
-      const catCompetenze = competenze.filter(c => c.categoria_id === catId)
-      let sSum = 0, cSum = 0, tSum = 0, count = 0
+      const catCompetenze = competenze.filter(c => c.categoria_id === cat._id)
+      const acc = { sSum: 0, cSum: 0, tSum: 0, sCount: 0, cCount: 0, tCount: 0 }
       catCompetenze.forEach(comp => {
         const key = `${selectedMemberId}_${comp._id}`
-        const cell = matrix.valori?.[key]
-        if (cell) {
-          const s = Number(cell.starting)
-          const c = Number(cell.current)
-          const t = Number(cell.target)
-          if (!isNaN(s) && s > 0) sSum += s
-          if (!isNaN(c) && c > 0) cSum += c
-          if (!isNaN(t) && t > 0) tSum += t
-          if (!isNaN(s) || !isNaN(c) || !isNaN(t)) count++
-        }
+        accumulate(matrix.valori?.[key], acc)
       })
-      const result = {
+      return {
         categoria: cat.label,
-        starting: count > 0 ? totS / count : 0,
-        current: count > 0 ? totC / count : 0,
-        target: count > 0 ? totT / count : 0,
+        starting: acc.sCount > 0 ? acc.sSum / acc.sCount : 0,
+        current: acc.cCount > 0 ? acc.cSum / acc.cCount : 0,
+        target: acc.tCount > 0 ? acc.tSum / acc.tCount : 0,
       }
-      console.log('RADAR PILLAR', cat.label, '→ count:', count, 'S:', totS, 'C:', totC, 'T:', totT, 'catCompetenze:', catCompetenze.length)
-      return result
     })
-  }, [matrix, competenze, categorieConfig])
+  }, [matrix, selectedMemberId, competenze, categorieConfig])
 
+  // Radar per tutto il pillar (media)
   const radarDataForPillar = useMemo(() => {
     if (!matrix || !matrix.members || matrix.members.length === 0) return []
     return categorieConfig.filter(c => c.attivo !== false).map(cat => {
-      const catId = cat._id
-      const catCompetenze = competenze.filter(c => c.categoria_id === catId)
-      let totS = 0, totC = 0, totT = 0, count = 0
+      const catCompetenze = competenze.filter(c => c.categoria_id === cat._id)
+      const acc = { sSum: 0, cSum: 0, tSum: 0, sCount: 0, cCount: 0, tCount: 0 }
       matrix.members.forEach(m => {
         catCompetenze.forEach(comp => {
           const key = `${m.user_id}_${comp._id}`
-          const cell = matrix.valori?.[key]
-          if (cell) {
-            const s = Number(cell.starting)
-            const c = Number(cell.current)
-            const t = Number(cell.target)
-            if (!isNaN(s) && s > 0) totS += s
-            if (!isNaN(c) && c > 0) totC += c
-            if (!isNaN(t) && t > 0) totT += t
-            if (!isNaN(s) || !isNaN(c) || !isNaN(t)) count++
-          }
+          accumulate(matrix.valori?.[key], acc)
         })
       })
       return {
         categoria: cat.label,
-        starting: count > 0 ? totS / count : 0,
-        current: count > 0 ? totC / count : 0,
-        target: count > 0 ? totT / count : 0,
+        starting: acc.sCount > 0 ? acc.sSum / acc.sCount : 0,
+        current: acc.cCount > 0 ? acc.cSum / acc.cCount : 0,
+        target: acc.tCount > 0 ? acc.tSum / acc.tCount : 0,
       }
     })
   }, [matrix, competenze, categorieConfig])
@@ -416,7 +408,6 @@ export default function SkillMatrixTab({ pillar, color }) {
         </div>
       )}
 
-      {/* Modal config competenze */}
       {showConfigCompetenze && (
         <ConfigCompetenzeModal
           pillar={pillar}
@@ -428,7 +419,6 @@ export default function SkillMatrixTab({ pillar, color }) {
         />
       )}
 
-      {/* Modal aggiungi membro */}
       {showAddMember && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
@@ -458,7 +448,8 @@ export default function SkillMatrixTab({ pillar, color }) {
 // ─────────────────────────────────────────────
 
 function LevelCell({ value, onChange, bg = '', borderR = false }) {
-  const livello = LIVELLI.find(l => l.v === value)
+  const numValue = Number(value)
+  const livello = LIVELLI.find(l => l.v === numValue)
   return (
     <td
       className={`border-b p-0 ${borderR ? 'border-r' : ''} ${bg}`}
