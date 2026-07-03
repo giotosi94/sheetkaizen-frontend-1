@@ -98,6 +98,7 @@ const SECTIONS = [
     ],
   },
   {
+    {
     id: 'meetings',
     label: 'Meetings',
     color: 'orange',
@@ -108,6 +109,20 @@ const SECTIONS = [
         color: 'orange',
         description: 'Tipologie configurabili di Meeting/Dashboard (es. PCS Daily, Steering, Weekly Review)',
         usedIn: ['Form Nuova Dashboard', 'Filtri Meetings'],
+      },
+    ],
+  },
+  {
+    id: 'skill_matrix',
+    label: 'Skill Matrix',
+    color: 'pink',
+    tabs: [
+      {
+        id: 'categoria_skill',
+        label: 'Categorie Competenze',
+        color: 'pink',
+        description: 'Categorie standard LPW (es. LPW Concetti Base, Steps Pilastro, Team Management). Sono condivise tra tutti i Pillar.',
+        usedIn: ['Pillar → tab Skill Matrix', 'Radar Chart Skill Matrix'],
       },
     ],
   },
@@ -129,6 +144,7 @@ const SECTION_BG = {
   red: 'bg-red-50',
   purple: 'bg-purple-50',
   orange: 'bg-orange-50',
+  pink: 'bg-pink-50',
 }
 
 const ALL_TABS = SECTIONS.flatMap(s => s.tabs)
@@ -165,10 +181,11 @@ export default function SettingsPage() {
             {SECTIONS.map(section => (
               <div key={section.id} className="border-b last:border-b-0">
                 <div className={`px-3 py-2 ${SECTION_BG[section.color]}`}
-                  style={{ borderLeft: `4px solid ${section.color === 'indigo' ? '#6366f1' :
+                 style={{ borderLeft: `4px solid ${section.color === 'indigo' ? '#6366f1' :
                             section.color === 'green' ? '#10b981' :
                             section.color === 'red' ? '#ef4444' :
-                            section.color === 'orange' ? '#f97316' : '#a855f7'}` }}>
+                            section.color === 'orange' ? '#f97316' :
+                            section.color === 'pink' ? '#ec4899' : '#a855f7'}` }}>
                   <div className="text-xs font-bold uppercase tracking-wide text-gray-600">
                     {section.label}
                   </div>
