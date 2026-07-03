@@ -445,11 +445,12 @@ export default function SkillMatrixTab({ pillar, color }) {
 function LevelCell({ value, onChange, bg = '', borderR = false, disabled = false }) {
   const numValue = Number(value)
   const livello = LIVELLI.find(l => l.v === numValue)
+  const tooltip = disabled ? "Valore ereditato dall anno precedente (non modificabile)" : ""
   return (
     <td
       className={`border-b p-0 ${borderR ? 'border-r' : ''} ${bg}`}
       style={{ minWidth: 30, width: 30 }}
-      title={disabled ? "Valore ereditato dall'anno precedente (non modificabile)" : ""}
+      title={tooltip}
     >
       <select
         value={value ?? ''}
@@ -469,7 +470,6 @@ function LevelCell({ value, onChange, bg = '', borderR = false, disabled = false
     </td>
   )
 }
-`
 
 function ConfigCompetenzeModal({ pillar, color, competenze, onClose, onSaved }) {
   const [items, setItems] = useState(competenze)
