@@ -288,6 +288,9 @@ function RepartiTreePlaceholder() {
       alert('Errore: ' + msg)
       console.error('Errore completo:', err.response?.data)
     } finally {
+      setSaving(false)
+    }
+  }
 
   function toggleReparto(id) {
     setExpandedReparti(prev => {
