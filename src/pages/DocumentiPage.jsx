@@ -237,6 +237,7 @@ function PreviewModal({ doc, onClose }) {
   const fileType = getFileType(doc.file_name)
   const [blobUrl, setBlobUrl] = useState(null)
   const [textContent, setTextContent] = useState('')
+  const [officeViewerUrl, setOfficeViewerUrl] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -263,6 +264,23 @@ function PreviewModal({ doc, onClose }) {
     let cancelled = false
 
     async function loadFile() {
+      if (fileType === 'office') {
+        try {
+          const tokRes = await api.post(`/documenti/${doc._id}/preview-token`)
+          if (cancelled) return
+          const token = tokRes.data.token
+          const publicUrl = `${API_BASE}/api/documenti/${doc._id}/preview?token=${encodeURIComponent(token)}`
+          const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(publicUrl)}`
+          setOfficeViewerUrl(viewerUrl)
+          setLoading(false)
+        } catch (err) {
+          if (!cancelled) {
+            setError(err.response?.data?.detail || err.message || 'Errore preview Office')
+            setLoading(false)
+          }
+        }
+        return
+      }
       if (fileType !== 'pdf' && fileType !== 'image' && fileType !== 'text') {
         setLoading(false)
         return
@@ -353,7 +371,23 @@ function PreviewModal({ doc, onClose }) {
       )
     }
 
-    // Office (xlsx, docx, pptx) e altri: no preview, solo download
+    if (fileType === 'office' && officeViewerUrl) {
+      return (
+        <div className="w-full h-full flex flex-col">
+          {React.createElement('iframe', {
+            src: officeViewerUrl,
+            className: 'flex-1 w-full border-0',
+            title: doc.titolo,
+            frameBorder: '0',
+          })}
+          <div className="bg-yellow-50 border-t border-yellow-200 px-4 py-2 text-xs text-yellow-800 flex-shrink-0">
+            Anteprima via Office Online Viewer. Se non si carica in pochi secondi, usa Scarica.
+          </div>
+        </div>
+      )
+    }
+
+    // Fallback per office se il token non è ancora pronto o tipi non supportati
     const isOffice = fileType === 'office'
     return (
       <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 p-8">
