@@ -18,6 +18,7 @@
     "lucide-react": "^0.447.0",
     "date-fns": "^4.1.0",
     "react-grid-layout": "^1.4.4",
+    "xlsx": "^0.18.5",
     "recharts": "^2.13.0"
   },
   "devDependencies": {
