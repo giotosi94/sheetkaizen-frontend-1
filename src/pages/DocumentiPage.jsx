@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import api from '../services/api'
 import { FileText, Upload, Download, Search, Trash2, Edit2, Eye, X } from 'lucide-react'
-import * as XLSX from 'xlsx'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -13,8 +12,7 @@ function getFileType(filename) {
   const ext = filename.split('.').pop().toLowerCase()
   if (['pdf'].includes(ext)) return 'pdf'
   if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) return 'image'
-  if (['xlsx', 'xls'].includes(ext)) return 'excel'
-  if (['docx', 'doc', 'pptx', 'ppt'].includes(ext)) return 'office'
+  if (['xlsx', 'xls', 'docx', 'doc', 'pptx', 'ppt'].includes(ext)) return 'office'
   if (['txt', 'csv', 'log', 'json', 'xml'].includes(ext)) return 'text'
   return 'unknown'
 }
@@ -239,8 +237,6 @@ function PreviewModal({ doc, onClose }) {
   const fileType = getFileType(doc.file_name)
   const [blobUrl, setBlobUrl] = useState(null)
   const [textContent, setTextContent] = useState('')
-  const [excelSheets, setExcelSheets] = useState([])
-  const [activeSheet, setActiveSheet] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -267,12 +263,7 @@ function PreviewModal({ doc, onClose }) {
     let cancelled = false
 
     async function loadFile() {
-      if (
-        fileType !== 'pdf' &&
-        fileType !== 'image' &&
-        fileType !== 'text' &&
-        fileType !== 'excel'
-      ) {
+      if (fileType !== 'pdf' && fileType !== 'image' && fileType !== 'text') {
         setLoading(false)
         return
       }
@@ -284,18 +275,6 @@ function PreviewModal({ doc, onClose }) {
           const text = await res.data.text()
           if (!cancelled) {
             setTextContent(text)
-            setLoading(false)
-          }
-        } else if (fileType === 'excel') {
-          const arrayBuf = await res.data.arrayBuffer()
-          if (!cancelled) {
-            const wb = XLSX.read(arrayBuf, { type: 'array' })
-            const sheets = wb.SheetNames.map(name => {
-              const ws = wb.Sheets[name]
-              const html = XLSX.utils.sheet_to_html(ws, { editable: false })
-              return { name, html }
-            })
-            setExcelSheets(sheets)
             setLoading(false)
           }
         } else {
@@ -374,36 +353,7 @@ function PreviewModal({ doc, onClose }) {
       )
     }
 
-    if (fileType === 'excel' && excelSheets.length > 0) {
-      const sheet = excelSheets[activeSheet] || excelSheets[0]
-      return (
-        <div className="w-full h-full flex flex-col bg-white">
-          {excelSheets.length > 1 && (
-            <div className="flex gap-1 border-b bg-gray-50 px-3 py-2 overflow-x-auto flex-shrink-0">
-              {excelSheets.map((s, i) => (
-                <button
-                  key={i}
-                  onClick={() => setActiveSheet(i)}
-                  className={`px-3 py-1 text-xs font-medium rounded whitespace-nowrap ${
-                    i === activeSheet
-                      ? 'bg-primary text-white'
-                      : 'bg-white border hover:bg-gray-100'
-                  }`}
-                >
-                  {s.name}
-                </button>
-              ))}
-            </div>
-          )}
-          <div
-            className="flex-1 overflow-auto p-4 excel-preview"
-            dangerouslySetInnerHTML={{ __html: sheet.html }}
-          />
-        </div>
-      )
-    }
-
-    // Office (docx, pptx) e altri: no preview, solo download
+    // Office (xlsx, docx, pptx) e altri: no preview, solo download
     const isOffice = fileType === 'office'
     return (
       <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 p-8">
@@ -414,7 +364,7 @@ function PreviewModal({ doc, onClose }) {
         <div className="text-sm mb-2 text-gray-400">{doc.file_name}</div>
         {isOffice && (
           <div className="text-xs mb-6 text-gray-400 max-w-md text-center">
-            I file Word e PowerPoint richiedono di essere scaricati per essere visualizzati.
+            I file Excel, Word e PowerPoint richiedono di essere scaricati per essere visualizzati.
           </div>
         )}
         <button
