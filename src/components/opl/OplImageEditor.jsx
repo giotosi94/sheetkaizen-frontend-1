@@ -461,6 +461,42 @@ function AnnotationNode({ annotation, isSelected, onSelect, onChange }) {
         />
       </Group>
     )
+  } else if (symbol.type === 'icon') {
+    const isHazard = symbol.category === 'hazard'
+    renderedShape = (
+      <Group {...commonProps}>
+        {isHazard ? (
+          <RegularPolygon
+            x={annotation.width / 2}
+            y={annotation.height / 2}
+            sides={3}
+            radius={Math.min(annotation.width, annotation.height) / 2}
+            fill={symbol.color}
+            stroke="#000"
+            strokeWidth={3}
+          />
+        ) : (
+          <Circle
+            x={annotation.width / 2}
+            y={annotation.height / 2}
+            radius={Math.min(annotation.width, annotation.height) / 2}
+            fill={symbol.color}
+            stroke="#000"
+            strokeWidth={3}
+          />
+        )}
+        <Text
+          x={0}
+          y={isHazard ? annotation.height * 0.2 : 0}
+          width={annotation.width}
+          height={annotation.height}
+          text={symbol.preview}
+          fontSize={annotation.height * 0.5}
+          align="center"
+          verticalAlign="middle"
+        />
+      </Group>
+    )
   }
 
   return (
