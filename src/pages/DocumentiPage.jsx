@@ -1724,11 +1724,15 @@ function AnnotationSvg({ annotation }) {
 
   // Immagine custom caricata dall'utente
   if (annotation.symbolId === '__custom_image__' && annotation.imageData) {
-    return (
-      {annotation.imageData}form={transform}
-        preserveAspectRatio="none"
-      />
-    )
+    return React.createElement('image', {
+      href: annotation.imageData,
+      x: x,
+      y: y,
+      width: width,
+      height: height,
+      transform: transform,
+      preserveAspectRatio: 'none',
+    })
   }
 
   const symbol = OPL_SYMBOLS.find(s => s.id === annotation.symbolId)
