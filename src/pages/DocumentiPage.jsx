@@ -1827,6 +1827,28 @@ function AnnotationSvg({ annotation }) {
       />
     )
   }
+  if (symbol.type === 'icon') {
+    const isHazard = symbol.category === 'hazard'
+    if (isHazard) {
+      const points = [
+        [cx, y],
+        [x + width, y + height],
+        [x, y + height],
+      ].map(p => p.join(',')).join(' ')
+      return (
+        <g transform={transform}>
+          <polygon points={points} fill={symbol.color} stroke="#000" strokeWidth="3" />
+          <text x={cx} y={cy + height * 0.15} fontSize={height * 0.5} textAnchor="middle" dominantBaseline="middle">{symbol.preview}</text>
+        </g>
+      )
+    }
+    return (
+      <g transform={transform}>
+        <circle cx={cx} cy={cy} r={r} fill={symbol.color} stroke="#000" strokeWidth="3" />
+        <text x={cx} y={cy} fontSize={height * 0.5} textAnchor="middle" dominantBaseline="central">{symbol.preview}</text>
+      </g>
+    )
+  }
 
   return null
 }
