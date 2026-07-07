@@ -1716,14 +1716,23 @@ function AnnotatedImage({ imageUrl, annotations }) {
 }
 
 function AnnotationSvg({ annotation }) {
-  const symbol = OPL_SYMBOLS.find(s => s.id === annotation.symbolId)
-  if (!symbol) return null
-
   const { x, y, width, height, rotation = 0 } = annotation
   const cx = x + width / 2
   const cy = y + height / 2
   const transform = rotation ? `rotate(${rotation} ${cx} ${cy})` : undefined
   const r = Math.min(width, height) / 2
+
+  // Immagine custom caricata dall'utente
+  if (annotation.symbolId === '__custom_image__' && annotation.imageData) {
+    return (
+      {annotation.imageData}form={transform}
+        preserveAspectRatio="none"
+      />
+    )
+  }
+
+  const symbol = OPL_SYMBOLS.find(s => s.id === annotation.symbolId)
+  if (!symbol) return null
 
   if (symbol.type === 'text') {
     return (
