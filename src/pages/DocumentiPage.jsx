@@ -1062,26 +1062,455 @@ function BulkUploadModal({ onClose, onSaved }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// OPL NATIVA MODAL — placeholder Step 1, form completo allo Step 2
+// OPL NATIVA MODAL — form completo per creare OPL strutturate
 // ─────────────────────────────────────────────────────────────
 
 function OplNativaModal({ onClose, onSaved }) {
+  const [saving, setSaving] = useState(false)
+  const [step, setStep] = useState(1) // 1=anagrafica, 2=contenuto, 3=verifica
+
+  // Dati caricati dal backend
+  const [areaOptions, setAreaOptions] = useState([])
+  const [tipoOptions, setTipoOptions] = useState([])
+  const [reparti, setReparti] = useState([])
+
+  // Form state
+  const [form, setForm] = useState({
+    titolo: '',
+    area_opl_id: '',
+    area_opl_label: '',
+    tipo_opl_id: '',
+    tipo_opl_label: '',
+    reparto: '',
+    linea: '',
+    macchina: '',
+    autore: '',
+    problema: '',
+    causa: '',
+    miglioramento: '',
+    verifica_1: '',
+    verifica_2: '',
+    verifica_3: '',
+    immagine_base64: '',
+    immagine_preview: '',
+  })
+
+  // Carica dati iniziali
+  useEffect(() => {
+    api.get('/configurazioni/?tipo=area_opl&attivo=true')
+      .then(res => setAreaOptions(res.data || []))
+      .catch(err => console.error('Errore area OPL:', err))
+    api.get('/configurazioni/?tipo=tipo_opl&attivo=true')
+      .then(res => setTipoOptions(res.data || []))
+      .catch(err => console.error('Errore tipo OPL:', err))
+    api.get('/reparti/')
+      .then(res => setReparti(res.data || []))
+      .catch(err => console.error('Errore reparti:', err))
+
+    // Autore da utente loggato (localStorage)
+    try {
+      const userStr = localStorage.getItem('user')
+      if (userStr) {
+        const user = JSON.parse(userStr)
+        setForm(f => ({ ...f, autore: user.name || user.email || '' }))
+      }
+    } catch (e) { /* ignore */ }
+  }, [])
+
+  // Linee filtrate dal reparto scelto
+  const lineeAvailable = (reparti.find(r => r.nome === form.reparto)?.linee || [])
+  const macchineAvailable = (lineeAvailable.find(l => l.nome === form.linea)?.macchine || [])
+
+  // Handler cambio area (aggiorna sia id che label)
+  function handleAreaChange(id) {
+    const a = areaOptions.find(x => x._id === id)
+    setForm({ ...form, area_opl_id: id, area_opl_label: a?.label || '' })
+  }
+  function handleTipoChange(id) {
+    const t = tipoOptions.find(x => x._id === id)
+    setForm({ ...form, tipo_opl_id: id, tipo_opl_label: t?.label || '' })
+  }
+  function handleRepartoChange(nome) {
+    setForm({ ...form, reparto: nome, linea: '', macchina: '' })
+  }
+  function handleLineaChange(nome) {
+    setForm({ ...form, linea: nome, macchina: '' })
+  }
+
+  // Upload immagine con compressione
+  async function handleImageUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      alert('Seleziona un file immagine valido')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Immagine troppo grande (max 5 MB)')
+      return
+    }
+    // Compressione client-side a max 1280px
+    const compressed = await compressImage(file, 1280, 0.8)
+    setForm(f => ({
+      ...f,
+      immagine_base64: compressed,
+      immagine_preview: compressed,
+    }))
+  }
+
+  function removeImage() {
+    setForm(f => ({ ...f, immagine_base64: '', immagine_preview: '' }))
+  }
+
+  // Submit
+  async function handleSubmit() {
+    if (!form.titolo.trim()) {
+      alert('Titolo obbligatorio')
+      setStep(1)
+      return
+    }
+    setSaving(true)
+    try {
+      const payload = {
+        titolo: form.titolo,
+        area_opl_id: form.area_opl_id || null,
+        area_opl_label: form.area_opl_label || null,
+        tipo_opl_id: form.tipo_opl_id || null,
+        tipo_opl_label: form.tipo_opl_label || null,
+        reparto: form.reparto || null,
+        linea: form.linea || null,
+        macchina: form.macchina || null,
+        autore: form.autore || null,
+        problema: form.problema,
+        causa: form.causa,
+        miglioramento: form.miglioramento,
+        verifica_1: form.verifica_1,
+        verifica_2: form.verifica_2,
+        verifica_3: form.verifica_3,
+        immagine_base64: form.immagine_base64 || null,
+      }
+      const res = await api.post('/documenti/opl-nativa', payload)
+      alert(`OPL Nativa ${res.data.numero} creata con successo`)
+      onSaved()
+      onClose()
+    } catch (err) {
+      console.error(err)
+      alert('Errore creazione OPL: ' + (err.response?.data?.detail || err.message))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const canGoNext = form.titolo.trim().length > 0
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl w-full max-w-md p-6 text-center">
-        <div className="text-5xl mb-3">🚧</div>
-        <h2 className="text-lg font-bold mb-2">Form OPL Nativa</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          Verrà completato nel prossimo step.<br/>
-          Ora testiamo solo che il bottone si veda correttamente.
-        </p>
-        <button
-          onClick={onClose}
-          className="bg-primary text-white px-6 py-2 rounded-lg"
-        >
-          Chiudi
-        </button>
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl w-full max-w-3xl max-h-[95vh] overflow-y-auto shadow-2xl">
+        {/* Header */}
+        <div className="bg-yellow-500 text-white p-4 rounded-t-xl flex justify-between items-center sticky top-0 z-10">
+          <div>
+            <h2 className="text-lg font-bold">Nuova OPL Nativa</h2>
+            <div className="text-xs opacity-90">Step {step} di 3</div>
+          </div>
+          <button onClick={onClose}><X size={20} /></button>
+        </div>
+
+        {/* Stepper */}
+        <div className="flex border-b bg-gray-50">
+          {[
+            { n: 1, label: 'Anagrafica' },
+            { n: 2, label: 'Contenuto' },
+            { n: 3, label: 'Verifica apprendimento' },
+          ].map(s => (
+            <button
+              key={s.n}
+              onClick={() => setStep(s.n)}
+              className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                step === s.n
+                  ? 'border-yellow-500 text-yellow-700 bg-white'
+                  : 'border-transparent text-gray-500 hover:bg-gray-100'
+              }`}
+            >
+              <span className="font-mono mr-1">{s.n}.</span> {s.label}
+            </button>
+          ))}
+        </div>
+
+        {/* STEP 1 — ANAGRAFICA */}
+        {step === 1 && (
+          <div className="p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Titolo <span className="text-red-500">*</span>
+              </label>
+              <input
+                autoFocus
+                value={form.titolo}
+                onChange={(e) => setForm({ ...form, titolo: e.target.value })}
+                className="w-full border rounded-lg px-3 py-2"
+                placeholder="Es: Pulizia filtro Bindler 11"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Area OPL</label>
+                <select
+                  value={form.area_opl_id}
+                  onChange={(e) => handleAreaChange(e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2"
+                >
+                  <option value="">— Seleziona —</option>
+                  {areaOptions.map(a => (
+                    <option key={a._id} value={a._id}>
+                      {a.icon ? `${a.icon} ` : ''}{a.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Tipo OPL</label>
+                <select
+                  value={form.tipo_opl_id}
+                  onChange={(e) => handleTipoChange(e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2"
+                >
+                  <option value="">— Seleziona —</option>
+                  {tipoOptions.map(t => (
+                    <option key={t._id} value={t._id}>
+                      {t.icon ? `${t.icon} ` : ''}{t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Reparto</label>
+                <select
+                  value={form.reparto}
+                  onChange={(e) => handleRepartoChange(e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2"
+                >
+                  <option value="">— Seleziona —</option>
+                  {reparti.map(r => (
+                    <option key={r._id} value={r.nome}>{r.nome}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Linea</label>
+                <select
+                  value={form.linea}
+                  onChange={(e) => handleLineaChange(e.target.value)}
+                  disabled={!form.reparto}
+                  className="w-full border rounded-lg px-3 py-2 disabled:bg-gray-100"
+                >
+                  <option value="">— Seleziona —</option>
+                  {lineeAvailable.map(l => (
+                    <option key={l.id} value={l.nome}>{l.nome}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Macchina</label>
+                <select
+                  value={form.macchina}
+                  onChange={(e) => setForm({ ...form, macchina: e.target.value })}
+                  disabled={!form.linea}
+                  className="w-full border rounded-lg px-3 py-2 disabled:bg-gray-100"
+                >
+                  <option value="">— Seleziona —</option>
+                  {macchineAvailable.map(m => (
+                    <option key={m.id} value={m.nome}>{m.nome}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Autore</label>
+              <input
+                value={form.autore}
+                onChange={(e) => setForm({ ...form, autore: e.target.value })}
+                className="w-full border rounded-lg px-3 py-2"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* STEP 2 — CONTENUTO */}
+        {step === 2 && (
+          <div className="p-6 space-y-4">
+            {/* Immagine */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Immagine centrale (opzionale)</label>
+              {form.immagine_preview ? (
+                <div className="relative">
+                  {React.createElement('img', {
+                    src: form.immagine_preview,
+                    alt: 'Preview',
+                    className: 'w-full max-h-64 object-contain border rounded-lg bg-gray-50',
+                  })}
+                  <button
+                    onClick={removeImage}
+                    className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ) : (
+                <label className="block border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-yellow-400 hover:bg-yellow-50">
+                  <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                  <Upload className="mx-auto mb-2 text-gray-400" size={32} />
+                  <p className="text-sm text-gray-500">Click per caricare immagine (max 5 MB)</p>
+                  <p className="text-xs text-gray-400 mt-1">Verrà compressa automaticamente</p>
+                </label>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Problema (situazione riscontrata)</label>
+              <textarea
+                value={form.problema}
+                onChange={(e) => setForm({ ...form, problema: e.target.value })}
+                rows={3}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                placeholder="Descrivi il problema o la situazione da cui nasce l'OPL"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Causa</label>
+              <textarea
+                value={form.causa}
+                onChange={(e) => setForm({ ...form, causa: e.target.value })}
+                rows={3}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                placeholder="Causa radice del problema"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Miglioramento / Contenuto <span className="text-gray-400">(cosa fare)</span>
+              </label>
+              <textarea
+                value={form.miglioramento}
+                onChange={(e) => setForm({ ...form, miglioramento: e.target.value })}
+                rows={4}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                placeholder="Descrivi la procedura, il miglioramento adottato o l'istruzione operativa"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* STEP 3 — VERIFICA APPRENDIMENTO */}
+        {step === 3 && (
+          <div className="p-6 space-y-4">
+            <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-3 text-sm text-blue-800">
+              Inserisci fino a 3 domande di verifica per validare l'apprendimento dell'operatore. Sono opzionali.
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Domanda 1</label>
+              <input
+                value={form.verifica_1}
+                onChange={(e) => setForm({ ...form, verifica_1: e.target.value })}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                placeholder="Es: Ogni quanto va effettuato il controllo?"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Domanda 2</label>
+              <input
+                value={form.verifica_2}
+                onChange={(e) => setForm({ ...form, verifica_2: e.target.value })}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Domanda 3</label>
+              <input
+                value={form.verifica_3}
+                onChange={(e) => setForm({ ...form, verifica_3: e.target.value })}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Footer bottoni */}
+        <div className="border-t bg-gray-50 px-6 py-3 flex justify-between items-center sticky bottom-0">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border rounded-lg text-sm"
+          >
+            Annulla
+          </button>
+          <div className="flex gap-2">
+            {step > 1 && (
+              <button
+                onClick={() => setStep(step - 1)}
+                className="px-4 py-2 border rounded-lg text-sm"
+              >
+                ← Indietro
+              </button>
+            )}
+            {step < 3 ? (
+              <button
+                onClick={() => setStep(step + 1)}
+                disabled={!canGoNext}
+                className="px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm hover:bg-yellow-600 disabled:opacity-50"
+              >
+                Avanti →
+              </button>
+            ) : (
+              <button
+                onClick={handleSubmit}
+                disabled={saving || !canGoNext}
+                className="px-6 py-2 bg-yellow-500 text-white rounded-lg text-sm hover:bg-yellow-600 disabled:opacity-50 font-medium"
+              >
+                {saving ? 'Creazione...' : 'Crea OPL'}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )
 }
+
+// Utility: compressione immagine client-side
+async function compressImage(file, maxSize = 1280, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        let w = img.width
+        let h = img.height
+        if (w > h && w > maxSize) {
+          h = h * (maxSize / w)
+          w = maxSize
+        } else if (h > maxSize) {
+          w = w * (maxSize / h)
+          h = maxSize
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, w, h)
+        const dataUrl = canvas.toDataURL('image/jpeg', quality)
+        resolve(dataUrl)
+      }
+      img.onerror = reject
+      img.src = e.target.result
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
