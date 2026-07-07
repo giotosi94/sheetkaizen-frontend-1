@@ -372,10 +372,14 @@ function PreviewModal({ doc, onClose }) {
       return (
         <div className="w-full h-full flex items-center justify-center p-4 overflow-auto">
           {React.createElement('img', {
-            src: blobUrl,
-            alt: doc.titolo,
-            className: 'max-w-full max-h-full object-contain shadow-lg',
-          })}
+        ref: imgRef,
+        src: imageUrl,
+        alt: 'OPL',
+        onLoad: onImgLoad,
+        className: 'max-w-full object-contain block',
+        style: { maxHeight: '70vh' },
+      })}
+
         </div>
       )
     }
