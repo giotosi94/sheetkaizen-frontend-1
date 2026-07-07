@@ -19,7 +19,9 @@
     "date-fns": "^4.1.0",
     "react-grid-layout": "^1.4.4",
     "xlsx": "^0.18.5",
-    "recharts": "^2.13.0"
+    "recharts": "^2.13.0",
+    "konva": "^9.3.16",
+    "react-konva": "^18.2.10"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.2",
