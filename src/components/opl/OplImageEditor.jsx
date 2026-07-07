@@ -63,6 +63,46 @@ export default function OplImageEditor({ documento, imageBlobUrl, onClose, onSav
   const scaleX = stageSize.width / imageSize.width || 1
   const scaleY = stageSize.height / imageSize.height || 1
 
+  // Upload immagine custom -> compressione -> aggiungi come annotazione
+  async function handleCustomImageUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      alert('Seleziona un file immagine valido')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Immagine troppo grande (max 5 MB)')
+      return
+    }
+    try {
+      const dataUrl = await compressToBase64(file, 800, 0.85)
+      const { width, height } = await getImageSize(dataUrl)
+      // Scale iniziale: massimo 30% dell'immagine base
+      const maxW = imageSize.width * 0.3
+      const scale = width > maxW ? maxW / width : 1
+      const w = width * scale
+      const h = height * scale
+      const cx = imageSize.width / 2
+      const cy = imageSize.height / 2
+      const newAnn = {
+        id: `ann_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        symbolId: '__custom_image__',
+        x: cx - w / 2,
+        y: cy - h / 2,
+        width: w,
+        height: h,
+        rotation: 0,
+        imageData: dataUrl,
+      }
+      setAnnotations(prev => [...prev, newAnn])
+      setSelectedId(newAnn.id)
+      e.target.value = '' // reset input
+    } catch (err) {
+      alert('Errore caricamento immagine: ' + err.message)
+    }
+  }
+
   // Aggiungi simbolo al centro dell'immagine (in coordinate originali)
   function addSymbol(symbol) {
     const cx = imageSize.width / 2
@@ -208,6 +248,21 @@ export default function OplImageEditor({ documento, imageBlobUrl, onClose, onSav
             </div>
 
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              <label className="w-full bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg p-3 hover:bg-blue-100 flex items-center gap-2 cursor-pointer text-left transition-all">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCustomImageUpload}
+                  className="hidden"
+                />
+                <div className="text-2xl w-10 h-10 flex items-center justify-center bg-white rounded flex-shrink-0">
+                  📎
+                </div>
+                <div className="text-xs font-medium text-blue-800 flex-1">
+                  Carica immagine custom
+                </div>
+              </label>
+
               {symbolsInCategory.map(sym => (
                 <button
                   key={sym.id}
@@ -249,6 +304,53 @@ export default function OplImageEditor({ documento, imageBlobUrl, onClose, onSav
         </div>
       </div>
     </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// CUSTOM IMAGE NODE (immagine caricata dall'utente)
+// ─────────────────────────────────────────────────────────────
+
+function CustomImageNode({ annotation, shapeRef, onSelect, onChange }) {
+  const [img, setImg] = useState(null)
+
+  useEffect(() => {
+    if (!annotation.imageData) return
+    const image = new window.Image()
+    image.src = annotation.imageData
+    image.onload = () => setImg(image)
+  }, [annotation.imageData])
+
+  if (!img) return null
+
+  return (
+    <KonvaImage
+      ref={shapeRef}
+      image={img}
+      x={annotation.x}
+      y={annotation.y}
+      width={annotation.width}
+      height={annotation.height}
+      rotation={annotation.rotation || 0}
+      draggable
+      onClick={onSelect}
+      onTap={onSelect}
+      onDragEnd={(e) => onChange({ x: e.target.x(), y: e.target.y() })}
+      onTransformEnd={(e) => {
+        const node = shapeRef.current
+        const scaleX = node.scaleX()
+        const scaleY = node.scaleY()
+        node.scaleX(1)
+        node.scaleY(1)
+        onChange({
+          x: node.x(),
+          y: node.y(),
+          width: Math.max(20, node.width() * scaleX),
+          height: Math.max(20, node.height() * scaleY),
+          rotation: node.rotation(),
+        })
+      }}
+    />
   )
 }
 
@@ -298,6 +400,30 @@ function AnnotationNode({ annotation, isSelected, onSelect, onChange }) {
   }
 
   let renderedShape = null
+
+  // Immagini custom caricate dall'utente
+  if (annotation.symbolId === '__custom_image__' && annotation.imageData) {
+    return (
+      <>
+        <CustomImageNode
+          annotation={annotation}
+          shapeRef={shapeRef}
+          onSelect={onSelect}
+          onChange={onChange}
+        />
+        {isSelected && (
+          <Transformer
+            ref={trRef}
+            rotateEnabled
+            boundBoxFunc={(oldBox, newBox) => {
+              if (newBox.width < 20 || newBox.height < 20) return oldBox
+              return newBox
+            }}
+          />
+        )}
+      </>
+    )
+  }
 
   if (symbol.type === 'text') {
     renderedShape = (
@@ -514,4 +640,46 @@ function AnnotationNode({ annotation, isSelected, onSelect, onChange }) {
       )}
     </>
   )
+}
+// ─────────────────────────────────────────────────────────────
+// Helpers utility per upload immagini custom
+// ─────────────────────────────────────────────────────────────
+
+function compressToBase64(file, maxSize = 800, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new window.Image()
+      img.onload = () => {
+        let w = img.width
+        let h = img.height
+        if (w > h && w > maxSize) {
+          h = h * (maxSize / w)
+          w = maxSize
+        } else if (h > maxSize) {
+          w = w * (maxSize / h)
+          h = maxSize
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.onerror = reject
+      img.src = e.target.result
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+function getImageSize(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image()
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight })
+    img.onerror = reject
+    img.src = dataUrl
+  })
 }
