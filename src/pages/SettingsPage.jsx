@@ -254,7 +254,7 @@ function RepartiTreePlaceholder() {
       alert('Errore: ' + msg)
       console.error('Errore completo:', err.response?.data)
     } finally {
-      setSaving(false)
+      setLoading(false)
     }
   }
 
