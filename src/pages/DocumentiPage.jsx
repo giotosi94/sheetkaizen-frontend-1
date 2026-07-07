@@ -269,7 +269,8 @@ function PreviewModal({ doc, onClose }) {
           const tokRes = await api.post(`/documenti/${doc._id}/preview-token`)
           if (cancelled) return
           const token = tokRes.data.token
-          const publicUrl = `${API_BASE}/api/documenti/${doc._id}/preview?token=${encodeURIComponent(token)}`
+          const ext = (doc.file_name || 'file.xlsx').split('.').pop().toLowerCase()
+          const publicUrl = `${API_BASE}/api/documenti/${doc._id}/preview.${ext}?token=${encodeURIComponent(token)}`
           const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(publicUrl)}`
           setOfficeViewerUrl(viewerUrl)
           setLoading(false)
