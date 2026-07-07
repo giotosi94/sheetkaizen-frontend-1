@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import api from '../services/api'
-import { FileText, Upload, Download, Search, Trash2, Edit2, Eye, X } from 'lucide-react'
+import { FileText, Upload, Download, Search, Trash2, Edit2, Eye, X, Plus } from 'lucide-react'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -28,6 +28,7 @@ export default function DocumentiPage() {
   const [editingDoc, setEditingDoc] = useState(null)
   const [previewDoc, setPreviewDoc] = useState(null)
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [oplNativaOpen, setOplNativaOpen] = useState(false)
 
   useEffect(() => { load() }, [filterTipo, filterCategoria, filterStato])
 
@@ -74,6 +75,12 @@ export default function DocumentiPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Document Manager (OPL / SOP)</h1>
         <div className="flex gap-2">
+          <button
+            onClick={() => setOplNativaOpen(true)}
+            className="bg-yellow-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-yellow-600 font-medium"
+          >
+            <Plus size={18} /> Nuova OPL Nativa
+          </button>
           <button
             onClick={() => setBulkOpen(true)}
             className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700"
@@ -225,6 +232,7 @@ export default function DocumentiPage() {
       {editingDoc && <EditModal doc={editingDoc} onClose={() => setEditingDoc(null)} onSaved={load} />}
       {previewDoc && <PreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
       {bulkOpen && <BulkUploadModal onClose={() => setBulkOpen(false)} onSaved={load} />}
+      {oplNativaOpen && <OplNativaModal onClose={() => setOplNativaOpen(false)} onSaved={load} />}
     </div>
   )
 }
@@ -1048,6 +1056,31 @@ function BulkUploadModal({ onClose, onSaved }) {
             )}
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// OPL NATIVA MODAL — placeholder Step 1, form completo allo Step 2
+// ─────────────────────────────────────────────────────────────
+
+function OplNativaModal({ onClose, onSaved }) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl w-full max-w-md p-6 text-center">
+        <div className="text-5xl mb-3">🚧</div>
+        <h2 className="text-lg font-bold mb-2">Form OPL Nativa</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Verrà completato nel prossimo step.<br/>
+          Ora testiamo solo che il bottone si veda correttamente.
+        </p>
+        <button
+          onClick={onClose}
+          className="bg-primary text-white px-6 py-2 rounded-lg"
+        >
+          Chiudi
+        </button>
       </div>
     </div>
   )
