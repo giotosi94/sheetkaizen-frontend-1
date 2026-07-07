@@ -290,7 +290,8 @@ function PreviewModal({ doc, onClose }) {
         }
         return
       }
-      if (fileType !== 'pdf' && fileType !== 'image' && fileType !== 'text') {
+      const isOplNativaWithImage = doc.formato === 'nativa' && doc.file_id
+      if (fileType !== 'pdf' && fileType !== 'image' && fileType !== 'text' && !isOplNativaWithImage) {
         setLoading(false)
         return
       }
@@ -328,6 +329,11 @@ function PreviewModal({ doc, onClose }) {
   }, [doc._id, fileType])
 
   const previewContent = (() => {
+    // OPL Nativa: layout strutturato in stile Lindt
+    if (doc.formato === 'nativa' && doc.opl_data) {
+      return <OplNativaPreview doc={doc} imageBlobUrl={blobUrl} />
+    }
+
     if (loading) {
       return (
         <div className="w-full h-full flex items-center justify-center text-gray-500">
@@ -1512,5 +1518,144 @@ async function compressImage(file, maxSize = 1280, quality = 0.8) {
     reader.onerror = reject
     reader.readAsDataURL(file)
   })
+}
+
+// ─────────────────────────────────────────────────────────────
+// OPL NATIVA PREVIEW — layout stile Lindt
+// ─────────────────────────────────────────────────────────────
+
+function OplNativaPreview({ doc, imageBlobUrl }) {
+  const data = doc.opl_data || {}
+  const areaLabel = data.area_opl_label || '—'
+  const tipoLabel = data.tipo_opl_label || '—'
+
+  const hasVerifica = data.verifica_1 || data.verifica_2 || data.verifica_3
+
+  return (
+    <div className="w-full h-full overflow-auto bg-gray-100 p-6">
+      <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden border-4 border-yellow-400">
+
+        {/* Header giallo stile Lindt */}
+        <div className="bg-yellow-400 px-6 py-4 border-b-4 border-yellow-500">
+          <div className="flex justify-between items-start gap-4">
+            <div className="flex-1">
+              <div className="text-xs font-bold uppercase tracking-wider text-yellow-900 mb-1">
+                One Point Lesson
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900 leading-tight">
+                {doc.titolo}
+              </h1>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <div className="bg-white rounded px-3 py-1 shadow-sm">
+                <div className="text-[10px] uppercase text-gray-500 font-semibold">Numero</div>
+                <div className="font-mono font-bold text-lg text-gray-900">{doc.numero}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Riga metadati */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-xs">
+            <MetaBadge label="Area" value={areaLabel} />
+            <MetaBadge label="Tipo" value={tipoLabel} />
+            <MetaBadge label="Reparto" value={doc.reparto || '—'} />
+            <MetaBadge label="Linea" value={doc.linea || '—'} />
+          </div>
+        </div>
+
+        {/* Corpo */}
+        <div className="p-6 space-y-5">
+
+          {/* Immagine centrale */}
+          {imageBlobUrl && (
+            <div className="flex items-center justify-center bg-gray-50 border-2 border-gray-200 rounded-lg p-4">
+              {React.createElement('img', {
+                src: imageBlobUrl,
+                alt: doc.titolo,
+                className: 'max-w-full max-h-96 object-contain',
+              })}
+            </div>
+          )}
+
+          {/* Grid Problema / Causa / Miglioramento */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <OplBox
+              title="Problema"
+              content={data.problema}
+              bgColor="bg-red-50"
+              borderColor="border-red-300"
+              textColor="text-red-800"
+              icon="⚠️"
+            />
+            <OplBox
+              title="Causa"
+              content={data.causa}
+              bgColor="bg-orange-50"
+              borderColor="border-orange-300"
+              textColor="text-orange-800"
+              icon="🔍"
+            />
+            <OplBox
+              title="Miglioramento"
+              content={data.miglioramento}
+              bgColor="bg-green-50"
+              borderColor="border-green-300"
+              textColor="text-green-800"
+              icon="✅"
+            />
+          </div>
+
+          {/* Verifica apprendimento */}
+          {hasVerifica && (
+            <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
+              <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2">
+                <span>📝</span> Verifica apprendimento
+              </h3>
+              <ol className="space-y-2 list-decimal list-inside text-sm text-blue-900">
+                {data.verifica_1 && <li>{data.verifica_1}</li>}
+                {data.verifica_2 && <li>{data.verifica_2}</li>}
+                {data.verifica_3 && <li>{data.verifica_3}</li>}
+              </ol>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="bg-gray-50 border-t px-6 py-3 flex justify-between text-xs text-gray-600">
+          <div>
+            <strong>Autore:</strong> {doc.autore || '—'}
+          </div>
+          <div>
+            <strong>Versione:</strong> v{doc.versione || 1} · <strong>Stato:</strong> {doc.stato}
+          </div>
+          <div>
+            {doc.created_at && new Date(doc.created_at).toLocaleDateString('it-IT')}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MetaBadge({ label, value }) {
+  return (
+    <div className="bg-white bg-opacity-70 rounded px-2 py-1">
+      <div className="text-[9px] uppercase font-bold text-yellow-900">{label}</div>
+      <div className="text-sm font-medium text-gray-800 truncate">{value}</div>
+    </div>
+  )
+}
+
+function OplBox({ title, content, bgColor, borderColor, textColor, icon }) {
+  return (
+    <div className={`${bgColor} border-2 ${borderColor} rounded-lg p-4`}>
+      <div className={`font-bold ${textColor} mb-2 flex items-center gap-1 text-sm uppercase`}>
+        <span>{icon}</span> {title}
+      </div>
+      <div className={`text-sm ${textColor} whitespace-pre-wrap min-h-[60px]`}>
+        {content || <span className="italic opacity-50">Non compilato</span>}
+      </div>
+    </div>
+  )
 }
 
