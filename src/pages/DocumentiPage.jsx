@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import api from '../services/api'
-import { FileText, Upload, Download, Search, Trash2, Edit2, Eye, X, Plus } from 'lucide-react'
+import { FileText, Upload, Download, Search, Trash2, Edit2, Eye, X, Plus, Pencil } from 'lucide-react'
+import OplImageEditor from '../components/opl/OplImageEditor'
+import { OPL_SYMBOLS } from '../components/opl/oplSymbols'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -1525,9 +1527,26 @@ async function compressImage(file, maxSize = 1280, quality = 0.8) {
 // ─────────────────────────────────────────────────────────────
 
 function OplNativaPreview({ doc, imageBlobUrl }) {
-  const data = doc.opl_data || {}
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [currentDoc, setCurrentDoc] = useState(doc)
+
+  useEffect(() => { setCurrentDoc(doc) }, [doc])
+
+  const data = currentDoc.opl_data || {}
   const areaLabel = data.area_opl_label || '—'
   const tipoLabel = data.tipo_opl_label || '—'
+  const annotations = data.annotations || []
+
+  async function handleAnnotationsSaved() {
+    try {
+      const res = await api.get(`/documenti/${currentDoc._id}`)
+      setCurrentDoc(res.data)
+      setRefreshKey(k => k + 1)
+    } catch (err) {
+      console.error('Errore ricarica documento:', err)
+    }
+  }
 
   const hasVerifica = data.verifica_1 || data.verifica_2 || data.verifica_3
 
@@ -1568,12 +1587,19 @@ function OplNativaPreview({ doc, imageBlobUrl }) {
 
           {/* Immagine centrale */}
           {imageBlobUrl && (
-            <div className="flex items-center justify-center bg-gray-50 border-2 border-gray-200 rounded-lg p-4">
-              {React.createElement('img', {
-                src: imageBlobUrl,
-                alt: doc.titolo,
-                className: 'max-w-full max-h-96 object-contain',
-              })}
+            <div className="relative bg-gray-50 border-2 border-gray-200 rounded-lg p-4">
+              <button
+                onClick={() => setEditorOpen(true)}
+                className="absolute top-2 right-2 z-10 bg-yellow-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-yellow-600 shadow flex items-center gap-1"
+                title="Modifica annotazioni sull'immagine"
+              >
+                <Pencil size={12} /> Modifica annotazioni
+              </button>
+              <AnnotatedImage
+                key={refreshKey}
+                imageUrl={imageBlobUrl}
+                annotations={annotations}
+              />
             </div>
           )}
 
@@ -1623,18 +1649,182 @@ function OplNativaPreview({ doc, imageBlobUrl }) {
         {/* Footer */}
         <div className="bg-gray-50 border-t px-6 py-3 flex justify-between text-xs text-gray-600">
           <div>
-            <strong>Autore:</strong> {doc.autore || '—'}
+            <strong>Autore:</strong> {currentDoc.autore || '—'}
           </div>
           <div>
-            <strong>Versione:</strong> v{doc.versione || 1} · <strong>Stato:</strong> {doc.stato}
+            <strong>Versione:</strong> v{currentDoc.versione || 1} · <strong>Stato:</strong> {currentDoc.stato}
           </div>
           <div>
-            {doc.created_at && new Date(doc.created_at).toLocaleDateString('it-IT')}
+            {currentDoc.created_at && new Date(currentDoc.created_at).toLocaleDateString('it-IT')}
           </div>
         </div>
       </div>
+
+      {editorOpen && (
+        <OplImageEditor
+          documento={currentDoc}
+          imageBlobUrl={imageBlobUrl}
+          onClose={() => setEditorOpen(false)}
+          onSaved={handleAnnotationsSaved}
+        />
+      )}
     </div>
   )
+}
+
+// ─────────────────────────────────────────────────────────────
+// AnnotatedImage: mostra immagine + annotazioni (read-only)
+// ─────────────────────────────────────────────────────────────
+
+function AnnotatedImage({ imageUrl, annotations }) {
+  const [imgSize, setImgSize] = useState({ w: 0, h: 0 })
+  const imgRef = useRef(null)
+
+  function onImgLoad(e) {
+    setImgSize({
+      w: e.target.naturalWidth,
+      h: e.target.naturalHeight,
+    })
+  }
+
+  return (
+    <div className="relative inline-block max-w-full">
+      {React.createElement('img', {
+        ref: imgRef,
+        src: imageUrl,
+        alt: 'OPL',
+        onLoad: onImgLoad,
+        className: 'max-w-full max-h-96 object-contain block',
+      })}
+      {imgSize.w > 0 && annotations.length > 0 && (
+        <svg
+          viewBox={`0 0 ${imgSize.w} ${imgSize.h}`}
+          className="absolute top-0 left-0 w-full h-full pointer-events-none"
+          preserveAspectRatio="xMidYMid meet"
+        >
+          {annotations.map(ann => (
+            <AnnotationSvg key={ann.id} annotation={ann} />
+          ))}
+        </svg>
+      )}
+    </div>
+  )
+}
+
+function AnnotationSvg({ annotation }) {
+  const symbol = OPL_SYMBOLS.find(s => s.id === annotation.symbolId)
+  if (!symbol) return null
+
+  const { x, y, width, height, rotation = 0 } = annotation
+  const cx = x + width / 2
+  const cy = y + height / 2
+  const transform = rotation ? `rotate(${rotation} ${cx} ${cy})` : undefined
+  const r = Math.min(width, height) / 2
+
+  if (symbol.type === 'text') {
+    return (
+      <text
+        x={cx}
+        y={cy}
+        fill={symbol.color}
+        fontSize={symbol.fontSize}
+        fontWeight={symbol.fontStyle === 'bold' ? 'bold' : 'normal'}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        transform={transform}
+      >
+        {annotation.text || symbol.text}
+      </text>
+    )
+  }
+
+  if (symbol.render === 'ko_circle') {
+    return (
+      <g transform={transform}>
+        <circle cx={cx} cy={cy} r={r} fill="#DC2626" stroke="#7F1D1D" strokeWidth="3" />
+        <text x={cx} y={cy} fill="white" fontSize={height * 0.6} fontWeight="bold" textAnchor="middle" dominantBaseline="central">✕</text>
+      </g>
+    )
+  }
+  if (symbol.render === 'ok_circle') {
+    return (
+      <g transform={transform}>
+        <circle cx={cx} cy={cy} r={r} fill="#16A34A" stroke="#14532D" strokeWidth="3" />
+        <text x={cx} y={cy} fill="white" fontSize={height * 0.6} fontWeight="bold" textAnchor="middle" dominantBaseline="central">✓</text>
+      </g>
+    )
+  }
+  if (symbol.render === 'warning') {
+    const points = [
+      [cx, y],
+      [x + width, y + height],
+      [x, y + height],
+    ].map(p => p.join(',')).join(' ')
+    return (
+      <g transform={transform}>
+        <polygon points={points} fill="#FBBF24" stroke="#000" strokeWidth="3" />
+        <text x={cx} y={cy + height * 0.15} fill="black" fontSize={height * 0.5} fontWeight="bold" textAnchor="middle" dominantBaseline="middle">!</text>
+      </g>
+    )
+  }
+  if (symbol.render === 'info') {
+    return (
+      <g transform={transform}>
+        <circle cx={cx} cy={cy} r={r} fill="#2563EB" stroke="#1E3A8A" strokeWidth="3" />
+        <text x={cx} y={cy} fill="white" fontSize={height * 0.6} fontWeight="bold" fontStyle="italic" textAnchor="middle" dominantBaseline="central">i</text>
+      </g>
+    )
+  }
+  if (symbol.render === 'arrow') {
+    const c = symbol.color || '#DC2626'
+    const bodyH = height * 0.5
+    const headW = width * 0.4
+    const points = [
+      [x + headW, y + (height - bodyH) / 2],
+      [x + width, y + (height - bodyH) / 2],
+      [x + width, y + (height + bodyH) / 2],
+      [x + headW, y + (height + bodyH) / 2],
+      [x + headW, y + height],
+      [x, y + height / 2],
+      [x + headW, y],
+      [x + headW, y + (height - bodyH) / 2],
+    ].map(p => p.join(',')).join(' ')
+    return (
+      <g transform={transform}>
+        <polygon points={points} fill={c} stroke="#000" strokeWidth="2" />
+      </g>
+    )
+  }
+  if (symbol.render === 'rect') {
+    return (
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        fill="none"
+        stroke={symbol.color}
+        strokeWidth="5"
+        rx="4"
+        transform={transform}
+      />
+    )
+  }
+  if (symbol.render === 'circle') {
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={r}
+        fill="none"
+        stroke={symbol.color}
+        strokeWidth="5"
+        transform={transform}
+      />
+    )
+  }
+
+  return null
 }
 
 function MetaBadge({ label, value }) {
