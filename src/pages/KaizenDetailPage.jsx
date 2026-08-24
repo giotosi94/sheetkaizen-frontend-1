@@ -517,48 +517,6 @@ export default function KaizenDetailPage() {
                   Miglioramento richiesto: <strong>{miglioramentoPct.toFixed(1)}%</strong> (da {kaizen.obiettivi.start} a {kaizen.obiettivi.target})
                 </div>
               )}
-{kaizen.obiettivi?.start && kaizen.obiettivi?.target && (() => {
-const start = parseFloat(kaizen.obiettivi.start)
-const target = parseFloat(kaizen.obiettivi.target)
-const attuale = kaizen.risultati?.attuale != null && kaizen.risultati?.attuale !== '' ? parseFloat(kaizen.risultati.attuale) : null
-const vals = [start, target, attuale].filter(v => v != null && !isNaN(v))
-const maxV = Math.max(...vals)
-const minV = Math.min(0, ...vals)
-const range = maxV - minV || 1
-const pct = v => ((v - minV) / range) * 100
-const isReduction = target < start
-let progress = null
-if (attuale != null && !isNaN(attuale)) {
-progress = Math.max(0, Math.min(100, ((start - attuale) / (start - target)) * 100))
-}
-const bar = (label, val, color) => (
-<div className="flex items-center gap-3">
-<div className="w-16 text-xs font-bold text-gray-600 uppercase text-right">{label}</div>
-<div className="flex-1 bg-gray-100 rounded-full h-6 relative overflow-hidden">
-<div className={`h-full rounded-full ${color} flex items-center justify-end pr-2 transition-all duration-500`} style={{ width: `${Math.max(pct(val), 8)}%` }}>
-<span className="text-xs font-bold text-white">{val}</span>
-</div>
-</div>
-</div>
-)
-return (
-<div className="bg-gray-50 rounded-lg p-4 mb-4">
-<div className="flex items-center justify-between mb-3">
-<span className="text-xs font-bold text-gray-600 uppercase">Andamento {kaizen.obiettivi?.kpi || 'KPI'}</span>
-{progress != null && (
-<span className={`text-xs font-bold px-2 py-1 rounded ${progress >= 100 ? 'bg-green-500 text-white' : progress >= 50 ? 'bg-yellow-500 text-white' : 'bg-orange-500 text-white'}`}>
-{progress.toFixed(0)}% verso il target
-</span>
-)}
-</div>
-<div className="space-y-2">
-{bar('Start', start, 'bg-gray-400')}
-{attuale != null && !isNaN(attuale) && bar('Attuale', attuale, attuale === target || (isReduction ? attuale <= target : attuale >= target) ? 'bg-green-500' : 'bg-blue-500')}
-{bar('Target', target, 'bg-primary')}
-</div>
-</div>
-)
-})()}
 <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Obiettivo SMART</label>
               <textarea value={kaizen.obiettivi?.smart || ''} onChange={(e) => updateField('obiettivi', 'smart', e.target.value)} rows={2} placeholder='es. "Ridurre gli scarti sulla Bindler 7 del 30% entro 4 mesi ripristinando le condizioni base"' className="w-full border rounded-lg px-3 py-2 text-sm" />
               <div className="mt-4 pt-4 border-t">
@@ -568,7 +526,18 @@ return (
             </div>
           )}
 
-          {/* PASSO 2 — Ishikawa */}
+{/* PARETO DELLE PERDITE (solo Standard/Major) */}
+{livelloAttuale !== 'Quick' && (
+<div className="bg-white rounded-xl shadow p-6">
+<h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">LOSS DEPLOYMENT - PARETO DELLE PERDITE</h3>
+<LossPareto
+value={kaizen.loss_pareto?.items || []}
+onChange={(items) => setKaizen(prev => ({ ...prev, loss_pareto: { ...prev.loss_pareto, items } }))}
+/>
+</div>
+)}
+
+{/* PASSO 2 - Ishikawa */}
           <div className="bg-white rounded-xl shadow p-6">
             <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">
               PASSO 2 - CAUSE PROBABILI (Ishikawa)
@@ -1567,4 +1536,109 @@ function CountermeasureLadderTab({ kaizen }) {
       </div>
     </div>
   )
+}
+
+// ----------------------------------------------------------
+// LOSS PARETO - grafico delle perdite (Standard Kaizen step 2)
+// ----------------------------------------------------------
+function LossPareto({ value = [], onChange }) {
+const [label, setLabel] = useState('')
+const [val, setVal] = useState('')
+
+const add = () => {
+const n = parseFloat(val)
+if (!label.trim() || isNaN(n) || n <= 0) return
+onChange([...value, { id: Date.now().toString(), label: label.trim(), value: n }])
+setLabel('')
+setVal('')
+}
+
+const remove = (id) => onChange(value.filter(i => i.id !== id))
+
+const sorted = [...value].sort((a, b) => b.value - a.value)
+const total = sorted.reduce((s, i) => s + i.value, 0)
+const maxV = sorted.length > 0 ? sorted[0].value : 1
+let cum = 0
+const withCum = sorted.map(i => {
+cum += i.value
+return { ...i, cumPct: total > 0 ? (cum / total) * 100 : 0 }
+})
+
+const chartH = 220
+const barW = 60
+const gap = 24
+const padL = 40
+const padB = 70
+const padT = 20
+const chartW = padL + withCum.length * (barW + gap) + 20
+const x = idx => padL + idx * (barW + gap)
+
+return (
+<div className="space-y-4">
+<div className="flex gap-2">
+<input value={label} onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} placeholder="Categoria perdita (es. Start-up, Cambio formato...)" className="flex-1 border rounded-lg px-3 py-2 text-sm" />
+<input type="number" value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} placeholder="Valore" className="w-32 border rounded-lg px-3 py-2 text-sm" />
+<button onClick={add} className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-light">Aggiungi</button>
+</div>
+
+{withCum.length === 0 ? (
+<div className="bg-gray-50 rounded-lg p-8 text-center text-sm text-gray-400">Aggiungi le categorie di perdita per generare il Pareto</div>
+) : (
+<>
+<div className="overflow-x-auto">
+<svg width={Math.max(chartW, 320)} height={chartH + padB} className="min-w-full">
+{[0, 25, 50, 75, 100].map(g => (
+<g key={g}>
+<line x1={padL} y1={padT + (chartH * (100 - g) / 100)} x2={chartW} y2={padT + (chartH * (100 - g) / 100)} stroke="#e5e7eb" strokeWidth="1" />
+<text x={padL - 8} y={padT + (chartH * (100 - g) / 100) + 4} textAnchor="end" fontSize="10" fill="#9ca3af">{g}%</text>
+</g>
+))}
+{withCum.map((item, idx) => {
+const h = (item.value / maxV) * chartH
+return (
+<g key={item.id}>
+<rect x={x(idx)} y={padT + chartH - h} width={barW} height={h} rx="3" fill="#1e3a8a" />
+<text x={x(idx) + barW / 2} y={padT + chartH - h - 6} textAnchor="middle" fontSize="11" fontWeight="bold" fill="#1e3a8a">{item.value}</text>
+<text x={x(idx) + barW / 2} y={padT + chartH + 16} textAnchor="middle" fontSize="10" fill="#374151">{item.label.length > 10 ? item.label.slice(0, 9) + '.' : item.label}</text>
+<text x={x(idx) + barW / 2} y={padT + chartH + 30} textAnchor="middle" fontSize="9" fill="#9ca3af">{((item.value / total) * 100).toFixed(0)}%</text>
+</g>
+)
+})}
+<polyline
+fill="none"
+stroke="#f59e0b"
+strokeWidth="2"
+points={withCum.map((item, idx) => `${x(idx) + barW / 2},${padT + chartH - (item.cumPct / 100) * chartH}`).join(' ')}
+/>
+{withCum.map((item, idx) => (
+<g key={'p' + item.id}>
+<circle cx={x(idx) + barW / 2} cy={padT + chartH - (item.cumPct / 100) * chartH} r="4" fill="#f59e0b" />
+<text x={x(idx) + barW / 2} y={padT + chartH - (item.cumPct / 100) * chartH - 10} textAnchor="middle" fontSize="10" fontWeight="bold" fill="#d97706">{item.cumPct.toFixed(0)}%</text>
+</g>
+))}
+</svg>
+</div>
+
+<div className="flex items-center gap-4 text-xs text-gray-500">
+<span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block" style={{ background: '#1e3a8a' }}></span> Perdita</span>
+<span className="flex items-center gap-1"><span className="w-3 h-1 inline-block" style={{ background: '#f59e0b' }}></span> Cumulata %</span>
+<span className="ml-auto font-semibold text-gray-700">Totale: {total}</span>
+</div>
+
+<div className="space-y-1">
+{withCum.map(item => (
+<div key={item.id} className="flex items-center justify-between text-sm bg-gray-50 rounded px-3 py-1.5">
+<span className="font-medium">{item.label}</span>
+<div className="flex items-center gap-3">
+<span className="text-gray-500">{((item.value / total) * 100).toFixed(1)}%</span>
+<span className="font-bold text-primary">{item.value}</span>
+<button onClick={() => remove(item.id)} className="text-red-500 hover:bg-red-50 p-1 rounded"><X size={14} /></button>
+</div>
+</div>
+))}
+</div>
+</>
+)}
+</div>
+)
 }
