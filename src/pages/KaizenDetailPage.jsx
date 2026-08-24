@@ -517,7 +517,49 @@ export default function KaizenDetailPage() {
                   Miglioramento richiesto: <strong>{miglioramentoPct.toFixed(1)}%</strong> (da {kaizen.obiettivi.start} a {kaizen.obiettivi.target})
                 </div>
               )}
-              <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Obiettivo SMART</label>
+{kaizen.obiettivi?.start && kaizen.obiettivi?.target && (() => {
+const start = parseFloat(kaizen.obiettivi.start)
+const target = parseFloat(kaizen.obiettivi.target)
+const attuale = kaizen.risultati?.attuale != null && kaizen.risultati?.attuale !== '' ? parseFloat(kaizen.risultati.attuale) : null
+const vals = [start, target, attuale].filter(v => v != null && !isNaN(v))
+const maxV = Math.max(...vals)
+const minV = Math.min(0, ...vals)
+const range = maxV - minV || 1
+const pct = v => ((v - minV) / range) * 100
+const isReduction = target < start
+let progress = null
+if (attuale != null && !isNaN(attuale)) {
+progress = Math.max(0, Math.min(100, ((start - attuale) / (start - target)) * 100))
+}
+const bar = (label, val, color) => (
+<div className="flex items-center gap-3">
+<div className="w-16 text-xs font-bold text-gray-600 uppercase text-right">{label}</div>
+<div className="flex-1 bg-gray-100 rounded-full h-6 relative overflow-hidden">
+<div className={`h-full rounded-full ${color} flex items-center justify-end pr-2 transition-all duration-500`} style={{ width: `${Math.max(pct(val), 8)}%` }}>
+<span className="text-xs font-bold text-white">{val}</span>
+</div>
+</div>
+</div>
+)
+return (
+<div className="bg-gray-50 rounded-lg p-4 mb-4">
+<div className="flex items-center justify-between mb-3">
+<span className="text-xs font-bold text-gray-600 uppercase">Andamento {kaizen.obiettivi?.kpi || 'KPI'}</span>
+{progress != null && (
+<span className={`text-xs font-bold px-2 py-1 rounded ${progress >= 100 ? 'bg-green-500 text-white' : progress >= 50 ? 'bg-yellow-500 text-white' : 'bg-orange-500 text-white'}`}>
+{progress.toFixed(0)}% verso il target
+</span>
+)}
+</div>
+<div className="space-y-2">
+{bar('Start', start, 'bg-gray-400')}
+{attuale != null && !isNaN(attuale) && bar('Attuale', attuale, attuale === target || (isReduction ? attuale <= target : attuale >= target) ? 'bg-green-500' : 'bg-blue-500')}
+{bar('Target', target, 'bg-primary')}
+</div>
+</div>
+)
+})()}
+<label className="block text-xs font-bold text-gray-600 uppercase mb-1">Obiettivo SMART</label>
               <textarea value={kaizen.obiettivi?.smart || ''} onChange={(e) => updateField('obiettivi', 'smart', e.target.value)} rows={2} placeholder='es. "Ridurre gli scarti sulla Bindler 7 del 30% entro 4 mesi ripristinando le condizioni base"' className="w-full border rounded-lg px-3 py-2 text-sm" />
               <div className="mt-4 pt-4 border-t">
                 <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Osservazione Gemba</label>
