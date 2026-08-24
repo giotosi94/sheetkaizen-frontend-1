@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../services/api'
-import { Save, ChevronDown, X, History, RefreshCw, Lock, RotateCcw } from 'lucide-react'
+import {
+  Save, ChevronDown, X, History, RefreshCw, Lock, RotateCcw,
+  Zap, BarChart3, Trophy, FileText, Activity, User, Target,
+  Factory, MapPin, Cog, Building2, CalendarDays, Check, AlertTriangle,
+} from 'lucide-react'
 import ActionPlanFormShared from '../components/ActionPlanFormShared'
 import IshikawaDiagram from '../components/kaizen/IshikawaDiagram'
 import FiveWhysFlowChart from '../components/kaizen/FiveWhysFlowChart'
@@ -11,9 +15,9 @@ import KaizenAzioniList from '../components/kaizen/KaizenAzioniList'
 const LIVELLI = ['Quick', 'Standard', 'Major']
 
 const livelloConfig = {
-  Quick: { icon: '⚡', color: '#10b981', label: 'Quick Kaizen', desc: 'Risoluzione rapida' },
-  Standard: { icon: '📊', color: '#3b82f6', label: 'Standard Kaizen', desc: 'Progetto strutturato' },
-  Major: { icon: '🏆', color: '#8b5cf6', label: 'Major Kaizen', desc: 'Iniziativa Pillar' },
+  Quick: { Icon: Zap, color: '#10b981', label: 'Quick Kaizen', desc: 'Risoluzione rapida' },
+  Standard: { Icon: BarChart3, color: '#3b82f6', label: 'Standard Kaizen', desc: 'Progetto strutturato' },
+  Major: { Icon: Trophy, color: '#8b5cf6', label: 'Major Kaizen', desc: 'Iniziativa Pillar' },
 }
 
 function getLivelloFromKaizen(kaizen) {
@@ -56,11 +60,10 @@ export default function KaizenDetailPage() {
   const [showStoria, setShowStoria] = useState(false)
   const [transforming, setTransforming] = useState(false)
 
-  // Flusso Ishikawa → Crea Action Plan da Root Cause
+  // Flusso Ishikawa -> Crea Action Plan da Root Cause
   const [showAPFormFromRootCause, setShowAPFormFromRootCause] = useState(false)
   const [rootCausePrefill, setRootCausePrefill] = useState(null)
 
-  // Quando l'utente clicca "Crea Action Plan da questa Root Cause"
   function handleCreateAPFromRootCause(rootCauseNode, problema) {
     const desc = `Problema: ${problema}\n\nRoot cause identificata: ${rootCauseNode.label}`
     setRootCausePrefill({
@@ -88,7 +91,6 @@ export default function KaizenDetailPage() {
   const indiceLivello = LIVELLI.indexOf(livelloAttuale)
   const tabs = buildTabsForLivello(livelloAttuale)
 
-  // 🔒 Lock totale quando il Kaizen è chiuso
   const isLocked = kaizen?.stato === 'Chiuso' || kaizen?.stato === 'Cancelled'
 
   useEffect(() => {
@@ -109,10 +111,10 @@ export default function KaizenDetailPage() {
     setSaving(true)
     try {
       await api.put(`/kaizens/${id}`, kaizen)
-      alert('✅ Kaizen salvato!')
+      alert('Kaizen salvato correttamente.')
     } catch (err) {
       console.error(err)
-      alert('❌ Errore salvataggio: ' + (err.response?.data?.detail || err.message))
+      alert('Errore durante il salvataggio: ' + (err.response?.data?.detail || err.message))
     }
     setSaving(false)
   }
@@ -122,22 +124,22 @@ export default function KaizenDetailPage() {
     try {
       await api.put(`/kaizens/${id}`, { stato: 'Aperto' })
       await loadKaizen()
-      alert('✅ Kaizen riaperto')
+      alert('Kaizen riaperto.')
     } catch (err) {
       console.error(err)
-      alert('❌ Errore riapertura: ' + (err.response?.data?.detail || err.message))
+      alert('Errore durante la riapertura: ' + (err.response?.data?.detail || err.message))
     }
   }
 
   const chiudiKaizen = async () => {
-    if (!confirm(`Chiudere il Kaizen "${kaizen.numero}"?\n\nDiventerà read-only e tutti i campi saranno bloccati.\nPotrai riaprirlo in seguito se necessario.`)) return
+    if (!confirm(`Chiudere il Kaizen "${kaizen.numero}"?\n\nDiventerà in sola lettura e tutti i campi saranno bloccati.\nPotrai riaprirlo in seguito se necessario.`)) return
     try {
       await api.put(`/kaizens/${id}`, { stato: 'Chiuso' })
       await loadKaizen()
-      alert('✅ Kaizen chiuso')
+      alert('Kaizen chiuso.')
     } catch (err) {
       console.error(err)
-      alert('❌ Errore chiusura: ' + (err.response?.data?.detail || err.message))
+      alert('Errore durante la chiusura: ' + (err.response?.data?.detail || err.message))
     }
   }
 
@@ -167,10 +169,10 @@ export default function KaizenDetailPage() {
       setShowTransformModal(false)
       setTargetLivello(null)
       setMotivoTrasforma('')
-      alert(`✅ Kaizen trasformato in ${targetLivello}!`)
+      alert(`Kaizen trasformato in ${targetLivello}.`)
     } catch (err) {
       console.error(err)
-      alert('❌ Errore trasformazione: ' + (err.response?.data?.detail || err.message))
+      alert('Errore durante la trasformazione: ' + (err.response?.data?.detail || err.message))
     } finally {
       setTransforming(false)
     }
@@ -178,36 +180,43 @@ export default function KaizenDetailPage() {
 
   if (!kaizen) return <div className="text-center py-8">Caricamento...</div>
 
+  const miglioramentoPct = (kaizen.obiettivi?.start && kaizen.obiettivi?.target)
+    ? Math.abs(((parseFloat(kaizen.obiettivi.target) - parseFloat(kaizen.obiettivi.start)) / parseFloat(kaizen.obiettivi.start)) * 100)
+    : null
+
+  const costo = parseFloat(kaizen.risultati?.costo) || 0
+  const risparmio = parseFloat(kaizen.risultati?.risparmio) || 0
+
   return (
     <div>
       <div className="bg-primary text-white rounded-xl p-6 mb-6">
         <div className="flex justify-between items-start mb-5">
           <div>
             <h1 className="text-2xl font-bold">{kaizen.titolo || 'Kaizen'}</h1>
-            <div className="flex gap-4 mt-2 text-sm text-gray-200 flex-wrap">
-              <span>📋 {kaizen.numero}</span>
-              <span>📊 {kaizen.stato}</span>
-              {kaizen.creatore_nome && <span>👤 Creatore: {kaizen.creatore_nome}</span>}
-              {kaizen.team_leader_nome && <span>🎯 Leader: {kaizen.team_leader_nome}</span>}
-              {kaizen.reparto && <span>🏭 {kaizen.reparto}</span>}
-              {kaizen.linea && <span>📍 {kaizen.linea}</span>}
-              {kaizen.macchina && <span>⚙️ {kaizen.macchina}</span>}
+            <div className="flex gap-4 mt-2 text-sm text-gray-200 flex-wrap items-center">
+              <span className="flex items-center gap-1"><FileText size={14} /> {kaizen.numero}</span>
+              <span className="flex items-center gap-1"><Activity size={14} /> {kaizen.stato}</span>
+              {kaizen.creatore_nome && <span className="flex items-center gap-1"><User size={14} /> Creatore: {kaizen.creatore_nome}</span>}
+              {kaizen.team_leader_nome && <span className="flex items-center gap-1"><Target size={14} /> Leader: {kaizen.team_leader_nome}</span>}
+              {kaizen.reparto && <span className="flex items-center gap-1"><Factory size={14} /> {kaizen.reparto}</span>}
+              {kaizen.linea && <span className="flex items-center gap-1"><MapPin size={14} /> {kaizen.linea}</span>}
+              {kaizen.macchina && <span className="flex items-center gap-1"><Cog size={14} /> {kaizen.macchina}</span>}
               {kaizen.pillar_sigla && (
                 <Link
                   to={`/pillars/${kaizen.pillar_id}`}
-                  className="bg-white bg-opacity-20 hover:bg-opacity-30 px-2 py-0.5 rounded-full font-mono font-bold transition-colors"
+                  className="flex items-center gap-1 bg-white bg-opacity-20 hover:bg-opacity-30 px-2 py-0.5 rounded-full font-mono font-bold transition-colors"
                   title={`Apri Pillar ${kaizen.pillar_sigla}`}
                 >
-                  🏛️ {kaizen.pillar_sigla}
+                  <Building2 size={14} /> {kaizen.pillar_sigla}
                 </Link>
               )}
               {kaizen.dashboard_id && kaizen.dashboard_nome && (
                 <Link
                   to={`/dashboard/${kaizen.dashboard_id}`}
-                  className="bg-purple-500 bg-opacity-30 hover:bg-opacity-50 px-2 py-0.5 rounded-full font-bold transition-colors"
+                  className="flex items-center gap-1 bg-purple-500 bg-opacity-30 hover:bg-opacity-50 px-2 py-0.5 rounded-full font-bold transition-colors"
                   title={`Apri Meeting ${kaizen.dashboard_nome}`}
                 >
-                  📅 {kaizen.dashboard_nome}
+                  <CalendarDays size={14} /> {kaizen.dashboard_nome}
                 </Link>
               )}
             </div>
@@ -252,23 +261,24 @@ export default function KaizenDetailPage() {
               const isCompleted = idx < indiceLivello
               const isFuture = idx > indiceLivello
               const cfg = livelloConfig[lvl]
+              const StepIcon = cfg.Icon
               return (
                 <div key={lvl} className="flex-1 flex items-center">
                   <div className="flex flex-col items-center flex-shrink-0">
                     <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl transition-all ${
+                      className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
                         isActive ? 'bg-white shadow-lg scale-110 ring-4 ring-white ring-opacity-30' :
                         isCompleted ? 'bg-white bg-opacity-90' :
                         'bg-white bg-opacity-20'
                       }`}
                     >
-                      {cfg.icon}
+                      <StepIcon size={22} color={isActive || isCompleted ? cfg.color : '#ffffff'} />
                     </div>
                     <div className={`text-xs mt-1 font-medium ${isActive ? 'text-white' : 'text-gray-300'}`}>
                       {cfg.label}
                     </div>
                     {isActive && (<div className="text-xs text-yellow-300 font-bold mt-0.5">ATTUALE</div>)}
-                    {isFuture && (<div className="text-xs text-gray-400 mt-0.5">🔒 Bloccato</div>)}
+                    {isFuture && (<div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1"><Lock size={10} /> Bloccato</div>)}
                   </div>
                   {idx < LIVELLI.length - 1 && (
                     <div className={`flex-1 h-1 mx-2 rounded ${idx < indiceLivello ? 'bg-white bg-opacity-90' : 'bg-white bg-opacity-20'}`} />
@@ -280,7 +290,7 @@ export default function KaizenDetailPage() {
         </div>
       </div>
 
-      {/* 🔒 Banner Kaizen chiuso */}
+      {/* Banner Kaizen chiuso */}
       {isLocked && (
         <div className="bg-yellow-50 border-l-4 border-yellow-500 rounded-r-lg p-4 mb-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -317,6 +327,7 @@ export default function KaizenDetailPage() {
             <div className="absolute top-full left-0 mt-2 bg-white border rounded-lg shadow-xl z-50 min-w-[260px] overflow-hidden">
               {LIVELLI.map(lvl => {
                 const cfg = livelloConfig[lvl]
+                const DropIcon = cfg.Icon
                 const isCurrent = lvl === livelloAttuale
                 return (
                   <button
@@ -327,13 +338,13 @@ export default function KaizenDetailPage() {
                       isCurrent ? 'bg-gray-50 cursor-not-allowed' : 'hover:bg-blue-50 cursor-pointer'
                     } transition-colors border-b last:border-b-0`}
                   >
-                    <span className="text-2xl">{cfg.icon}</span>
+                    <DropIcon size={22} color={cfg.color} />
                     <div className="flex-1">
                       <div className={`font-semibold ${isCurrent ? 'text-gray-400' : 'text-gray-800'}`}>{cfg.label}</div>
                       <div className={`text-xs ${isCurrent ? 'text-gray-400' : 'text-gray-500'}`}>{cfg.desc}</div>
                     </div>
                     {isCurrent && (
-                      <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-medium">✓ ATTUALE</span>
+                      <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-medium">ATTUALE</span>
                     )}
                   </button>
                 )
@@ -357,9 +368,10 @@ export default function KaizenDetailPage() {
           <div className="space-y-2">
             {[...kaizen.livello_storia].reverse().map((entry, i) => {
               const cfg = livelloConfig[entry.livello]
+              const EntryIcon = cfg?.Icon || FileText
               return (
                 <div key={i} className="flex items-start gap-3 py-2 border-b last:border-0">
-                  <div className="text-2xl flex-shrink-0">{cfg?.icon || '📋'}</div>
+                  <div className="flex-shrink-0 mt-0.5"><EntryIcon size={20} color={cfg?.color || '#64748b'} /></div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm">
                       <strong>{entry.livello}</strong>
@@ -385,17 +397,17 @@ export default function KaizenDetailPage() {
             <div className="p-6 space-y-4">
               <div className="flex items-center justify-center gap-3 bg-gray-50 p-4 rounded-lg">
                 <div className="text-center">
-                  <div className="text-3xl">{livelloConfig[livelloAttuale]?.icon}</div>
+                  {(() => { const I = livelloConfig[livelloAttuale]?.Icon; return I ? <I size={30} color={livelloConfig[livelloAttuale]?.color} /> : null })()}
                   <div className="text-xs text-gray-600 mt-1">{livelloAttuale}</div>
                 </div>
-                <div className="text-2xl text-gray-400">→</div>
+                <div className="text-2xl text-gray-400">&rarr;</div>
                 <div className="text-center">
-                  <div className="text-3xl">{livelloConfig[targetLivello]?.icon}</div>
+                  {(() => { const I = livelloConfig[targetLivello]?.Icon; return I ? <I size={30} color={livelloConfig[targetLivello]?.color} /> : null })()}
                   <div className="text-xs font-bold mt-1" style={{ color: livelloConfig[targetLivello]?.color }}>{targetLivello}</div>
                 </div>
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
-                <strong className="text-blue-700">ℹ️ {livelloConfig[targetLivello]?.label}</strong>
+                <strong className="text-blue-700">{livelloConfig[targetLivello]?.label}</strong>
                 <p className="text-blue-600 text-xs mt-1">{livelloConfig[targetLivello]?.desc}</p>
               </div>
               <div>
@@ -405,7 +417,7 @@ export default function KaizenDetailPage() {
               <div className="flex gap-2 justify-end pt-3 border-t">
                 <button onClick={() => setShowTransformModal(false)} className="px-4 py-2 border rounded-lg hover:bg-gray-50" disabled={transforming}>Annulla</button>
                 <button onClick={confirmTransform} disabled={transforming} className="px-6 py-2 text-white rounded-lg shadow-sm disabled:opacity-50 flex items-center gap-2" style={{ backgroundColor: livelloConfig[targetLivello]?.color || '#3b82f6' }}>
-                  {transforming ? '⏳ Trasformazione...' : '✨ Conferma trasformazione'}
+                  {transforming ? 'Trasformazione...' : 'Conferma trasformazione'}
                 </button>
               </div>
             </div>
@@ -413,35 +425,35 @@ export default function KaizenDetailPage() {
         </div>
       )}
 
-      {/* 🆕 Banner Pillar per Major Kaizen */}
+      {/* Banner Pillar per Major Kaizen */}
       {livelloAttuale === 'Major' && kaizen.pillar_id && (
         <div className="bg-purple-50 border-l-4 border-purple-400 rounded-r-lg p-3 mb-4 text-sm flex items-center gap-3">
-          <span className="text-2xl">🏛️</span>
+          <Building2 size={24} className="text-purple-600 flex-shrink-0" />
           <div className="flex-1">
             <div className="font-semibold text-purple-900">
               Questo Major Kaizen fa parte del Pillar <strong>{kaizen.pillar_sigla}</strong>
               {kaizen.pillar_label && ` — ${kaizen.pillar_label}`}
             </div>
             <div className="text-xs text-purple-700">
-              Per gestire i 5 Step KPI Management e il Master Plan annuale → vai al Pillar
+              Per gestire i 5 Step KPI Management e il Master Plan annuale, vai al Pillar.
             </div>
           </div>
           <Link
             to={`/pillars/${kaizen.pillar_id}`}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 flex items-center gap-2 shadow-sm"
           >
-            🎯 Apri Pillar →
+            Apri Pillar
           </Link>
         </div>
       )}
       {livelloAttuale === 'Major' && !kaizen.pillar_id && (
         <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-r-lg p-3 mb-4 text-sm">
           <div className="flex items-center gap-2">
-            <span className="text-xl">⚠️</span>
+            <AlertTriangle size={20} className="text-yellow-600 flex-shrink-0" />
             <div className="flex-1">
               <strong>Questo Major Kaizen non è collegato a nessun Pillar</strong>
               <div className="text-xs text-yellow-700 mt-0.5">
-                Vai su <strong>Kaizen → Modifica</strong> per assegnarlo a un Pillar e gestire i 5 Step KPI.
+                Vai su <strong>Kaizen &gt; Modifica</strong> per assegnarlo a un Pillar e gestire i 5 Step KPI.
               </div>
             </div>
           </div>
@@ -457,7 +469,7 @@ export default function KaizenDetailPage() {
         ))}
       </div>
 
-      {/* 🔒 Wrapper che disabilita TUTTI i campi quando isLocked */}
+      {/* Wrapper che disabilita tutti i campi quando isLocked */}
       <fieldset disabled={isLocked} className={isLocked ? 'opacity-90 pointer-events-none' : ''}>
 
       {activeTab === 'quickkaizen' && (
@@ -477,6 +489,42 @@ export default function KaizenDetailPage() {
               ))}
             </div>
           </div>
+
+          {/* OBIETTIVI, KPI E GEMBA (solo Standard/Major) */}
+          {livelloAttuale !== 'Quick' && (
+            <div className="bg-white rounded-xl shadow p-6">
+              <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">OBIETTIVI, KPI E OSSERVAZIONE GEMBA</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 uppercase mb-1">KPI / OPI</label>
+                  <input value={kaizen.obiettivi?.kpi || ''} onChange={(e) => updateField('obiettivi', 'kpi', e.target.value)} placeholder="es. ppm, kg/sett, %" className="w-full border rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Start Point</label>
+                  <input type="number" value={kaizen.obiettivi?.start ?? ''} onChange={(e) => updateField('obiettivi', 'start', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Target</label>
+                  <input type="number" value={kaizen.obiettivi?.target ?? ''} onChange={(e) => updateField('obiettivi', 'target', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Scadenza</label>
+                  <input type="date" value={kaizen.obiettivi?.scadenza || ''} onChange={(e) => updateField('obiettivi', 'scadenza', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                </div>
+              </div>
+              {miglioramentoPct !== null && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 mb-4">
+                  Miglioramento richiesto: <strong>{miglioramentoPct.toFixed(1)}%</strong> (da {kaizen.obiettivi.start} a {kaizen.obiettivi.target})
+                </div>
+              )}
+              <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Obiettivo SMART</label>
+              <textarea value={kaizen.obiettivi?.smart || ''} onChange={(e) => updateField('obiettivi', 'smart', e.target.value)} rows={2} placeholder='es. "Ridurre gli scarti sulla Bindler 7 del 30% entro 4 mesi ripristinando le condizioni base"' className="w-full border rounded-lg px-3 py-2 text-sm" />
+              <div className="mt-4 pt-4 border-t">
+                <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Osservazione Gemba</label>
+                <textarea value={kaizen.gemba?.osservazioni || ''} onChange={(e) => updateField('gemba', 'osservazioni', e.target.value)} rows={3} placeholder="Cosa è stato osservato direttamente sul campo (macchina, linea, processo)?" className="w-full border rounded-lg px-3 py-2 text-sm" />
+              </div>
+            </div>
+          )}
 
           {/* PASSO 2 — Ishikawa */}
           <div className="bg-white rounded-xl shadow p-6">
@@ -541,13 +589,12 @@ export default function KaizenDetailPage() {
             </div>
           </div>
 
-          {/* PASSO 5 — Piano Azioni (Standard/Major: Gant + Lista | Quick: solo lista) */}
+          {/* PASSO 5 — Piano Azioni */}
           <div className="bg-white rounded-xl shadow p-6">
             <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">PASSO 5 - PIANO AZIONI</h3>
 
             {livelloAttuale !== 'Quick' && (
               <>
-                {/* Gant in cima (solo Standard/Major) */}
                 <div className="mb-6">
                   <h4 className="font-bold text-sm uppercase text-gray-700 mb-2">Gant macro</h4>
                   <KaizenGantMasterPlan kaizen={kaizen} onSaved={loadKaizen} />
@@ -556,7 +603,6 @@ export default function KaizenDetailPage() {
               </>
             )}
 
-            {/* Lista azioni (per tutti i livelli) */}
             <KaizenAzioniList
               kaizen={kaizen}
               kaizenId={id}
@@ -567,17 +613,71 @@ export default function KaizenDetailPage() {
 
           {/* FASE 6 + FASE 7 affiancate */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            {/* FASE 6 — Risultati e Benefici */}
             <div className="bg-white rounded-xl shadow p-6">
-              <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">FASE 6 - VALUTAZIONE EFFICACIA</h3>
+              <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">FASE 6 - RISULTATI E BENEFICI</h3>
+              {livelloAttuale !== 'Quick' && (
+                <div className="mb-4 space-y-3">
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-gray-50 rounded-lg p-2">
+                      <div className="text-xs text-gray-500 uppercase">Start</div>
+                      <div className="text-lg font-bold text-gray-700">{kaizen.obiettivi?.start ?? '—'}</div>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-2">
+                      <div className="text-xs text-gray-500 uppercase">Target</div>
+                      <div className="text-lg font-bold text-blue-600">{kaizen.obiettivi?.target ?? '—'}</div>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-2">
+                      <div className="text-xs text-gray-500 uppercase">Attuale</div>
+                      <input type="number" value={kaizen.risultati?.attuale ?? ''} onChange={(e) => updateField('risultati', 'attuale', e.target.value)} className="w-full border rounded px-2 py-1 text-center text-lg font-bold text-green-600" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Costo progetto (EUR)</label>
+                      <input type="number" value={kaizen.risultati?.costo ?? ''} onChange={(e) => updateField('risultati', 'costo', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Risparmio (EUR/anno)</label>
+                      <input type="number" value={kaizen.risultati?.risparmio ?? ''} onChange={(e) => updateField('risultati', 'risparmio', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+                  </div>
+                  {costo > 0 && risparmio > 0 && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-2 text-sm text-green-800 text-center">
+                      ROI: <strong>{(risparmio / costo).toFixed(1)}x</strong> · Payback: <strong>{(costo / risparmio * 12).toFixed(1)} mesi</strong>
+                    </div>
+                  )}
+                </div>
+              )}
+              <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Valutazione efficacia</label>
               <textarea value={kaizen.fase5_valutazione_efficacia?.osservazioni || ''}
                 onChange={(e) => updateField('fase5_valutazione_efficacia', 'osservazioni', e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm" rows={6} />
+                className="w-full border rounded-lg px-3 py-2 text-sm" rows={5} />
             </div>
+
+            {/* FASE 7 — Standardizzazione e Replica */}
             <div className="bg-white rounded-xl shadow p-6">
               <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">FASE 7 - STANDARDIZZAZIONE E REPLICA</h3>
+              {livelloAttuale !== 'Quick' && (
+                <div className="mb-4 space-y-2">
+                  {[
+                    { key: 'sop', label: 'SOP / OPL creata o aggiornata' },
+                    { key: 'dms', label: 'Documento caricato nel Document Management' },
+                    { key: 'training', label: 'Persone coinvolte formate' },
+                    { key: 'audit', label: 'Sistema di audit / check attivo' },
+                  ].map(item => (
+                    <label key={item.key} className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={!!kaizen.standardizzazione?.[item.key]} onChange={(e) => updateField('standardizzazione', item.key, e.target.checked)} className="w-4 h-4" />
+                      {item.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+              <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Note e piano di replica</label>
               <textarea value={kaizen.fase6_standardizzazione?.osservazioni || ''}
                 onChange={(e) => updateField('fase6_standardizzazione', 'osservazioni', e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm" rows={6} />
+                className="w-full border rounded-lg px-3 py-2 text-sm" rows={5} />
             </div>
           </div>
 
@@ -604,11 +704,11 @@ export default function KaizenDetailPage() {
       )}
 
       {activeTab === 'costbenefit' && (
-        <PlaceholderTab icon="💰" title="Cost & Benefit" subtitle="Business case e calcolo ROI automatico"
+        <PlaceholderTab title="Cost & Benefit" subtitle="Business case e calcolo ROI automatico"
           features={[
             'Calcolo costo totale (investimento + manodopera + materiali)',
             'Saving annuo stimato vs reale',
-            'ROI % e Payback period automatici',
+            'ROI e Payback period automatici',
             'Grafico proiezione 5 anni',
             'VAN (Valore Attuale Netto)',
             'Confronto stimato vs reale post-progetto',
@@ -618,7 +718,7 @@ export default function KaizenDetailPage() {
 
       {activeTab === 'lavagna' && (
         <div className="bg-white rounded-xl shadow p-6">
-          <textarea value={kaizen.lavagna || ''} onChange={(e) => setKaizen({...kaizen, lavagna: e.target.value})}
+          <textarea value={kaizen.lavagna || ''} onChange={(e) => setKaizen({ ...kaizen, lavagna: e.target.value })}
             className="w-full border rounded-lg px-4 py-3 min-h-[400px]" placeholder="Scrivi qui le tue note..." />
         </div>
       )}
@@ -639,7 +739,7 @@ export default function KaizenDetailPage() {
       )}
 
       </fieldset>
-      
+
       {/* Form AP creato da Root Cause dei 5 Perché */}
       {showAPFormFromRootCause && rootCausePrefill && (
         <ActionPlanFormShared
@@ -656,7 +756,7 @@ export default function KaizenDetailPage() {
             setShowAPFormFromRootCause(false)
             setRootCausePrefill(null)
             loadKaizen()
-            alert('Action Plan creato e collegato al Kaizen')
+            alert('Action Plan creato e collegato al Kaizen.')
           }}
         />
       )}
@@ -667,24 +767,18 @@ export default function KaizenDetailPage() {
 // ──────────────────────────────────────────────────────────
 // COMPONENTE PLACEHOLDER
 // ──────────────────────────────────────────────────────────
-function PlaceholderTab({ icon, title, subtitle, steps, features, phase, target }) {
+function PlaceholderTab({ title, subtitle, steps, features, phase, target }) {
   return (
     <div className="bg-white rounded-xl shadow p-8">
       <div className="text-center mb-6">
-        <div className="text-6xl mb-3">{icon}</div>
         <h2 className="text-2xl font-bold mb-1">{title}</h2>
         <p className="text-sm text-gray-500">{subtitle}</p>
-        {target && (<span className="inline-block mt-2 px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">🎯 {target}</span>)}
+        {target && (<span className="inline-block mt-2 px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">{target}</span>)}
       </div>
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-blue-400 p-4 rounded-r-lg mb-6">
-        <div className="flex items-start gap-3">
-          <div className="text-2xl">🚧</div>
-          <div>
-            <div className="font-bold text-blue-900 mb-1">In costruzione</div>
-            <div className="text-sm text-blue-700">Questa sezione verrà sbloccata nella <strong>Fase {phase}</strong> della roadmap SheetKaizen.</div>
-            <div className="text-xs text-blue-600 mt-1">💡 Per ora la struttura è visibile come anteprima.</div>
-          </div>
-        </div>
+        <div className="font-bold text-blue-900 mb-1">In costruzione</div>
+        <div className="text-sm text-blue-700">Questa sezione verrà sbloccata nella <strong>Fase {phase}</strong> della roadmap LPW.</div>
+        <div className="text-xs text-blue-600 mt-1">Per ora la struttura è visibile come anteprima.</div>
       </div>
       {steps && (
         <div>
@@ -716,7 +810,6 @@ function PlaceholderTab({ icon, title, subtitle, steps, features, phase, target 
   )
 }
 
-
 // ──────────────────────────────────────────────────────────
 // FIGLI TAB — Quick Kaizen collegati al progetto Standard/Major
 // ──────────────────────────────────────────────────────────
@@ -739,7 +832,7 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
   }
 
   const createFiglio = async () => {
-    if (!newTitolo.trim()) return alert('Inserisci un titolo')
+    if (!newTitolo.trim()) return alert('Inserisci un titolo.')
     setCreating(true)
     try {
       const res = await api.post('/kaizens/', {
@@ -754,16 +847,16 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
       setShowCreateModal(false)
       loadFigli()
       onUpdate?.()
-      alert(`✅ Quick Kaizen ${res.data?.numero} creato e collegato a ${kaizenNumero}`)
+      alert(`Quick Kaizen ${res.data?.numero} creato e collegato a ${kaizenNumero}.`)
     } catch (err) {
       console.error(err)
-      alert('Errore creazione: ' + (err.response?.data?.detail || err.message))
+      alert('Errore durante la creazione: ' + (err.response?.data?.detail || err.message))
     }
     setCreating(false)
   }
 
   const scollegaFiglio = async (childId, childNumero) => {
-    if (!confirm(`🔓 Scollegare ${childNumero} da ${kaizenNumero}?\n\nIl Quick Kaizen rimane in vita ma non sarà più collegato a questo progetto.`)) return
+    if (!confirm(`Scollegare ${childNumero} da ${kaizenNumero}?\n\nIl Quick Kaizen rimane in vita ma non sarà più collegato a questo progetto.`)) return
     try {
       await api.delete(`/kaizens/${kaizenId}/link-child/${childId}`)
       loadFigli()
@@ -782,8 +875,8 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
       <div className="bg-white rounded-xl shadow p-4">
         <div className="flex justify-between items-center mb-2">
           <div>
-            <h3 className="font-bold text-lg flex items-center gap-2">
-              ⚡ Quick Kaizen del progetto {kaizenNumero}
+            <h3 className="font-bold text-lg">
+              Quick Kaizen del progetto {kaizenNumero}
             </h3>
             <p className="text-xs text-gray-500">
               {figli.length === 0
@@ -793,7 +886,7 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
             </p>
           </div>
           <button onClick={() => setShowCreateModal(true)} className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-light text-sm font-medium">
-            ➕ Crea Quick Kaizen
+            Crea Quick Kaizen
           </button>
         </div>
       </div>
@@ -801,13 +894,13 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl w-full max-w-md shadow-2xl">
-            <div className="bg-green-500 text-white px-5 py-3 rounded-t-xl flex justify-between items-center">
-              <h2 className="text-lg font-bold flex items-center gap-2">⚡ Crea Quick Kaizen</h2>
+            <div className="bg-green-600 text-white px-5 py-3 rounded-t-xl flex justify-between items-center">
+              <h2 className="text-lg font-bold">Crea Quick Kaizen</h2>
               <button onClick={() => setShowCreateModal(false)} className="hover:bg-white hover:bg-opacity-20 p-1 rounded"><X size={20} /></button>
             </div>
             <div className="p-5 space-y-3">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
-                <strong className="text-blue-700">ℹ️ Verrà collegato a {kaizenNumero}</strong>
+                <strong className="text-blue-700">Verrà collegato a {kaizenNumero}</strong>
                 <p className="text-blue-600 text-xs mt-1">Reparto e linea vengono ereditati dal progetto padre quando possibile.</p>
               </div>
               <div>
@@ -815,12 +908,12 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
                 <input value={newTitolo} onChange={(e) => setNewTitolo(e.target.value)} placeholder="Es: Pulizia ugelli linea 3" className="w-full border rounded-lg px-3 py-2" autoFocus />
               </div>
               <div className="text-xs text-gray-500">
-                💡 Per personalizzare ulteriormente (macchina, partecipanti, ecc.), apri il Quick Kaizen dopo la creazione.
+                Per personalizzare ulteriormente (macchina, partecipanti, ecc.), apri il Quick Kaizen dopo la creazione.
               </div>
               <div className="flex justify-end gap-2 pt-3 border-t">
                 <button onClick={() => setShowCreateModal(false)} className="px-4 py-2 border rounded-lg" disabled={creating}>Annulla</button>
-                <button onClick={createFiglio} disabled={creating} className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50">
-                  {creating ? '⏳ Creazione...' : '⚡ Crea Quick Kaizen'}
+                <button onClick={createFiglio} disabled={creating} className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
+                  {creating ? 'Creazione...' : 'Crea Quick Kaizen'}
                 </button>
               </div>
             </div>
@@ -829,15 +922,14 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
       )}
 
       {loading ? (
-        <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">⏳ Caricamento...</div>
+        <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">Caricamento...</div>
       ) : figli.length === 0 ? (
         <div className="bg-white rounded-xl shadow p-12 text-center">
-          <div className="text-5xl mb-3">⚡</div>
           <h3 className="text-lg font-semibold mb-1">Nessun Quick Kaizen ancora</h3>
           <p className="text-sm text-gray-500 mb-4">
             Un {kaizenLivello} Kaizen può includere Quick Kaizen più piccoli per gestire sotto-problemi specifici.
           </p>
-          <button onClick={() => setShowCreateModal(true)} className="text-primary hover:underline">➕ Crea il primo Quick Kaizen</button>
+          <button onClick={() => setShowCreateModal(true)} className="text-primary hover:underline">Crea il primo Quick Kaizen</button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -846,7 +938,7 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-2xl">⚡</span>
+                    <Zap size={18} className="text-green-600" />
                     <span className="font-mono text-xs text-primary font-bold">{child.numero}</span>
                   </div>
                   <h4 className="font-semibold mb-1">{child.titolo || 'Senza titolo'}</h4>
@@ -856,17 +948,17 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
                         {child.stato}
                       </span>
                     )}
-                    {child.reparto && <span className="text-gray-600">🏭 {child.reparto}</span>}
-                    {child.linea && <span className="text-gray-600">📍 {child.linea}</span>}
+                    {child.reparto && <span className="text-gray-600 flex items-center gap-1"><Factory size={12} /> {child.reparto}</span>}
+                    {child.linea && <span className="text-gray-600 flex items-center gap-1"><MapPin size={12} /> {child.linea}</span>}
                   </div>
                 </div>
               </div>
               <div className="flex gap-2 pt-2 border-t mt-2">
                 <a href={`/kaizen/${child._id}`} className="text-xs px-3 py-1.5 bg-blue-50 hover:bg-blue-100 rounded text-blue-700 flex-1 text-center">
-                  👁 Apri Kaizen
+                  Apri Kaizen
                 </a>
                 <button onClick={() => scollegaFiglio(child._id, child.numero)} className="text-xs px-3 py-1.5 bg-red-50 hover:bg-red-100 rounded text-red-600" title="Scollega dal progetto">
-                  🔓 Scollega
+                  Scollega
                 </button>
               </div>
             </div>
@@ -924,14 +1016,14 @@ const STD_ELEMENTS = [
 ]
 
 const SCORE_OPTIONS = [
-  { value: 0, label: 'Non OK', icon: '❌', color: 'bg-red-100 text-red-700 border-red-400' },
-  { value: 0.5, label: 'Parziale', icon: '⚠️', color: 'bg-yellow-100 text-yellow-700 border-yellow-400' },
-  { value: 1, label: 'OK', icon: '✓', color: 'bg-green-100 text-green-700 border-green-400' },
+  { value: 0, label: 'Non OK', color: 'bg-red-100 text-red-700 border-red-400' },
+  { value: 0.5, label: 'Parziale', color: 'bg-yellow-100 text-yellow-700 border-yellow-400' },
+  { value: 1, label: 'OK', color: 'bg-green-100 text-green-700 border-green-400' },
 ]
 
 const MAX_SCORE = 8
 
-function StandardElementsTab({ kaizen, onSaved }) {
+function StandardElementsTab({ kaizen }) {
   const [scores, setScores] = useState(kaizen.standard_elements?.scores || {})
   const [notes, setNotes] = useState(kaizen.standard_elements?.notes || {})
   const [saving, setSaving] = useState(false)
@@ -950,11 +1042,11 @@ function StandardElementsTab({ kaizen, onSaved }) {
   const completedCount = Object.keys(scores).length
   const totalElements = STD_ELEMENTS.reduce((sum, area) => sum + area.items.length, 0)
 
-  let passStatus = { label: 'Da Completare', color: 'bg-gray-100 text-gray-700', emoji: '📝' }
+  let passStatus = { label: 'Da Completare', color: 'bg-gray-100 text-gray-700' }
   if (completedCount === totalElements) {
-    if (totalScore >= 8) passStatus = { label: 'PASS', color: 'bg-green-500 text-white', emoji: '🏆' }
-    else if (totalScore >= 5) passStatus = { label: 'PARTIAL PASS', color: 'bg-yellow-500 text-white', emoji: '⚠️' }
-    else passStatus = { label: 'FAIL', color: 'bg-red-500 text-white', emoji: '❌' }
+    if (totalScore >= 8) passStatus = { label: 'PASS', color: 'bg-green-600 text-white' }
+    else if (totalScore >= 5) passStatus = { label: 'PARTIAL PASS', color: 'bg-yellow-500 text-white' }
+    else passStatus = { label: 'FAIL', color: 'bg-red-600 text-white' }
   }
 
   const doSave = async (silent = false) => {
@@ -990,7 +1082,7 @@ function StandardElementsTab({ kaizen, onSaved }) {
       return true
     } catch (err) {
       console.error('Errore salvataggio Standard Elements:', err)
-      if (!silent) alert('❌ Errore salvataggio: ' + (err.response?.data?.detail || err.message))
+      if (!silent) alert('Errore durante il salvataggio: ' + (err.response?.data?.detail || err.message))
       return false
     } finally {
       if (!silent) setSaving(false)
@@ -1054,20 +1146,20 @@ function StandardElementsTab({ kaizen, onSaved }) {
       <div className="bg-white rounded-xl shadow p-6">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h3 className="text-xl font-bold mb-1">📊 8 Standard Elements</h3>
+            <h3 className="text-xl font-bold mb-1">8 Standard Elements</h3>
             <p className="text-sm text-gray-500">Valutazione qualità Quick Kaizen — Lindt FI Pillar</p>
           </div>
           <div className="text-right">
             <div className={`inline-block px-3 py-1.5 rounded-lg font-bold text-sm ${passStatus.color}`}>
-              {passStatus.emoji} {passStatus.label}
+              {passStatus.label}
             </div>
             <div className="text-xs mt-1 flex items-center justify-end gap-2">
-              {saving ? <span className="text-blue-600">⏳ Salvataggio...</span> :
-               hasUnsavedChanges ? <span className="text-orange-600 font-medium">⚠️ Modifiche non salvate</span> :
-               lastSaved ? <span className="text-green-600">💾 Salvato {lastSaved.toLocaleTimeString('it-IT')}</span> :
+              {saving ? <span className="text-blue-600">Salvataggio...</span> :
+               hasUnsavedChanges ? <span className="text-orange-600 font-medium">Modifiche non salvate</span> :
+               lastSaved ? <span className="text-green-600">Salvato alle {lastSaved.toLocaleTimeString('it-IT')}</span> :
                <span className="text-gray-400">In attesa</span>}
               <button onClick={manualSave} disabled={saving} className="bg-primary text-white px-3 py-1 rounded text-xs hover:bg-primary-light disabled:opacity-50">
-                💾 Salva ora
+                Salva ora
               </button>
             </div>
           </div>
@@ -1076,7 +1168,7 @@ function StandardElementsTab({ kaizen, onSaved }) {
         <div className="bg-gray-50 rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-600">SCORE TOTALE</span>
-            <span className="text-sm text-gray-500">🎯 Target Lindt: 8/8</span>
+            <span className="text-sm text-gray-500">Target Lindt: 8/8</span>
           </div>
           <div className="flex items-baseline gap-2 mb-3">
             <span className="text-4xl font-bold text-primary">{totalScore.toFixed(1)}</span>
@@ -1130,7 +1222,7 @@ function StandardElementsTab({ kaizen, onSaved }) {
                           }`}
                           title={opt.label}
                         >
-                          {opt.icon} {opt.value}
+                          {opt.label} ({opt.value})
                         </button>
                       ))}
                     </div>
@@ -1138,7 +1230,7 @@ function StandardElementsTab({ kaizen, onSaved }) {
                   <textarea
                     value={notes[item.id] || ''}
                     onChange={(e) => setNote(item.id, e.target.value)}
-                    placeholder="📝 Note opzionali (giustificazione, evidenze, riferimenti)..."
+                    placeholder="Note opzionali (giustificazione, evidenze, riferimenti)..."
                     rows={2}
                     className="w-full text-xs border rounded-lg px-3 py-2 mt-1 resize-none focus:outline-none focus:ring-2 focus:ring-primary"
                   />
@@ -1150,13 +1242,13 @@ function StandardElementsTab({ kaizen, onSaved }) {
       ))}
 
       <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-4 text-sm text-blue-700">
-        <div className="font-semibold mb-1">ℹ️ Come compilare</div>
+        <div className="font-semibold mb-1">Come compilare</div>
         <div className="text-xs space-y-1">
-          <div>• <strong>✓ OK (1)</strong> → Elemento pienamente soddisfatto</div>
-          <div>• <strong>⚠️ Parziale (0.5)</strong> → Soddisfatto ma migliorabile</div>
-          <div>• <strong>❌ Non OK (0)</strong> → Elemento mancante o non sufficiente</div>
+          <div><strong>OK (1)</strong> — Elemento pienamente soddisfatto</div>
+          <div><strong>Parziale (0.5)</strong> — Soddisfatto ma migliorabile</div>
+          <div><strong>Non OK (0)</strong> — Elemento mancante o non sufficiente</div>
           <div className="mt-2 pt-2 border-t border-blue-200">
-            <strong>Soglie Lindt:</strong> 🏆 PASS = 8 · ⚠️ PARTIAL = 5-7 · ❌ FAIL = &lt; 5
+            <strong>Soglie Lindt:</strong> PASS = 8 · PARTIAL = 5-7 · FAIL &lt; 5
           </div>
         </div>
       </div>
@@ -1168,15 +1260,15 @@ function StandardElementsTab({ kaizen, onSaved }) {
 // COUNTERMEASURE LADDER TAB — Lindt FI Pillar 6 livelli
 // ──────────────────────────────────────────────────────────
 const CM_LEVELS = [
-  { level: 6, label: 'Innovation / Re-engineering', desc: 'Nuove tecnologie, redesign processo, investimenti strutturali', color: 'bg-emerald-50 border-emerald-400', headerColor: 'bg-emerald-100 text-emerald-900', badge: 'bg-emerald-500 text-white', emoji: '🚀' },
-  { level: 5, label: 'Technological / Process Improvement', desc: 'Meccanizzazione, automazione, modifica processo', color: 'bg-green-50 border-green-400', headerColor: 'bg-green-100 text-green-900', badge: 'bg-green-500 text-white', emoji: '⚙️' },
-  { level: 4, label: 'Root Cause Elimination (Poka Yoke)', desc: 'Miglioramento parametri oltre lo standard originale (errore impossibile)', color: 'bg-lime-50 border-lime-400', headerColor: 'bg-lime-100 text-lime-900', badge: 'bg-lime-500 text-white', emoji: '🛡️' },
-  { level: 3, label: 'Visual Control / Management', desc: 'Contromisure stabili che eliminano la causa tecnica (visual control)', color: 'bg-yellow-50 border-yellow-400', headerColor: 'bg-yellow-100 text-yellow-900', badge: 'bg-yellow-500 text-white', emoji: '👁️' },
-  { level: 2, label: 'Restoration of Process Standards', desc: 'Azioni che riportano il processo agli standard (cicli pulizia, ruoli chiari)', color: 'bg-orange-50 border-orange-400', headerColor: 'bg-orange-100 text-orange-900', badge: 'bg-orange-500 text-white', emoji: '📋' },
-  { level: 1, label: 'Restoration of Basic Conditions', desc: 'Pulizia base, 5S, ricordare check agli operatori', color: 'bg-red-50 border-red-400', headerColor: 'bg-red-100 text-red-900', badge: 'bg-red-500 text-white', emoji: '🧹' },
+  { level: 6, label: 'Innovation / Re-engineering', desc: 'Nuove tecnologie, redesign processo, investimenti strutturali', color: 'bg-emerald-50 border-emerald-400', headerColor: 'bg-emerald-100 text-emerald-900', badge: 'bg-emerald-600 text-white' },
+  { level: 5, label: 'Technological / Process Improvement', desc: 'Meccanizzazione, automazione, modifica processo', color: 'bg-green-50 border-green-400', headerColor: 'bg-green-100 text-green-900', badge: 'bg-green-600 text-white' },
+  { level: 4, label: 'Root Cause Elimination (Poka Yoke)', desc: 'Miglioramento parametri oltre lo standard originale (errore impossibile)', color: 'bg-lime-50 border-lime-400', headerColor: 'bg-lime-100 text-lime-900', badge: 'bg-lime-600 text-white' },
+  { level: 3, label: 'Visual Control / Management', desc: 'Contromisure stabili che eliminano la causa tecnica (visual control)', color: 'bg-yellow-50 border-yellow-400', headerColor: 'bg-yellow-100 text-yellow-900', badge: 'bg-yellow-600 text-white' },
+  { level: 2, label: 'Restoration of Process Standards', desc: 'Azioni che riportano il processo agli standard (cicli pulizia, ruoli chiari)', color: 'bg-orange-50 border-orange-400', headerColor: 'bg-orange-100 text-orange-900', badge: 'bg-orange-600 text-white' },
+  { level: 1, label: 'Restoration of Basic Conditions', desc: 'Pulizia base, 5S, ricordare check agli operatori', color: 'bg-red-50 border-red-400', headerColor: 'bg-red-100 text-red-900', badge: 'bg-red-600 text-white' },
 ]
 
-function CountermeasureLadderTab({ kaizen, onSaved }) {
+function CountermeasureLadderTab({ kaizen }) {
   const [countermeasures, setCountermeasures] = useState(kaizen.countermeasure_ladder?.items || {})
   const [saving, setSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
@@ -1194,10 +1286,10 @@ function CountermeasureLadderTab({ kaizen, onSaved }) {
   const maxLevel = livelliPresenti.length > 0 ? Math.max(...livelliPresenti) : 0
   const totalCount = Object.values(countermeasures).reduce((sum, arr) => sum + (arr?.length || 0), 0)
 
-  let robustness = { label: 'Da Compilare', color: 'bg-gray-100 text-gray-700', emoji: '📝' }
-  if (maxLevel >= 4) robustness = { label: 'OTTIMO', color: 'bg-green-500 text-white', emoji: '🏆' }
-  else if (maxLevel >= 3) robustness = { label: 'BUONO', color: 'bg-yellow-500 text-white', emoji: '✅' }
-  else if (maxLevel >= 1) robustness = { label: 'DEBOLE', color: 'bg-red-500 text-white', emoji: '⚠️' }
+  let robustness = { label: 'Da Compilare', color: 'bg-gray-100 text-gray-700' }
+  if (maxLevel >= 4) robustness = { label: 'OTTIMO', color: 'bg-green-600 text-white' }
+  else if (maxLevel >= 3) robustness = { label: 'BUONO', color: 'bg-yellow-500 text-white' }
+  else if (maxLevel >= 1) robustness = { label: 'DEBOLE', color: 'bg-red-600 text-white' }
 
   const doSave = async (silent = false) => {
     if (!silent) setSaving(true)
@@ -1226,7 +1318,7 @@ function CountermeasureLadderTab({ kaizen, onSaved }) {
       }
     } catch (err) {
       console.error('Errore salvataggio Countermeasure Ladder:', err)
-      if (!silent) alert('❌ Errore: ' + (err.response?.data?.detail || err.message))
+      if (!silent) alert('Errore: ' + (err.response?.data?.detail || err.message))
     } finally {
       if (!silent) setSaving(false)
     }
@@ -1305,20 +1397,20 @@ function CountermeasureLadderTab({ kaizen, onSaved }) {
       <div className="bg-white rounded-xl shadow p-6">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h3 className="text-xl font-bold mb-1">🏔️ Countermeasure Ladder</h3>
+            <h3 className="text-xl font-bold mb-1">Countermeasure Ladder</h3>
             <p className="text-sm text-gray-500">Robustezza delle contromisure — Lindt FI Pillar</p>
           </div>
           <div className="text-right">
             <div className={`inline-block px-3 py-1.5 rounded-lg font-bold text-sm ${robustness.color}`}>
-              {robustness.emoji} {robustness.label}
+              {robustness.label}
             </div>
             <div className="text-xs mt-1 flex items-center justify-end gap-2">
-              {saving ? <span className="text-blue-600">⏳ Salvataggio...</span> :
-               hasUnsavedChanges ? <span className="text-orange-600 font-medium">⚠️ Modifiche non salvate</span> :
-               lastSaved ? <span className="text-green-600">💾 Salvato {lastSaved.toLocaleTimeString('it-IT')}</span> :
+              {saving ? <span className="text-blue-600">Salvataggio...</span> :
+               hasUnsavedChanges ? <span className="text-orange-600 font-medium">Modifiche non salvate</span> :
+               lastSaved ? <span className="text-green-600">Salvato alle {lastSaved.toLocaleTimeString('it-IT')}</span> :
                <span className="text-gray-400">In attesa</span>}
               <button onClick={manualSave} disabled={saving} className="bg-primary text-white px-3 py-1 rounded text-xs hover:bg-primary-light disabled:opacity-50">
-                💾 Salva ora
+                Salva ora
               </button>
             </div>
           </div>
@@ -1327,7 +1419,7 @@ function CountermeasureLadderTab({ kaizen, onSaved }) {
         <div className="bg-gray-50 rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-600">LIVELLO MASSIMO RAGGIUNTO</span>
-            <span className="text-sm text-gray-500">🎯 Target: ≥ 4 (Poka Yoke)</span>
+            <span className="text-sm text-gray-500">Target: &ge; 4 (Poka Yoke)</span>
           </div>
           <div className="flex items-baseline gap-2 mb-3">
             <span className="text-4xl font-bold text-primary">{maxLevel}</span>
@@ -1360,10 +1452,7 @@ function CountermeasureLadderTab({ kaizen, onSaved }) {
                 Liv. {lvl.level}
               </span>
               <div className="flex-1">
-                <div className="font-bold text-sm flex items-center gap-2">
-                  <span className="text-lg">{lvl.emoji}</span>
-                  {lvl.label}
-                </div>
+                <div className="font-bold text-sm">{lvl.label}</div>
                 <div className="text-xs opacity-80 mt-0.5">{lvl.desc}</div>
               </div>
               {items.length > 0 && (
@@ -1413,7 +1502,7 @@ function CountermeasureLadderTab({ kaizen, onSaved }) {
                   disabled={!newInputs[lvl.level]?.trim()}
                   className={`${lvl.badge} px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed transition-opacity`}
                 >
-                  + Aggiungi
+                  Aggiungi
                 </button>
               </div>
             </div>
@@ -1422,15 +1511,15 @@ function CountermeasureLadderTab({ kaizen, onSaved }) {
       })}
 
       <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-4 text-sm text-blue-700">
-        <div className="font-semibold mb-2">ℹ️ Come funziona</div>
+        <div className="font-semibold mb-2">Come funziona</div>
         <div className="text-xs space-y-1">
-          <div>📌 Per ogni livello aggiungi le contromisure che hai implementato (premi <strong>Invio</strong> o click <strong>Aggiungi</strong>)</div>
-          <div>📌 Il <strong>livello più alto raggiunto</strong> determina la robustezza globale</div>
+          <div>Per ogni livello aggiungi le contromisure che hai implementato (premi <strong>Invio</strong> o click <strong>Aggiungi</strong>).</div>
+          <div>Il <strong>livello più alto raggiunto</strong> determina la robustezza globale.</div>
           <div className="mt-2 pt-2 border-t border-blue-200">
-            <strong>Soglie Lindt:</strong> 🏆 OTTIMO ≥ Liv.4 (Poka Yoke) · ✅ BUONO = Liv.3 · ⚠️ DEBOLE ≤ Liv.2
+            <strong>Soglie Lindt:</strong> OTTIMO &ge; Liv.4 (Poka Yoke) · BUONO = Liv.3 · DEBOLE &le; Liv.2
           </div>
           <div className="mt-1 text-blue-600 italic">
-            💡 Più alta la contromisura, più robusta nel tempo. Punta sempre al massimo livello possibile!
+            Più alta la contromisura, più robusta nel tempo. Punta sempre al massimo livello possibile.
           </div>
         </div>
       </div>
