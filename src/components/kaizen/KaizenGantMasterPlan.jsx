@@ -2,10 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import api from '../../services/api'
 import { Plus, Trash2 } from 'lucide-react'
 
-const CELL_STATES = [
-  { value: 0, label: 'Vuoto', color: '' },
-  { value: 1, label: 'Pianificato', color: '#10b981' },
-  { value: 2, label: 'Completato', color: '#2563eb' },
+const ROW_TYPES = [
+  { id: 'planned', label: 'Pianificato', color: '#10b981' },
+  { id: 'completed', label: 'Completato', color: '#2563eb' },
 ]
 
 // Granularità configurabile dall'utente
@@ -119,16 +118,34 @@ export default function KaizenGantMasterPlan({ kaizen, onSaved, value, onChange 
   }, [data])
 
   // CRUD celle / steps
-  function getCellValue(stepId, year, period) {
-    return data.cells[`${stepId}_${year}_${period}`] || 0
+  function getCellValue(stepId, rowType, year, period) {
+    const key = `${stepId}_${rowType}_${year}_${period}`
+
+    if (Object.prototype.hasOwnProperty.call(data.cells, key)) {
+      return data.cells[key] === true
+    }
+
+    const legacyKey = `${stepId}_${year}_${period}`
+    const legacyValue = data.cells[legacyKey] || 0
+
+    if (rowType === 'planned') {
+      return legacyValue === 1 || legacyValue === 2
+    }
+
+    return legacyValue === 2
   }
-  function cycleCell(stepId, year, period) {
-    const key = `${stepId}_${year}_${period}`
-    const current = data.cells[key] || 0
-    const next = (current + 1) % CELL_STATES.length
+
+  function toggleCell(stepId, rowType, year, period) {
+    const key = `${stepId}_${rowType}_${year}_${period}`
+
     setData(prev => {
+      const currentValue = getCellValue(stepId, rowType, year, period)
       const newCells = { ...prev.cells }
-      newCells[key] = next
+
+      Object.assign(newCells, {
+        !currentValue,
+      })
+
       return { ...prev, cells: newCells }
     })
   }
@@ -276,14 +293,13 @@ export default function KaizenGantMasterPlan({ kaizen, onSaved, value, onChange 
         </div>
 
         <div className="flex gap-3 mt-3 pt-3 border-t text-xs items-center flex-wrap">
-          <span className="font-medium text-gray-600">Stati cella:</span>
-          {CELL_STATES.map(s => (
-            <div key={s.value} className="flex items-center gap-1">
-              <div className="w-4 h-4 border rounded" style={{ backgroundColor: s.color || 'white' }} />
-              <span>{s.label}</span>
+          {ROW_TYPES.map(row => (
+            <div key={row.id} className="flex items-center gap-1">
+              <div className="w-4 h-4 border rounded" style={{ backgroundColor: row.color }} />
+              <span>{row.label}</span>
             </div>
           ))}
-          <span className="ml-auto text-gray-500 italic">Click su cella per cambiare stato</span>
+          <span className="ml-auto text-gray-500 italic">Riga superiore pianificata, riga inferiore completata</span>
         </div>
       </div>
 
@@ -328,6 +344,7 @@ export default function KaizenGantMasterPlan({ kaizen, onSaved, value, onChange 
               <div className="w-12 px-2 py-2 text-sm font-bold text-center border-r flex items-center justify-center bg-blue-50 text-primary">
                 {step.num}
               </div>
+
               <div className="w-80 px-2 py-1 border-r flex items-center">
                 {editingStepId === step.id ? (
                   <input
@@ -348,36 +365,32 @@ export default function KaizenGantMasterPlan({ kaizen, onSaved, value, onChange 
                   </div>
                 )}
               </div>
-              <div className="w-20 px-1 border-r flex items-center justify-center gap-0.5">
-                <button onClick={() => moveStep(step.id, 'up')} disabled={idx === 0} className="text-xs px-1 hover:bg-gray-200 rounded disabled:opacity-30" title="Sposta su">▲</button>
-                <button onClick={() => moveStep(step.id, 'down')} disabled={idx === data.steps.length - 1} className="text-xs px-1 hover:bg-gray-200 rounded disabled:opacity-30" title="Sposta giù">▼</button>
-                <button onClick={() => clearRow(step.id)} className="text-xs px-1 hover:bg-yellow-100 rounded text-yellow-600" title="Pulisci riga">⌫</button>
-                <button onClick={() => removeStep(step.id)} className="p-0.5 hover:bg-red-100 rounded text-red-600" title="Elimina step">
-                  <Trash2 size={11} />
-                </button>
-              </div>
 
-              {/* Celle */}
-              {columns.map((col, ci) => {
-                const val = getCellValue(step.id, col.year, col.period)
-                const state = CELL_STATES[val]
-                return (
-                  <button
-                    key={ci}
-                    onClick={() => cycleCell(step.id, col.year, col.period)}
-                    className="border-r hover:opacity-75 transition-opacity"
-                    style={{
-                      width: CELL_WIDTH,
-                      minWidth: CELL_WIDTH,
-                      backgroundColor: state.color || 'transparent',
-                      minHeight: '32px',
-                    }}
-                    title={`${col.year} ${col.label}: ${state.label}`}
-                  />
-                )
-              })}
-            </div>
-          ))}
+              <div className="w-20 px-1 border-r flex items-center justify-center gap-0.5">
+                <button
+                  onClick={() => moveStep(step.id, 'up')}
+                  disabled={idx === 0}
+                  className="text-xs px-1 hover:bg-gray-200 rounded disabled:opacity-30"
+                  title="Sposta su"
+                >
+                  ▲
+                </button>
+
+                <button
+                  onClick={() => moveStep(step.id, 'down')}
+                  disabled={idx === data.steps.length - 1}
+                  className="text-xs px-1 hover:bg-gray-200 rounded disabled:opacity-30"
+                  title="Sposta giù"
+                >
+                  ▼
+                </button>
+
+                <button
+                  onClick={() => clearRow(step.id)}
+                  className="text-xs px-1 hover:bg-yellow-100 rounded text-yellow-600"
+                  title="Pulisci riga"
+                >
+          
 
           {data.steps.length === 0 && (
             <div className="text-center py-12 text-gray-400">
