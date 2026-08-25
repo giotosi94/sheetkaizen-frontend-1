@@ -29,7 +29,7 @@ const PRIORITA_BG = {
 
 const TIPO_ICONS = {
   Task: CheckSquare,
-  Bug: Bug,
+  Bug,
   Improvement: TrendingUp,
   Audit: Shield,
   Manutenzione: Wrench,
@@ -56,13 +56,9 @@ async function compressImage(file, maxSize = 1280, quality = 0.8) {
         let { width, height } = image
 
         if (width > maxSize || height > maxSize) {
-          if (width > height) {
-            height = Math.round((height * maxSize) / width)
-            width = maxSize
-          } else {
-            width = Math.round((width * maxSize) / height)
-            height = maxSize
-          }
+          const scale = Math.min(maxSize / width, maxSize / height)
+          width = Math.round(width * scale)
+          height = Math.round(height * scale)
         }
 
         const canvas = document.createElement('canvas')
@@ -70,16 +66,13 @@ async function compressImage(file, maxSize = 1280, quality = 0.8) {
         canvas.height = height
 
         const context = canvas.getContext('2d')
-
         if (!context) {
           reject(new Error('Impossibile elaborare l’immagine'))
           return
         }
 
         context.drawImage(image, 0, 0, width, height)
-
-        const dataUrl = canvas.toDataURL('image/jpeg', quality)
-        resolve(dataUrl)
+        resolve(canvas.toDataURL('image/jpeg', quality))
       }
 
       image.onerror = reject
@@ -94,7 +87,6 @@ async function compressImage(file, maxSize = 1280, quality = 0.8) {
 async function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
-
     reader.onload = event => resolve(event.target.result)
     reader.onerror = reject
     reader.readAsDataURL(file)
@@ -123,19 +115,10 @@ export default function ActionPlanDetailPanel({
 
   const { configs } = useAllConfigurations()
   const statiConfig = configs.stato_ap || []
-
-  const statoCorrente = statiConfig.find(
-    stato => stato.label === detail.stato
-  )
-
-  const isLocked = Boolean(
-    statoCorrente && statoCorrente.is_terminal
-  )
-
+  const statoCorrente = statiConfig.find(stato => stato.label === detail.stato)
+  const isLocked = Boolean(statoCorrente?.is_terminal)
   const statoRiapertura =
-    statiConfig.find(
-      stato => stato.label === 'Aperto' && !stato.is_terminal
-    )?.label ||
+    statiConfig.find(stato => stato.label === 'Aperto' && !stato.is_terminal)?.label ||
     statiConfig.find(stato => !stato.is_terminal)?.label ||
     'Aperto'
 
@@ -149,49 +132,27 @@ export default function ActionPlanDetailPanel({
   useEffect(() => {
     return () => {
       if (streamRef.current) {
-        streamRef.current
-          .getTracks()
-          .forEach(track => track.stop())
-
+        streamRef.current.getTracks().forEach(track => track.stop())
         streamRef.current = null
       }
     }
   }, [])
 
   async function reload() {
-    const response = await api.get(
-      `/action-plans/${plan._id}`
-    )
-
+    const response = await api.get(`/action-plans/${plan._id}`)
     setDetail(response.data)
     onUpdated?.()
   }
 
   async function riapriAP() {
-    if (
-      !confirm(
-        `Riaprire questo Action Plan?\nLo stato tornerà a "${statoRiapertura}".`
-      )
-    ) {
-      return
-    }
+    if (!confirm(`Riaprire questo Action Plan?\nLo stato tornerà a "${statoRiapertura}".`)) return
 
     try {
-      await api.patch(
-        `/action-plans/${plan._id}/stato`,
-        {
-          stato: statoRiapertura,
-        }
-      )
-
+      await api.patch(`/action-plans/${plan._id}/stato`, { stato: statoRiapertura })
       await reload()
     } catch (error) {
       console.error(error)
-
-      alert(
-        'Errore durante la riapertura: ' +
-        (error.response?.data?.detail || error.message)
-      )
+      alert('Errore durante la riapertura: ' + (error.response?.data?.detail || error.message))
     }
   }
 
@@ -199,23 +160,15 @@ export default function ActionPlanDetailPanel({
     if (!nuovoCommento.trim()) return
 
     try {
-      await api.post(
-        `/action-plans/${plan._id}/commenti`,
-        {
-          testo: nuovoCommento,
-          autore: 'Default User',
-        }
-      )
-
+      await api.post(`/action-plans/${plan._id}/commenti`, {
+        testo: nuovoCommento,
+        autore: 'Default User',
+      })
       setNuovoCommento('')
       await reload()
     } catch (error) {
       console.error(error)
-
-      alert(
-        'Errore durante l’aggiunta del commento: ' +
-        (error.response?.data?.detail || error.message)
-      )
+      alert('Errore durante l’aggiunta del commento: ' + (error.response?.data?.detail || error.message))
     }
   }
 
@@ -223,178 +176,106 @@ export default function ActionPlanDetailPanel({
     if (!nuovoChecklistItem.trim()) return
 
     try {
-      await api.post(
-        `/action-plans/${plan._id}/checklist`,
-        {
-          testo: nuovoChecklistItem,
-        }
-      )
-
+      await api.post(`/action-plans/${plan._id}/checklist`, { testo: nuovoChecklistItem })
       setNuovoChecklistItem('')
       await reload()
     } catch (error) {
       console.error(error)
-
-      alert(
-        'Errore durante l’aggiunta dell’item: ' +
-        (error.response?.data?.detail || error.message)
-      )
+      alert('Errore durante l’aggiunta dell’item: ' + (error.response?.data?.detail || error.message))
     }
   }
 
   async function toggleChecklist(itemId, completato) {
     try {
-      await api.patch(
-        `/action-plans/${plan._id}/checklist/${itemId}`,
-        {
-          completato,
-        }
-      )
-
+      await api.patch(`/action-plans/${plan._id}/checklist/${itemId}`, { completato })
       await reload()
     } catch (error) {
       console.error(error)
-
-      alert(
-        'Errore durante l’aggiornamento della checklist: ' +
-        (error.response?.data?.detail || error.message)
-      )
+      alert('Errore durante l’aggiornamento della checklist: ' + (error.response?.data?.detail || error.message))
     }
   }
 
   async function removeChecklist(itemId) {
     try {
-      await api.delete(
-        `/action-plans/${plan._id}/checklist/${itemId}`
-      )
-
+      await api.delete(`/action-plans/${plan._id}/checklist/${itemId}`)
       await reload()
     } catch (error) {
       console.error(error)
-
-      alert(
-        'Errore durante la rimozione dell’item: ' +
-        (error.response?.data?.detail || error.message)
-      )
+      alert('Errore durante la rimozione dell’item: ' + (error.response?.data?.detail || error.message))
     }
   }
 
   async function changeStato(stato) {
     try {
-      await api.patch(
-        `/action-plans/${plan._id}/stato`,
-        {
-          stato,
-        }
-      )
-
+      await api.patch(`/action-plans/${plan._id}/stato`, { stato })
       await reload()
     } catch (error) {
       console.error(error)
-
-      alert(
-        'Errore durante il cambio stato: ' +
-        (error.response?.data?.detail || error.message)
-      )
+      alert('Errore durante il cambio stato: ' + (error.response?.data?.detail || error.message))
     }
   }
 
-  async function uploadActionPlanFile(
-    file,
-    currentAttachmentCount
-  ) {
+  async function uploadActionPlanFile(file, currentAttachmentCount) {
     if (currentAttachmentCount >= 10) {
       alert('Massimo 10 allegati per Action Plan')
       return false
     }
 
+    const lowerName = file.name.toLowerCase()
     const isImage = file.type.startsWith('image/')
-    const isPdf = file.type === 'application/pdf'
-
-    const isWord =
-      file.type.includes('word') ||
-      file.name.toLowerCase().endsWith('.doc') ||
-      file.name.toLowerCase().endsWith('.docx')
-
+    const isPdf = file.type === 'application/pdf' || lowerName.endsWith('.pdf')
+    const isWord = file.type.includes('word') || lowerName.endsWith('.doc') || lowerName.endsWith('.docx')
     const isExcel =
       file.type.includes('excel') ||
       file.type.includes('sheet') ||
-      file.name.toLowerCase().endsWith('.xls') ||
-      file.name.toLowerCase().endsWith('.xlsx')
+      lowerName.endsWith('.xls') ||
+      lowerName.endsWith('.xlsx')
 
     if (!isImage && !isPdf && !isWord && !isExcel) {
-      alert(
-        `Tipo file non supportato: ${file.name}\nSupportati: immagini, PDF, Word ed Excel`
-      )
-
+      alert(`Tipo file non supportato: ${file.name}\nSupportati: immagini, PDF, Word ed Excel`)
       return false
     }
 
-    const maxBytes = isImage
-      ? 10 * 1024 * 1024
-      : 2 * 1024 * 1024
-
+    const maxBytes = isImage ? 10 * 1024 * 1024 : 2 * 1024 * 1024
     if (file.size > maxBytes) {
       alert(
         `File troppo grande: ${file.name}\nMassimo consentito: ${
-          isImage
-            ? '10 MB per le immagini'
-            : '2 MB per i documenti'
+          isImage ? '10 MB per le immagini' : '2 MB per i documenti'
         }`
       )
-
       return false
     }
 
-    const base64Data = isImage
-      ? await compressImage(file)
-      : await fileToBase64(file)
-
+    const base64Data = isImage ? await compressImage(file) : await fileToBase64(file)
     const base64Content =
-      typeof base64Data === 'string' &&
-      base64Data.includes(',')
+      typeof base64Data === 'string' && base64Data.includes(',')
         ? base64Data.split(',')[1]
         : base64Data
+    const dimensioneFinale = Math.round((base64Content.length * 3) / 4)
 
-    const dimensioneFinale = Math.round(
-      (base64Content.length * 3) / 4
-    )
-
-    await api.post(
-      `/action-plans/${plan._id}/allegati`,
-      {
-        nome: file.name,
-        tipo: file.type || 'application/octet-stream',
-        dimensione: dimensioneFinale,
-        data: base64Data,
-        autore: 'Default User',
-      }
-    )
+    await api.post(`/action-plans/${plan._id}/allegati`, {
+      nome: file.name,
+      tipo: file.type || 'application/octet-stream',
+      dimensione: dimensioneFinale,
+      data: base64Data,
+      autore: 'Default User',
+    })
 
     return true
   }
 
   async function handleFileUpload(event) {
-    const files = Array.from(
-      event.target.files || []
-    )
-
+    const files = Array.from(event.target.files || [])
     if (files.length === 0) return
 
-    const availableSlots =
-      10 - (detail.allegati || []).length
-
+    const availableSlots = 10 - (detail.allegati || []).length
     if (availableSlots <= 0) {
       alert('Massimo 10 allegati per Action Plan')
       event.target.value = ''
       return
     }
 
-    const selectedFiles = files.slice(
-      0,
-      availableSlots
-    )
-
+    const selectedFiles = files.slice(0, availableSlots)
     if (files.length > availableSlots) {
       alert(
         `Puoi aggiungere ancora ${availableSlots} allegati. Verranno caricati soltanto i primi ${availableSlots} file.`
@@ -404,29 +285,17 @@ export default function ActionPlanDetailPanel({
     setUploadingAllegato(true)
 
     try {
-      let currentAttachmentCount =
-        (detail.allegati || []).length
+      let currentAttachmentCount = (detail.allegati || []).length
 
       for (const file of selectedFiles) {
-        const uploaded =
-          await uploadActionPlanFile(
-            file,
-            currentAttachmentCount
-          )
-
-        if (uploaded) {
-          currentAttachmentCount += 1
-        }
+        const uploaded = await uploadActionPlanFile(file, currentAttachmentCount)
+        if (uploaded) currentAttachmentCount += 1
       }
 
       await reload()
     } catch (error) {
       console.error(error)
-
-      alert(
-        'Errore durante il caricamento: ' +
-        (error.response?.data?.detail || error.message)
-      )
+      alert('Errore durante il caricamento: ' + (error.response?.data?.detail || error.message))
     } finally {
       setUploadingAllegato(false)
       event.target.value = ''
@@ -435,26 +304,17 @@ export default function ActionPlanDetailPanel({
 
   function stopCamera() {
     if (streamRef.current) {
-      streamRef.current
-        .getTracks()
-        .forEach(track => track.stop())
-
+      streamRef.current.getTracks().forEach(track => track.stop())
       streamRef.current = null
     }
 
-    if (videoRef.current) {
-      videoRef.current.srcObject = null
-    }
-
+    if (videoRef.current) videoRef.current.srcObject = null
     setCameraReady(false)
   }
 
   async function openCamera() {
     if (!navigator.mediaDevices?.getUserMedia) {
-      alert(
-        'La fotocamera non è supportata dal dispositivo o dal browser.'
-      )
-
+      alert('La fotocamera non è supportata dal dispositivo o dal browser.')
       return
     }
 
@@ -465,63 +325,37 @@ export default function ActionPlanDetailPanel({
 
     try {
       stopCamera()
-
       let stream
 
       try {
-        stream =
-          await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: {
-                ideal: 'environment',
-              },
-            },
-            audio: false,
-          })
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false,
+        })
       } catch {
-        stream =
-          await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: false,
-          })
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
       }
 
       streamRef.current = stream
       setShowCamera(true)
 
       window.setTimeout(() => {
-        if (
-          videoRef.current &&
-          streamRef.current
-        ) {
-          videoRef.current.srcObject =
-            streamRef.current
-
-          videoRef.current
-            .play()
-            .catch(() => {})
+        if (videoRef.current && streamRef.current) {
+          videoRef.current.srcObject = streamRef.current
+          videoRef.current.play().catch(() => {})
         }
       }, 100)
     } catch (error) {
       console.error(error)
-
       stopCamera()
       setShowCamera(false)
 
       if (error.name === 'NotAllowedError') {
-        alert(
-          'Accesso alla fotocamera non autorizzato. Abilita il permesso nelle impostazioni del browser.'
-        )
-      } else if (
-        error.name === 'NotFoundError'
-      ) {
-        alert(
-          'Nessuna fotocamera disponibile sul dispositivo.'
-        )
+        alert('Accesso alla fotocamera non autorizzato. Abilita il permesso nelle impostazioni del browser.')
+      } else if (error.name === 'NotFoundError') {
+        alert('Nessuna fotocamera disponibile sul dispositivo.')
       } else {
-        alert(
-          'Impossibile accedere alla fotocamera.'
-        )
+        alert('Impossibile accedere alla fotocamera.')
       }
     }
   }
@@ -534,35 +368,18 @@ export default function ActionPlanDetailPanel({
   function takePhoto() {
     const video = videoRef.current
 
-    if (
-      !video ||
-      !video.videoWidth ||
-      !video.videoHeight
-    ) {
-      alert(
-        'La fotocamera non è ancora pronta.'
-      )
-
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      alert('La fotocamera non è ancora pronta.')
       return
     }
 
-    const canvas =
-      document.createElement('canvas')
-
+    const canvas = document.createElement('canvas')
     const maxDimension = 1280
-
     let width = video.videoWidth
     let height = video.videoHeight
 
-    if (
-      width > maxDimension ||
-      height > maxDimension
-    ) {
-      const scale = Math.min(
-        maxDimension / width,
-        maxDimension / height
-      )
-
+    if (width > maxDimension || height > maxDimension) {
+      const scale = Math.min(maxDimension / width, maxDimension / height)
       width = Math.round(width * scale)
       height = Math.round(height * scale)
     }
@@ -571,63 +388,35 @@ export default function ActionPlanDetailPanel({
     canvas.height = height
 
     const context = canvas.getContext('2d')
-
     if (!context) {
-      alert(
-        'Impossibile elaborare la fotografia.'
-      )
-
+      alert('Impossibile elaborare la fotografia.')
       return
     }
 
-    context.drawImage(
-      video,
-      0,
-      0,
-      width,
-      height
-    )
+    context.drawImage(video, 0, 0, width, height)
 
     canvas.toBlob(
       async blob => {
         if (!blob) {
-          alert(
-            'Impossibile acquisire la fotografia.'
-          )
-
+          alert('Impossibile acquisire la fotografia.')
           return
         }
 
-        const file = new File(
-          [blob],
-          `action_plan_${Date.now()}.jpg`,
-          {
-            type: 'image/jpeg',
-          }
-        )
+        const file = new File([blob], `action_plan_${Date.now()}.jpg`, {
+          type: 'image/jpeg',
+        })
 
         closeCamera()
         setUploadingAllegato(true)
 
         try {
-          const uploaded =
-            await uploadActionPlanFile(
-              file,
-              (detail.allegati || []).length
-            )
-
-          if (uploaded) {
-            await reload()
-          }
+          const uploaded = await uploadActionPlanFile(file, (detail.allegati || []).length)
+          if (uploaded) await reload()
         } catch (error) {
           console.error(error)
-
           alert(
             'Errore durante il caricamento della fotografia: ' +
-            (
-              error.response?.data?.detail ||
-              error.message
-            )
+              (error.response?.data?.detail || error.message)
           )
         } finally {
           setUploadingAllegato(false)
@@ -638,66 +427,27 @@ export default function ActionPlanDetailPanel({
     )
   }
 
-  async function removeAllegato(
-    allegatoId,
-    nome
-  ) {
-    if (
-      !confirm(
-        `Eliminare l'allegato "${nome}"?`
-      )
-    ) {
-      return
-    }
+  async function removeAllegato(allegatoId, nome) {
+    if (!confirm(`Eliminare l'allegato "${nome}"?`)) return
 
     try {
-      await api.delete(
-        `/action-plans/${plan._id}/allegati/${allegatoId}`
-      )
-
+      await api.delete(`/action-plans/${plan._id}/allegati/${allegatoId}`)
       await reload()
     } catch (error) {
       console.error(error)
-
-      alert(
-        'Errore durante l’eliminazione: ' +
-        (error.response?.data?.detail || error.message)
-      )
+      alert('Errore durante l’eliminazione: ' + (error.response?.data?.detail || error.message))
     }
   }
 
-  const TipoIcon =
-    TIPO_ICONS[detail.tipo] || CheckSquare
-
-  const checklistCompletati =
-    detail.checklist?.filter(
-      item => item.completato
-    ).length || 0
-
-  const checklistTotali =
-    detail.checklist?.length || 0
-
-  const checklistPercent =
-    checklistTotali > 0
-      ? Math.round(
-          (
-            checklistCompletati /
-            checklistTotali
-          ) * 100
-        )
-      : 0
-
+  const TipoIcon = TIPO_ICONS[detail.tipo] || CheckSquare
+  const checklistCompletati = detail.checklist?.filter(item => item.completato).length || 0
+  const checklistTotali = detail.checklist?.length || 0
+  const checklistPercent = checklistTotali
+    ? Math.round((checklistCompletati / checklistTotali) * 100)
+    : 0
   const allegati = detail.allegati || []
-
-  const immagini = allegati.filter(
-    allegato =>
-      allegato.tipo?.startsWith('image/')
-  )
-
-  const documenti = allegati.filter(
-    allegato =>
-      !allegato.tipo?.startsWith('image/')
-  )
+  const immagini = allegati.filter(allegato => allegato.tipo?.startsWith('image/'))
+  const documenti = allegati.filter(allegato => !allegato.tipo?.startsWith('image/'))
 
   return (
     <Modal>
@@ -708,25 +458,16 @@ export default function ActionPlanDetailPanel({
               <TipoIcon size={16} />
               <span>{detail.tipo}</span>
               <span>·</span>
-              <span className="font-mono">
-                {detail.numero}
-              </span>
+              <span className="font-mono">{detail.numero}</span>
             </div>
-
-            <h2 className="text-xl font-bold">
-              {detail.titolo}
-            </h2>
+            <h2 className="text-xl font-bold">{detail.titolo}</h2>
           </div>
 
           {isLocked && (
             <div className="bg-yellow-50 border-l-4 border-yellow-400 px-4 py-3 flex items-center justify-between gap-3">
               <div className="text-sm text-yellow-900">
-                <strong>
-                  Action Plan chiuso
-                </strong>
-                {' '}· Modalità sola lettura. Per modificarlo, riapri l’Action Plan.
+                <strong>Action Plan chiuso</strong> · Modalità sola lettura. Per modificarlo, riapri l’Action Plan.
               </div>
-
               <button
                 type="button"
                 onClick={riapriAP}
@@ -741,137 +482,82 @@ export default function ActionPlanDetailPanel({
             <Section title="Descrizione">
               {detail.descrizione ? (
                 <div className="bg-gray-50 p-3 rounded text-sm whitespace-pre-wrap">
-                  {renderWithMentionsTags(
-                    detail.descrizione
-                  )}
+                  {renderWithMentionsTags(detail.descrizione)}
                 </div>
               ) : (
-                <div className="text-sm text-gray-400 italic">
-                  Nessuna descrizione
-                </div>
+                <div className="text-sm text-gray-400 italic">Nessuna descrizione</div>
               )}
             </Section>
 
-            {(
-              detail.tags?.length > 0 ||
-              detail.mentions?.length > 0
-            ) && (
+            {(detail.tags?.length > 0 || detail.mentions?.length > 0) && (
               <Section title="Tags & Mentions">
                 <div className="flex flex-wrap gap-2">
                   {detail.tags?.map(tag => (
-                    <span
-                      key={tag}
-                      className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs"
-                    >
+                    <span key={tag} className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs">
                       #{tag}
                     </span>
                   ))}
-
-                  {detail.mentions?.map(
-                    mention => (
-                      <span
-                        key={mention}
-                        className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs flex items-center gap-1"
-                      >
-                        <AtSign size={10} />
-                        {mention}
-                      </span>
-                    )
-                  )}
+                  {detail.mentions?.map(mention => (
+                    <span
+                      key={mention}
+                      className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs flex items-center gap-1"
+                    >
+                      <AtSign size={10} />
+                      {mention}
+                    </span>
+                  ))}
                 </div>
               </Section>
             )}
 
-            <Section
-              title={`Checklist ${
-                checklistTotali > 0
-                  ? `(${checklistCompletati}/${checklistTotali})`
-                  : ''
-              }`}
-            >
+            <Section title={`Checklist ${checklistTotali ? `(${checklistCompletati}/${checklistTotali})` : ''}`}>
               {checklistTotali > 0 && (
                 <div className="mb-2">
                   <div className="w-full bg-gray-200 rounded-full h-1.5">
                     <div
                       className="bg-green-500 h-1.5 rounded-full transition-all"
-                      style={{
-                        width: `${checklistPercent}%`,
-                      }}
+                      style={{ width: `${checklistPercent}%` }}
                     />
                   </div>
                 </div>
               )}
 
               <div className="space-y-1">
-                {(detail.checklist || []).map(
-                  item => (
-                    <div
-                      key={item.id}
-                      className="flex items-center gap-2 group"
+                {(detail.checklist || []).map(item => (
+                  <div key={item.id} className="flex items-center gap-2 group">
+                    <button
+                      type="button"
+                      onClick={() => toggleChecklist(item.id, !item.completato)}
+                      disabled={isLocked}
+                      className={isLocked ? 'cursor-not-allowed' : ''}
                     >
+                      {item.completato ? (
+                        <CheckSquare size={18} className="text-green-600" />
+                      ) : (
+                        <Square size={18} className="text-gray-400" />
+                      )}
+                    </button>
+                    <span className={`flex-1 text-sm ${item.completato ? 'line-through text-gray-400' : ''}`}>
+                      {item.testo}
+                    </span>
+                    {!isLocked && (
                       <button
                         type="button"
-                        onClick={() =>
-                          toggleChecklist(
-                            item.id,
-                            !item.completato
-                          )
-                        }
-                        disabled={isLocked}
-                        className={
-                          isLocked
-                            ? 'cursor-not-allowed'
-                            : ''
-                        }
+                        onClick={() => removeChecklist(item.id)}
+                        className="opacity-0 group-hover:opacity-100 text-red-500"
                       >
-                        {item.completato ? (
-                          <CheckSquare
-                            size={18}
-                            className="text-green-600"
-                          />
-                        ) : (
-                          <Square
-                            size={18}
-                            className="text-gray-400"
-                          />
-                        )}
+                        <Trash2 size={14} />
                       </button>
-
-                      <span
-                        className={`flex-1 text-sm ${
-                          item.completato
-                            ? 'line-through text-gray-400'
-                            : ''
-                        }`}
-                      >
-                        {item.testo}
-                      </span>
-
-                      {!isLocked && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            removeChecklist(item.id)
-                          }
-                          className="opacity-0 group-hover:opacity-100 text-red-500"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                  )
-                )}
+                    )}
+                  </div>
+                ))}
               </div>
 
               {!isLocked && (
                 <div className="flex gap-2 mt-2">
                   <input
                     value={nuovoChecklistItem}
-                    onChange={event =>
-                      setNuovoChecklistItem(
-                        event.target.value
-                      )
-                    }
+                    onChange={event => setNuovoChecklistItem(event.target.value)}
                     onKeyDown={event => {
                       if (event.key === 'Enter') {
                         event.preventDefault()
@@ -881,7 +567,6 @@ export default function ActionPlanDetailPanel({
                     placeholder="Aggiungi item..."
                     className="flex-1 border rounded px-3 py-1.5 text-sm"
                   />
-
                   <button
                     type="button"
                     onClick={addChecklistItem}
@@ -893,33 +578,21 @@ export default function ActionPlanDetailPanel({
               )}
             </Section>
 
-            <Section
-              title={`Allegati ${
-                allegati.length > 0
-                  ? `(${allegati.length}/10)`
-                  : ''
-              }`}
-            >
+            <Section title={`Allegati ${allegati.length ? `(${allegati.length}/10)` : ''}`}>
               {immagini.length > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
                   {immagini.map(image => (
-                    <div
-                    <div
-                      key={image.id}
-                      className="relative group"
-                    >
-                      {image.data} => setLightboxImg(image)}
+                    <div key={image.id} className="relative group">
+                      <img
+                        src={image.data}
+                        alt={image.nome}
+                        className="w-full h-24 object-cover rounded border cursor-pointer hover:opacity-80"
+                        onClick={() => setLightboxImg(image)}
                       />
-
                       {!isLocked && (
                         <button
                           type="button"
-                          onClick={() =>
-                            removeAllegato(
-                              image.id,
-                              image.nome
-                            )
-                          }
+                          onClick={() => removeAllegato(image.id, image.nome)}
                           className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                           title="Elimina immagine"
                         >
@@ -938,34 +611,21 @@ export default function ActionPlanDetailPanel({
                       key={documento.id}
                       className="flex items-center gap-2 p-2 bg-gray-50 rounded text-sm group"
                     >
-                      <FileText
-                        size={16}
-                        className="text-gray-500 flex-shrink-0"
-                      />
+                      <FileText size={16} className="text-gray-500 flex-shrink-0" />
                       <a
-                      {documento.data}
+                        href={documento.data}
+                        download={documento.nome}
+                        className="flex-1 truncate text-blue-600 hover:underline"
+                      >
                         {documento.nome}
                       </a>
-
                       <span className="text-xs text-gray-400">
-
-                        {documento.dimensione
-                          ? `${(
-                              documento.dimensione /
-                              1024
-                            ).toFixed(0)} KB`
-                          : ''}
+                        {documento.dimensione ? `${(documento.dimensione / 1024).toFixed(0)} KB` : ''}
                       </span>
-
                       {!isLocked && (
                         <button
                           type="button"
-                          onClick={() =>
-                            removeAllegato(
-                              documento.id,
-                              documento.nome
-                            )
-                          }
+                          onClick={() => removeAllegato(documento.id, documento.nome)}
                           className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-red-500"
                           title="Elimina documento"
                         >
@@ -978,112 +638,69 @@ export default function ActionPlanDetailPanel({
               )}
 
               {allegati.length === 0 && (
-                <div className="text-sm text-gray-400 italic mb-3">
-                  Nessun allegato
-                </div>
+                <div className="text-sm text-gray-400 italic mb-3">Nessun allegato</div>
               )}
 
-              {allegati.length < 10 &&
-                !isLocked && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <label className="flex items-center justify-center gap-2 px-3 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 hover:border-primary text-sm text-gray-600 transition-colors">
-                      <Paperclip size={16} />
-
-                      {uploadingAllegato
-                        ? 'Caricamento...'
-                        : 'Aggiungi file'}
-
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
-                        onChange={
-                          handleFileUpload
-                        }
-                        disabled={
-                          uploadingAllegato
-                        }
-                        className="hidden"
-                      />
-                    </label>
-
-                    <button
-                      type="button"
-                      onClick={openCamera}
-                      disabled={
-                        uploadingAllegato
-                      }
-                      className="flex items-center justify-center gap-2 px-3 py-3 border-2 border-dashed border-primary rounded-lg hover:bg-yellow-50 text-sm text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Camera size={16} />
-                      Scatta foto
-                    </button>
-                  </div>
-                )}
+              {allegati.length < 10 && !isLocked && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <label className="flex items-center justify-center gap-2 px-3 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 hover:border-primary text-sm text-gray-600 transition-colors">
+                    <Paperclip size={16} />
+                    {uploadingAllegato ? 'Caricamento...' : 'Aggiungi file'}
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                      onChange={handleFileUpload}
+                      disabled={uploadingAllegato}
+                      className="hidden"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={openCamera}
+                    disabled={uploadingAllegato}
+                    className="flex items-center justify-center gap-2 px-3 py-3 border-2 border-dashed border-primary rounded-lg hover:bg-yellow-50 text-sm text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Camera size={16} />
+                    Scatta foto
+                  </button>
+                </div>
+              )}
 
               {uploadingAllegato && (
                 <div className="mt-3">
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
                     <div className="h-full w-1/2 rounded-full bg-primary animate-pulse" />
                   </div>
-
-                  <div className="text-xs text-gray-500 mt-1">
-                    Caricamento allegato in corso...
-                  </div>
+                  <div className="text-xs text-gray-500 mt-1">Caricamento allegato in corso...</div>
                 </div>
               )}
             </Section>
 
-            <Section
-              title={`Commenti (${
-                detail.commenti?.length || 0
-              })`}
-            >
+            <Section title={`Commenti (${detail.commenti?.length || 0})`}>
               <div className="space-y-3 mb-3">
                 {(detail.commenti || [])
                   .slice()
                   .reverse()
                   .map(commento => (
-                    <div
-                      key={commento.id}
-                      className="flex gap-2"
-                    >
-                      <Avatar
-                        name={commento.autore}
-                        size={32}
-                      />
-
+                    <div key={commento.id} className="flex gap-2">
+                      <Avatar name={commento.autore} size={32} />
                       <div className="flex-1 bg-gray-50 p-3 rounded-lg">
                         <div className="flex justify-between items-center gap-3 mb-1">
-                          <strong className="text-sm">
-                            {commento.autore}
-                          </strong>
-
+                          <strong className="text-sm">{commento.autore}</strong>
                           <span className="text-xs text-gray-400">
-                            {new Date(
-                              commento.timestamp
-                            ).toLocaleString(
-                              'it-IT'
-                            )}
+                            {new Date(commento.timestamp).toLocaleString('it-IT')}
                           </span>
                         </div>
-
                         <div className="text-sm whitespace-pre-wrap">
-                          {renderWithMentionsTags(
-                            commento.testo
-                          )}
+                          {renderWithMentionsTags(commento.testo)}
                         </div>
                       </div>
                     </div>
                   ))}
 
-                {(
-                  !detail.commenti ||
-                  detail.commenti.length === 0
-                ) && (
-                  <div className="text-sm text-gray-400 italic">
-                    Nessun commento
-                  </div>
+                {(!detail.commenti || detail.commenti.length === 0) && (
+                  <div className="text-sm text-gray-400 italic">Nessun commento</div>
                 )}
               </div>
 
@@ -1091,16 +708,11 @@ export default function ActionPlanDetailPanel({
                 <div className="flex gap-2">
                   <textarea
                     value={nuovoCommento}
-                    onChange={event =>
-                      setNuovoCommento(
-                        event.target.value
-                      )
-                    }
+                    onChange={event => setNuovoCommento(event.target.value)}
                     placeholder="Scrivi un commento"
                     rows={2}
                     className="flex-1 border rounded-lg px-3 py-2 text-sm"
                   />
-
                   <button
                     type="button"
                     onClick={addCommento}
@@ -1116,67 +728,48 @@ export default function ActionPlanDetailPanel({
 
         <div className="overflow-y-auto bg-gray-50 p-4 space-y-4">
           <div className="flex justify-between items-center pb-2 border-b">
-            <span className="text-sm font-medium">
-              Dettagli
-            </span>
-
+            <span className="text-sm font-medium">Dettagli</span>
             <div className="flex gap-1">
-              {!isLocked &&
-                !detail.is_cancelled &&
-                onCancel && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onCancel(detail)
-                    }
-                    className="p-1.5 hover:bg-orange-100 rounded text-orange-600"
-                    title="Annulla"
-                  >
-                    <AlertCircle size={14} />
-                  </button>
-                )}
-
-              {!isLocked &&
-                detail.is_cancelled &&
-                onRestore && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onRestore(detail)
-                    }
-                    className="p-1.5 hover:bg-green-100 rounded text-green-600"
-                    title="Ripristina"
-                  >
-                    ↺
-                  </button>
-                )}
-
+              {!isLocked && !detail.is_cancelled && onCancel && (
+                <button
+                  type="button"
+                  onClick={() => onCancel(detail)}
+                  className="p-1.5 hover:bg-orange-100 rounded text-orange-600"
+                  title="Annulla"
+                >
+                  <AlertCircle size={14} />
+                </button>
+              )}
+              {!isLocked && detail.is_cancelled && onRestore && (
+                <button
+                  type="button"
+                  onClick={() => onRestore(detail)}
+                  className="p-1.5 hover:bg-green-100 rounded text-green-600"
+                  title="Ripristina"
+                >
+                  ↺
+                </button>
+              )}
               {!isLocked && onDelete && (
                 <button
                   type="button"
-                  onClick={() =>
-                    onDelete(detail._id)
-                  }
+                  onClick={() => onDelete(detail._id)}
                   className="p-1.5 hover:bg-red-100 rounded text-red-600"
                   title="Elimina"
                 >
                   <Trash2 size={14} />
                 </button>
               )}
-
               {!isLocked && onEdit && (
                 <button
                   type="button"
-                  onClick={() =>
-                    onEdit(detail)
-                  }
+                  onClick={() => onEdit(detail)}
                   className="p-1.5 hover:bg-gray-200 rounded"
                   title="Modifica"
                 >
                   <Edit2 size={14} />
                 </button>
               )}
-
               <button
                 type="button"
                 onClick={onClose}
@@ -1190,24 +783,14 @@ export default function ActionPlanDetailPanel({
 
           {detail.is_cancelled && (
             <div className="bg-red-100 border border-red-300 rounded p-2 text-xs">
-              <div className="font-bold text-red-800 mb-1">
-                Action Plan annullato
-              </div>
-
+              <div className="font-bold text-red-800 mb-1">Action Plan annullato</div>
               {detail.cancelled_reason && (
-                <div className="text-red-700 italic">
-                  “{detail.cancelled_reason}”
-                </div>
+                <div className="text-red-700 italic">“{detail.cancelled_reason}”</div>
               )}
-
               {detail.cancelled_at && (
                 <div className="text-red-600 mt-1">
-                  {new Date(
-                    detail.cancelled_at
-                  ).toLocaleDateString('it-IT')}
-
-                  {detail.cancelled_by &&
-                    ` da ${detail.cancelled_by}`}
+                  {new Date(detail.cancelled_at).toLocaleDateString('it-IT')}
+                  {detail.cancelled_by && ` da ${detail.cancelled_by}`}
                 </div>
               )}
             </div>
@@ -1216,27 +799,15 @@ export default function ActionPlanDetailPanel({
           <SidebarRow label="Stato">
             <select
               value={detail.stato || ''}
-              onChange={event =>
-                changeStato(
-                  event.target.value
-                )
-              }
+              onChange={event => changeStato(event.target.value)}
               disabled={isLocked}
               className="text-xs px-2 py-1 rounded border bg-gray-100 text-gray-700 border-gray-300 disabled:opacity-60"
             >
               {statiConfig.length === 0 ? (
-                <option
-                  value={detail.stato || ''}
-                >
-                  {detail.stato ||
-                    'Configura stati'}
-                </option>
+                <option value={detail.stato || ''}>{detail.stato || 'Configura stati'}</option>
               ) : (
                 statiConfig.map(stato => (
-                  <option
-                    key={stato._id}
-                    value={stato.label}
-                  >
+                  <option key={stato._id} value={stato.label}>
                     {stato.label}
                   </option>
                 ))
@@ -1245,26 +816,14 @@ export default function ActionPlanDetailPanel({
           </SidebarRow>
 
           <SidebarRow label="Priorità">
-            <span
-              className={`px-2 py-0.5 rounded text-xs ${
-                PRIORITA_BG[
-                  detail.priorita
-                ] || ''
-              }`}
-            >
+            <span className={`px-2 py-0.5 rounded text-xs ${PRIORITA_BG[detail.priorita] || ''}`}>
               {detail.priorita || '—'}
             </span>
           </SidebarRow>
 
           {detail.tipo && (
             <SidebarRow label="Tipo">
-              <span
-                className={`text-xs flex items-center gap-1 ${
-                  TIPO_COLORS[
-                    detail.tipo
-                  ] || ''
-                }`}
-              >
+              <span className={`text-xs flex items-center gap-1 ${TIPO_COLORS[detail.tipo] || ''}`}>
                 <TipoIcon size={12} />
                 {detail.tipo}
               </span>
@@ -1274,161 +833,89 @@ export default function ActionPlanDetailPanel({
           <SidebarRow label="Responsabile">
             {detail.responsabile ? (
               <div className="flex items-center gap-1">
-                <Avatar
-                  name={detail.responsabile}
-                  size={20}
-                />
-
-                <span className="text-xs">
-                  {detail.responsabile}
-                </span>
+                <Avatar name={detail.responsabile} size={20} />
+                <span className="text-xs">{detail.responsabile}</span>
               </div>
             ) : (
-              <span className="text-xs text-gray-400">
-                —
-              </span>
+              <span className="text-xs text-gray-400">—</span>
             )}
           </SidebarRow>
 
           <SidebarRow label="Reporter">
-            <span className="text-xs">
-              {detail.reporter || '—'}
-            </span>
+            <span className="text-xs">{detail.reporter || '—'}</span>
           </SidebarRow>
 
           <SidebarRow label="Scadenza">
-            <span
-              className={`text-xs ${
-                detail.stato_visuale ===
-                'In Ritardo'
-                  ? 'text-red-600 font-bold'
-                  : ''
-              }`}
-            >
+            <span className={`text-xs ${detail.stato_visuale === 'In Ritardo' ? 'text-red-600 font-bold' : ''}`}>
               {detail.data_scadenza
-                ? new Date(
-                    detail.data_scadenza
-                  ).toLocaleDateString(
-                    'it-IT'
-                  )
+                ? new Date(detail.data_scadenza).toLocaleDateString('it-IT')
                 : '—'}
             </span>
           </SidebarRow>
 
           <SidebarRow label="Categoria Perdita">
             <span className="text-xs">
-              {detail.categoria_perdita ||
-                detail.tipo_perdita ||
-                '—'}
+              {detail.categoria_perdita || detail.tipo_perdita || '—'}
             </span>
           </SidebarRow>
 
-          {detail.parent_type &&
-            detail.parent_type !==
-              'standalone' && (
-              <SidebarRow label="Collegato a">
-                <div className="text-xs text-right">
-                  <span
-                    className={`px-2 py-0.5 rounded ${
-                      detail.parent_type ===
-                      'pillar'
-                        ? 'bg-indigo-100 text-indigo-700'
-                        : detail.parent_type ===
-                            'kaizen'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : detail.parent_type ===
-                              'dashboard'
-                            ? 'bg-purple-100 text-purple-700'
-                            : 'bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    {detail.parent_type ===
-                      'pillar' && 'Pillar'}
-
-                    {detail.parent_type ===
-                      'kaizen' && 'Kaizen'}
-
-                    {detail.parent_type ===
-                      'dashboard' &&
-                      'Dashboard'}
-
-                    {detail.parent_label &&
-                      ` · ${detail.parent_label}`}
-                  </span>
-                </div>
-              </SidebarRow>
-            )}
-
-          {detail.pillar_id &&
-            detail.parent_type !==
-              'pillar' && (
-              <SidebarRow label="Pillar">
-                <span className="text-xs text-gray-600">
-                  {detail.pillar_id.slice(
-                    0,
-                    8
-                  )}
-                  ...
+          {detail.parent_type && detail.parent_type !== 'standalone' && (
+            <SidebarRow label="Collegato a">
+              <div className="text-xs text-right">
+                <span
+                  className={`px-2 py-0.5 rounded ${
+                    detail.parent_type === 'pillar'
+                      ? 'bg-indigo-100 text-indigo-700'
+                      : detail.parent_type === 'kaizen'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : detail.parent_type === 'dashboard'
+                          ? 'bg-purple-100 text-purple-700'
+                          : 'bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  {detail.parent_type === 'pillar' && 'Pillar'}
+                  {detail.parent_type === 'kaizen' && 'Kaizen'}
+                  {detail.parent_type === 'dashboard' && 'Dashboard'}
+                  {detail.parent_label && ` · ${detail.parent_label}`}
                 </span>
-              </SidebarRow>
-            )}
+              </div>
+            </SidebarRow>
+          )}
 
-          {(
-            detail.reparto ||
-            detail.linea ||
-            detail.macchina
-          ) && (
+          {detail.pillar_id && detail.parent_type !== 'pillar' && (
+            <SidebarRow label="Pillar">
+              <span className="text-xs text-gray-600">{detail.pillar_id.slice(0, 8)}...</span>
+            </SidebarRow>
+          )}
+
+          {(detail.reparto || detail.linea || detail.macchina) && (
             <SidebarRow label="Location">
               <div className="text-xs text-right">
-                {detail.reparto && (
-                  <div>
-                    {detail.reparto}
-                  </div>
-                )}
-
-                {detail.linea && (
-                  <div>
-                    {detail.linea}
-                  </div>
-                )}
-
-                {detail.macchina && (
-                  <div>
-                    {detail.macchina}
-                  </div>
-                )}
+                {detail.reparto && <div>{detail.reparto}</div>}
+                {detail.linea && <div>{detail.linea}</div>}
+                {detail.macchina && <div>{detail.macchina}</div>}
               </div>
             </SidebarRow>
           )}
 
           {detail.links?.length > 0 && (
-            <SidebarRow
-              label={`Links (${detail.links.length})`}
-            >
+            <SidebarRow label={`Links (${detail.links.length})`}>
               <div className="text-xs space-y-1">
-                {detail.links.map(
-                  (link, index) => (
-                    <div
-                      key={`${link.entity_id}_${index}`}
-                      className="bg-white px-2 py-1 rounded border"
-                    >
-                      <span className="text-gray-500">
-                        {link.entity_type}:
-                      </span>{' '}
-                      {link.entity_label ||
-                        link.entity_id}
-                    </div>
-                  )
-                )}
+                {detail.links.map((link, index) => (
+                  <div
+                    key={`${link.entity_id}_${index}`}
+                    className="bg-white px-2 py-1 rounded border"
+                  >
+                    <span className="text-gray-500">{link.entity_type}:</span>{' '}
+                    {link.entity_label || link.entity_id}
+                  </div>
+                ))}
               </div>
             </SidebarRow>
           )}
 
           <div className="pt-3 border-t">
-            <div className="text-xs font-medium mb-2">
-              Attività
-            </div>
-
+            <div className="text-xs font-medium mb-2">Attività</div>
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {(detail.feed || [])
                 .slice()
@@ -1440,19 +927,10 @@ export default function ActionPlanDetailPanel({
                     className="text-xs border-l-2 border-primary pl-2"
                   >
                     <div className="text-gray-500">
-                      {new Date(
-                        activity.timestamp
-                      ).toLocaleString(
-                        'it-IT'
-                      )}
+                      {new Date(activity.timestamp).toLocaleString('it-IT')}
                     </div>
-
                     <div>
-                      <strong>
-                        {activity.utente}
-                      </strong>
-                      {' · '}
-                      {activity.azione}
+                      <strong>{activity.utente}</strong> · {activity.azione}
                     </div>
                   </div>
                 ))}
@@ -1466,15 +944,11 @@ export default function ActionPlanDetailPanel({
           <div className="w-full max-w-4xl">
             <div className="flex items-center justify-between text-white mb-3">
               <div>
-                <div className="font-bold">
-                  Fotografia Action Plan
-                </div>
-
+                <div className="font-bold">Fotografia Action Plan</div>
                 <div className="text-xs text-gray-300">
                   Inquadra la condizione, il problema o il risultato dell’azione
                 </div>
               </div>
-
               <button
                 type="button"
                 onClick={closeCamera}
@@ -1491,12 +965,9 @@ export default function ActionPlanDetailPanel({
                 autoPlay
                 muted
                 playsInline
-                onLoadedMetadata={() =>
-                  setCameraReady(true)
-                }
+                onLoadedMetadata={() => setCameraReady(true)}
                 className="w-full max-h-[70vh] object-contain"
               />
-
               {!cameraReady && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black text-white text-sm">
                   Avvio fotocamera...
@@ -1508,19 +979,12 @@ export default function ActionPlanDetailPanel({
               <button
                 type="button"
                 onClick={takePhoto}
-                disabled={
-                  !cameraReady ||
-                  uploadingAllegato
-                }
+                disabled={!cameraReady || uploadingAllegato}
                 className="bg-primary text-white px-6 py-3 rounded-full flex items-center gap-2 font-medium hover:bg-primary-light disabled:opacity-50"
               >
                 <Camera size={20} />
-
-                {uploadingAllegato
-                  ? 'Caricamento...'
-                  : 'Scatta e carica'}
+                {uploadingAllegato ? 'Caricamento...' : 'Scatta e carica'}
               </button>
-
               <button
                 type="button"
                 onClick={closeCamera}
@@ -1536,30 +1000,22 @@ export default function ActionPlanDetailPanel({
       {lightboxImg && (
         <div
           className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[60] p-4"
-          onClick={() =>
-            setLightboxImg(null)
-          }
+          onClick={() => setLightboxImg(null)}
         >
           <button
             type="button"
-            onClick={() =>
-              setLightboxImg(null)
-            }
+            onClick={() => setLightboxImg(null)}
             className="absolute top-4 right-4 text-white hover:bg-white hover:bg-opacity-20 p-2 rounded-full"
             title="Chiudi anteprima"
           >
             <X size={24} />
           </button>
-
           <img
             src={lightboxImg.data}
             alt={lightboxImg.nome}
             className="max-w-full max-h-full object-contain"
-            onClick={event =>
-              event.stopPropagation()
-            }
+            onClick={event => event.stopPropagation()}
           />
-
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black bg-opacity-50 text-white px-4 py-2 rounded text-sm">
             {lightboxImg.nome}
           </div>
@@ -1579,10 +1035,7 @@ function Modal({ children }) {
   )
 }
 
-function Avatar({
-  name,
-  size = 24,
-}) {
+function Avatar({ name, size = 24 }) {
   if (!name) return null
 
   const initials = name
@@ -1591,7 +1044,6 @@ function Avatar({
     .slice(0, 2)
     .join('')
     .toUpperCase()
-
   const colors = [
     'bg-blue-500',
     'bg-green-500',
@@ -1601,20 +1053,11 @@ function Avatar({
     'bg-yellow-500',
     'bg-orange-500',
   ]
-
-  const color =
-    colors[
-      name.charCodeAt(0) %
-      colors.length
-    ]
+  const color = colors[name.charCodeAt(0) % colors.length]
 
   return (
     <div
-      style={{
-        width: size,
-        height: size,
-        fontSize: size * 0.45,
-      }}
+      style={{ width: size, height: size, fontSize: size * 0.45 }}
       className={`${color} text-white rounded-full flex items-center justify-center font-bold flex-shrink-0`}
       title={name}
     >
@@ -1623,34 +1066,20 @@ function Avatar({
   )
 }
 
-function Section({
-  title,
-  children,
-}) {
+function Section({ title, children }) {
   return (
     <div>
-      <h3 className="text-sm font-bold mb-2">
-        {title}
-      </h3>
-
+      <h3 className="text-sm font-bold mb-2">{title}</h3>
       {children}
     </div>
   )
 }
 
-function SidebarRow({
-  label,
-  children,
-}) {
+function SidebarRow({ label, children }) {
   return (
     <div className="flex justify-between items-center gap-3 text-sm">
-      <span className="text-gray-600 text-xs uppercase">
-        {label}
-      </span>
-
-      <div>
-        {children}
-      </div>
+      <span className="text-gray-600 text-xs uppercase">{label}</span>
+      <div>{children}</div>
     </div>
   )
 }
@@ -1658,17 +1087,12 @@ function SidebarRow({
 function renderWithMentionsTags(text) {
   if (!text) return null
 
-  const parts = text.split(
-    /(@[a-zA-Z0-9._-]+|#[a-zA-Z0-9_-]+)/g
-  )
+  const parts = text.split(/(@[a-zA-Z0-9._-]+|#[a-zA-Z0-9_-]+)/g)
 
   return parts.map((part, index) => {
     if (part.startsWith('@')) {
       return (
-        <span
-          key={index}
-          className="text-blue-600 font-medium"
-        >
+        <span key={index} className="text-blue-600 font-medium">
           {part}
         </span>
       )
@@ -1676,10 +1100,7 @@ function renderWithMentionsTags(text) {
 
     if (part.startsWith('#')) {
       return (
-        <span
-          key={index}
-          className="text-purple-600 font-medium"
-        >
+        <span key={index} className="text-purple-600 font-medium">
           {part}
         </span>
       )
