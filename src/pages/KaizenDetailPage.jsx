@@ -660,12 +660,12 @@ export default function KaizenDetailPage() {
             </div>
           )}
 
-          <div className="bg-white rounded-xl shadow p-6">
+          <div className="w-full max-w-full min-w-0 bg-white rounded-xl shadow p-6 overflow-hidden">
             <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">PASSO 5 - PIANO AZIONI</h3>
 
             {livelloAttuale !== 'Quick' && (
               <>
-                <div className="mb-6">
+                <div className="w-full max-w-full min-w-0 mb-6 overflow-hidden">
                   <h4 className="font-bold text-sm uppercase text-gray-700 mb-2">Gant macro</h4>
                   <KaizenGantMasterPlan kaizen={kaizen} onSaved={loadKaizen} />
                 </div>
