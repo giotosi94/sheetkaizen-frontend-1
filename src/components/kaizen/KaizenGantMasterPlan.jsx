@@ -300,17 +300,12 @@ function startDrag(step, rowType, columnIndex, event) {
   const endIndex = findColumnIndexByDate(interval.end)
   const hasInterval = startIndex >= 0 && endIndex >= 0
 
-  let mode = 'create'
-
-  if (hasInterval && columnIndex >= startIndex && columnIndex <= endIndex) {
-    if (startIndex !== endIndex && columnIndex === startIndex) {
-      mode = 'resize-start'
-    } else if (startIndex !== endIndex && columnIndex === endIndex) {
-      mode = 'resize-end'
-    } else {
-      mode = 'move'
-    }
-  }
+  const mode =
+    hasInterval &&
+    columnIndex >= startIndex &&
+    columnIndex <= endIndex
+      ? 'move'
+      : 'create'
 
   setDragState({
     stepId: step.id,
@@ -323,6 +318,27 @@ function startDrag(step, rowType, columnIndex, event) {
   })
 }
 
+function startResize(step, rowType, mode, event) {
+  event.preventDefault()
+  event.stopPropagation()
+
+  const interval = getStepInterval(step, rowType)
+  const startIndex = findColumnIndexByDate(interval.start)
+  const endIndex = findColumnIndexByDate(interval.end)
+
+  if (startIndex < 0 || endIndex < 0) return
+
+  setDragState({
+    stepId: step.id,
+    rowType,
+    mode,
+    anchorIndex: mode === 'resize-start' ? startIndex : endIndex,
+    currentIndex: mode === 'resize-start' ? startIndex : endIndex,
+    originalStartIndex: startIndex,
+    originalEndIndex: endIndex,
+  })
+}
+  
 function updateDrag(stepId, rowType, columnIndex) {
   setDragState(prev => {
     if (!prev) return prev
@@ -848,7 +864,7 @@ function getDurationLabel(interval) {
                 </button>
               </div>
 
-                            <div className="flex flex-col select-none">
+              <div className="flex flex-col select-none">
                 {ROW_TYPES.map(row => {
                   const interval = getDisplayInterval(step, row.id)
                   const durationLabel = getDurationLabel(interval)
@@ -862,18 +878,6 @@ function getDurationLabel(interval) {
                         const active = isColumnInInterval(col, interval)
                         const isStart = active && col.fullDate === interval?.start
                         const isEnd = active && col.fullDate === interval?.end
-
-                        let cursor = 'crosshair'
-
-                        if (active) {
-                          if (isStart && !isEnd) {
-                            cursor = 'w-resize'
-                          } else if (isEnd && !isStart) {
-                            cursor = 'e-resize'
-                          } else {
-                            cursor = 'grab'
-                          }
-                        }
 
                         const currentOperation =
                           dragState?.stepId === step.id &&
@@ -900,7 +904,7 @@ function getDurationLabel(interval) {
                             style={{
                               width: CELL_WIDTH,
                               minWidth: CELL_WIDTH,
-                              height: '24px',
+                              height: '26px',
                               backgroundColor: active
                                 ? row.color
                                 : 'transparent',
@@ -919,7 +923,9 @@ function getDurationLabel(interval) {
                               borderBottomRightRadius: isEnd
                                 ? '6px'
                                 : '0',
-                              cursor,
+                              cursor: active
+                                ? 'grab'
+                                : 'crosshair',
                             }}
                             title={
                               active
@@ -927,22 +933,40 @@ function getDurationLabel(interval) {
                                 : `${row.label}: trascina per creare`
                             }
                           >
-                            {isStart && active && !isEnd && (
-                              <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-white bg-opacity-70 rounded-l pointer-events-none" />
+                            {isStart && active && (
+                              <span
+                                onMouseDown={(event) => startResize(
+                                  step,
+                                  row.id,
+                                  'resize-start',
+                                  event
+                                )}
+                                className="absolute left-0 top-0 bottom-0 w-2.5 bg-white bg-opacity-80 rounded-l cursor-w-resize z-10"
+                                title="Trascina per modificare la data iniziale"
+                              />
                             )}
 
-                            {isEnd && active && !isStart && (
-                              <span className="absolute right-0 top-0 bottom-0 w-1.5 bg-white bg-opacity-70 rounded-r pointer-events-none" />
+                            {isEnd && active && (
+                              <span
+                                onMouseDown={(event) => startResize(
+                                  step,
+                                  row.id,
+                                  'resize-end',
+                                  event
+                                )}
+                                className="absolute right-0 top-0 bottom-0 w-2.5 bg-white bg-opacity-80 rounded-r cursor-e-resize z-10"
+                                title="Trascina per modificare la data finale"
+                              />
                             )}
 
                             {isStart && active && (
-                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[8px] font-bold text-white whitespace-nowrap pointer-events-none">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] font-bold text-white whitespace-nowrap pointer-events-none z-0">
                                 {durationLabel}
                               </span>
                             )}
 
                             {currentOperation && active && (
-                              <span className="absolute inset-0 ring-2 ring-yellow-300 ring-inset pointer-events-none" />
+                              <span className="absolute inset-0 ring-2 ring-yellow-300 ring-inset pointer-events-none z-20" />
                             )}
                           </button>
                         )
