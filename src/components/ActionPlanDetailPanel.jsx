@@ -907,9 +907,7 @@ export default function ActionPlanDetailPanel({
                       key={image.id}
                       className="relative group"
                     >
-                      {image.data} =>
-                          setLightboxImg(image)
-                        }
+                      {image.data} => setLightboxImg(image)}
                       />
 
                       {!isLocked && (
@@ -943,12 +941,13 @@ export default function ActionPlanDetailPanel({
                         size={16}
                         className="text-gray-500 flex-shrink-0"
                       />
-
-                      {documento.data}
-                        {documento.nome}
+                      <a
+                        href={documento.data}
+   nome}
                       </a>
 
                       <span className="text-xs text-gray-400">
+
                         {documento.dimensione
                           ? `${(
                               documento.dimensione /
