@@ -878,15 +878,33 @@ function getDurationLabel(interval) {
             <div className="w-12 border-r" />
             <div className="w-80 border-r" />
             <div className="w-20 border-r" />
-            {columns.map((col, ci) => (
-              <div
-                key={ci}
-                className="border-r flex flex-col items-center justify-center text-[10px] text-gray-500 py-1"
-                style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }}
-              >
-                {col.label}
-              </div>
-            ))}
+            {columns.map((col, ci) => {
+              const current = isTodayColumn(ci)
+
+              return (
+                <div
+                  key={ci}
+                  className={`relative border-r flex flex-col items-center justify-center text-[10px] py-1 ${
+                    current
+                      ? 'bg-red-50 text-red-700 font-bold'
+                      : 'text-gray-500'
+                  }`}
+                  style={{
+                    width: CELL_WIDTH,
+                    minWidth: CELL_WIDTH,
+                    borderLeft: current
+                      ? '2px solid #ef4444'
+                      : undefined,
+                  }}
+                >
+                  {col.label}
+
+                  {current && (
+                    <span className="absolute -top-1 left-0 w-2 h-2 bg-red-500 rotate-45 -translate-x-1" />
+                  )}
+                </div>
+              )
+            })}
           </div>
 
           {/* Righe steps */}
@@ -907,12 +925,20 @@ function getDurationLabel(interval) {
                     className="w-full border rounded px-2 py-1 text-xs"
                   />
                 ) : (
-                  <div
+                   <div
                     onClick={() => setEditingStepId(step.id)}
                     className="text-xs cursor-pointer hover:bg-yellow-50 px-2 py-1 rounded w-full"
                     title="Click per modificare"
                   >
-                    {step.label}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate">{step.label}</span>
+
+                      {getDelayStatus(step) && (
+                        <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[9px] font-bold ${getDelayStatus(step).className}`}>
+                          {getDelayStatus(step).label}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -967,6 +993,7 @@ function getDurationLabel(interval) {
                         const active = isColumnInInterval(col, interval)
                         const isStart = active && col.fullDate === interval?.start
                         const isEnd = active && col.fullDate === interval?.end
+                        const current = isTodayColumn(columnIndex)
 
                         const currentOperation =
                           dragState?.stepId === step.id &&
@@ -994,9 +1021,6 @@ function getDurationLabel(interval) {
                               width: CELL_WIDTH,
                               minWidth: CELL_WIDTH,
                               height: '26px',
-                              backgroundColor: active
-                                ? row.color
-                                : 'transparent',
                               borderRightColor: active
                                 ? row.color
                                 : undefined,
@@ -1012,9 +1036,17 @@ function getDurationLabel(interval) {
                               borderBottomRightRadius: isEnd
                                 ? '6px'
                                 : '0',
-                              cursor: active
+                                                            cursor: active
                                 ? 'grab'
                                 : 'crosshair',
+                              borderLeft: current
+                                ? '2px solid #ef4444'
+                                : undefined,
+                              backgroundColor: active
+                                ? row.color
+                                : current
+                                  ? '#fef2f2'
+                                  : 'transparent',
                             }}
                             title={
                               active
