@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { Plus, Search, Filter, ChevronDown, Archive, Trash2, RotateCcw } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { Plus, Search, Filter, ChevronDown } from 'lucide-react'
@@ -110,6 +110,8 @@ export default function KaizenListPage() {
   const { configs } = useAllConfigurations()
   const { pillars } = usePillars()
   const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
+  const [selected, setSelected] = useState(new Set())
 
   // Reparti per form e filtri
   const [reparti, setReparti] = useState([])
@@ -158,6 +160,57 @@ export default function KaizenListPage() {
       const res = await api.get('/kaizens')
       setKaizens(res.data)
     } catch (err) { console.error(err) }
+  }
+
+  const toggleSelect = (id) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = (ids) => {
+    setSelected(prev => {
+      const allSelected = ids.length > 0 && ids.every(id => prev.has(id))
+      return allSelected ? new Set() : new Set(ids)
+    })
+  }
+
+  const archiviaSelezionati = async () => {
+    if (selected.size === 0) return
+    if (!confirm(`Archiviare ${selected.size} kaizen?\n\nNon verranno eliminati: restano salvati e li ritrovi nella vista "Archiviati".`)) return
+    try {
+      await Promise.all([...selected].map(id => api.put(`/kaizens/${id}`, { archiviato: true })))
+      setSelected(new Set())
+      loadKaizens()
+    } catch (err) {
+      alert('Errore archiviazione: ' + (err.response?.data?.detail || err.message))
+    }
+  }
+
+  const ripristinaSelezionati = async () => {
+    if (selected.size === 0) return
+    try {
+      await Promise.all([...selected].map(id => api.put(`/kaizens/${id}`, { archiviato: false })))
+      setSelected(new Set())
+      loadKaizens()
+    } catch (err) {
+      alert('Errore ripristino: ' + (err.response?.data?.detail || err.message))
+    }
+  }
+
+  const eliminaSelezionati = async () => {
+    if (selected.size === 0) return
+    if (!confirm(`ELIMINARE DEFINITIVAMENTE ${selected.size} kaizen?\n\nQuesta azione non puo essere annullata.`)) return
+    try {
+      await Promise.all([...selected].map(id => api.delete(`/kaizens/${id}`)))
+      setSelected(new Set())
+      loadKaizens()
+    } catch (err) {
+      alert('Errore eliminazione: ' + (err.response?.data?.detail || err.message))
+    }
   }
 
   const createKaizen = async () => {
@@ -279,9 +332,11 @@ export default function KaizenListPage() {
         matchView = g !== null && g > 30 && k.stato !== 'Chiuso'
       }
 
+      const matchArchive = filters.view === 'archived' ? k.archiviato === true : k.archiviato !== true
+
       return matchSearch && matchTipo && matchStato && matchPillar && matchCategoria &&
              matchReparto && matchLinea && matchMacchina && matchDashboard &&
-             matchCreatore && matchLeader && matchView
+             matchCreatore && matchLeader && matchView && matchArchive
     })
   }, [kaizens, filters, user])
 
@@ -368,6 +423,11 @@ export default function KaizenListPage() {
                   active={filters.view === 'old30'}
                   onClick={() => setFilters({ ...filters, view: 'old30' })}
                   label="Vecchi 30+ giorni"
+                />
+                <FilterChip
+                  active={filters.view === 'archived'}
+                  onClick={() => { setFilters({ ...filters, view: 'archived' }); setSelected(new Set()) }}
+                  label="Archiviati"
                 />
               </div>
             </div>
@@ -500,11 +560,36 @@ export default function KaizenListPage() {
         )}
       </div>
 
+      {selected.size > 0 && (
+        <div className="bg-primary text-white rounded-lg px-4 py-2 mb-3 flex items-center gap-3">
+          <span className="text-sm font-medium">{selected.size} selezionati</span>
+          <div className="flex-1" />
+          {filters.view === 'archived' ? (
+            <button onClick={ripristinaSelezionati} className="flex items-center gap-1 bg-white text-primary px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-100">
+              <RotateCcw size={16} /> Ripristina
+            </button>
+          ) : (
+            <button onClick={archiviaSelezionati} className="flex items-center gap-1 bg-white text-primary px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-100">
+              <Archive size={16} /> Archivia
+            </button>
+          )}
+          {isAdmin && (
+            <button onClick={eliminaSelezionati} className="flex items-center gap-1 bg-red-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-700">
+              <Trash2 size={16} /> Elimina
+            </button>
+          )}
+          <button onClick={() => setSelected(new Set())} className="text-white opacity-80 hover:opacity-100 text-sm">Annulla</button>
+        </div>
+      )}
+
       {/* TABELLA */}
       <div className="bg-white rounded-xl shadow overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr className="text-left text-gray-500">
+              <th className="p-4 w-10">
+                <input type="checkbox" checked={filtered.length > 0 && filtered.every(k => selected.has(k._id))} onChange={() => toggleSelectAll(filtered.map(k => k._id))} className="w-4 h-4" />
+              </th>
               <th className="p-4">Numero</th>
               <th className="p-4">Titolo</th>
               <th className="p-4">Tipo</th>
@@ -522,7 +607,10 @@ export default function KaizenListPage() {
               const tipoStyle = getTipoStyle(k.livello || k.tipo)
               const giorni = giorniDaApertura(k.data_apertura)
               return (
-                <tr key={k._id} className="border-t hover:bg-gray-50">
+                <tr key={k._id} className={`border-t hover:bg-gray-50 ${selected.has(k._id) ? 'bg-blue-50' : ''}`}>
+                  <td className="p-4">
+                    <input type="checkbox" checked={selected.has(k._id)} onChange={() => toggleSelect(k._id)} className="w-4 h-4" />
+                  </td>
                   <td className="p-4">
                     <Link to={`/kaizen/${k._id}`} className="text-primary font-mono hover:underline">{k.numero}</Link>
                   </td>
