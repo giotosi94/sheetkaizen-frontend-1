@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Plus, Search, Filter, ChevronDown, Archive, Trash2, RotateCcw } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import { useAllConfigurations } from '../hooks/useConfigurations'
 import { usePillars } from '../hooks/usePillars'
@@ -100,6 +100,7 @@ function FilterChip({ active, onClick, label }) {
 }
 
 export default function KaizenListPage() {
+  const navigate = useNavigate()
   const [kaizens, setKaizens] = useState([])
   const [showModal, setShowModal] = useState(false)
   const [newKaizen, setNewKaizen] = useState(INITIAL_KAIZEN)
@@ -263,7 +264,11 @@ export default function KaizenListPage() {
 
       setShowModal(false)
       setNewKaizen(INITIAL_KAIZEN)
-      loadKaizens()
+      if (res.data?.id) {
+        navigate(`/kaizen/${res.data.id}`)
+      } else {
+        loadKaizens()
+      }
     } catch (err) {
       console.error(err)
       alert('Errore creazione: ' + (err.response?.data?.detail || err.message))
