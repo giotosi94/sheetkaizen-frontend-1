@@ -1663,7 +1663,7 @@ function GembaObiettiviTab({ kaizen, setKaizen, updateField }) {
   const gp = kaizen.gemba_plan || {}
   const perditeItems = kaizen.loss_pareto?.items || []
 
-  const updateGemba = (field, value) => setKaizen(prev => ({ ...prev, gemba_plan: { ...prev.gemba_plan, value } }))
+  const updateGemba = (field, value) => setKaizen(prev => ({ ...prev, gemba_plan: { ...prev.gemba_plan, [field]: value } }))
 
   const handlePerditaChange = (label) => {
     const found = perditeItems.find(i => i.label === label)
@@ -1829,7 +1829,7 @@ function GembaObiettiviTab({ kaizen, setKaizen, updateField }) {
 function FMEATable({ value = [], onChange }) {
   const addRow = () => onChange([...value, { id: Date.now().toString(), modo: '', effetto: '', causa: '', s: 5, o: 5, d: 5, azione: '', responsabile: '' }])
   const removeRow = (id) => onChange(value.filter(r => r.id !== id))
-  const updateRow = (id, field, val) => onChange(value.map(r => r.id === id ? { ...r, val } : r))
+  const updateRow = (id, field, val) => onChange(value.map(r => r.id === id ? { ...r, [field]: val } : r))
 
   const rpnOf = (r) => (parseInt(r.s) || 0) * (parseInt(r.o) || 0) * (parseInt(r.d) || 0)
   const rpnStyle = (rpn) => rpn >= 100 ? 'bg-red-100 text-red-700 border-red-300' : rpn >= 40 ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : 'bg-green-100 text-green-700 border-green-300'
@@ -1968,9 +1968,10 @@ function TeamAuditTab({ kaizen, setKaizen }) {
   const scores = kaizen.team_audit?.scores || {}
 
   const setAchieved = (id, val) => setKaizen(prev => ({
-    ...prev,
-    team_audit: { ...prev.team_audit, scores: { ...(prev.team_audit?.scores || {}), val } },
+  ...prev,
+  team_audit: { ...prev.team_audit, scores: { ...(prev.team_audit?.scores || {}), [id]: val } },
   }))
+
 
   const allItems = AUDIT_SECTIONS.flatMap(s => s.items)
   const totalAchieved = allItems.reduce((sum, it) => sum + (scores[it.id] ? it.score : 0), 0)
