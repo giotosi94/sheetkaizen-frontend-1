@@ -388,7 +388,59 @@ export default function KaizenGantMasterPlan({ kaizen, onSaved, value, onChange 
                   className="text-xs px-1 hover:bg-yellow-100 rounded text-yellow-600"
                   title="Pulisci riga"
                 >
-          
+                  ⌫
+                </button>
+
+                <button
+                  onClick={() => removeStep(step.id)}
+                  className="p-0.5 hover:bg-red-100 rounded text-red-600"
+                  title="Elimina step"
+                >
+                  <Trash2 size={11} />
+                </button>
+              </div>
+
+              <div className="flex flex-col">
+                {ROW_TYPES.map(row => (
+                  <div
+                    key={row.id}
+                    className={`flex ${row.id === 'planned' ? 'border-b' : ''}`}
+                  >
+                    {columns.map((col, ci) => {
+                      const active = getCellValue(
+                        step.id,
+                        row.id,
+                        col.year,
+                        col.period
+                      )
+
+                      return (
+                        <button
+                          key={`${row.id}_${ci}`}
+                          onClick={() => toggleCell(
+                            step.id,
+                            row.id,
+                            col.year,
+                            col.period
+                          )}
+                          className="border-r hover:opacity-75 transition-opacity"
+                          style={{
+                            width: CELL_WIDTH,
+                            minWidth: CELL_WIDTH,
+                            height: '22px',
+                            backgroundColor: active
+                              ? row.color
+                              : 'transparent',
+                          }}
+                          title={`${row.label} - ${col.year} ${col.label}`}
+                        />
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
 
           {data.steps.length === 0 && (
             <div className="text-center py-12 text-gray-400">
