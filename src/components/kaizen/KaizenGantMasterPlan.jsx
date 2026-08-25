@@ -15,6 +15,12 @@ const GRANULARITIES = [
   { id: 'quarter', label: 'Trimestre' },
 ]
 
+const ZOOM_LEVELS = [
+  { id: 'compact', label: 'Compatto', factor: 0.72 },
+  { id: 'normal', label: 'Normale', factor: 1 },
+  { id: 'wide', label: 'Ampio', factor: 1.35 },
+]
+
 function getDefaultGantData() {
   const currentYear = new Date().getFullYear()
   const today = new Date().toISOString().slice(0, 10)
@@ -141,6 +147,7 @@ export default function KaizenGantMasterPlan({ kaizen, onSaved, value, onChange 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
   const [dragState, setDragState] = useState(null)
+  const [zoom, setZoom] = useState('normal')
   const dataRef = useRef(data)
 
   useEffect(() => { dataRef.current = data }, [data])
@@ -450,6 +457,52 @@ function isColumnInInterval(column, interval) {
   )
 }
 
+function isTodayColumn(columnIndex) {
+  const column = columns[columnIndex]
+  const nextColumn = columns[columnIndex + 1]
+
+  if (!column) return false
+
+  if (!nextColumn) {
+    return today >= column.fullDate
+  }
+
+  return today >= column.fullDate && today < nextColumn.fullDate
+}
+
+function getDelayStatus(step) {
+  const planned = getStepInterval(step, 'planned')
+  const completed = getStepInterval(step, 'completed')
+
+  if (!planned?.end) return null
+
+  if (completed?.end) {
+    if (completed.end > planned.end) {
+      return {
+        label: 'Completato in ritardo',
+        className: 'bg-orange-100 text-orange-700',
+      }
+    }
+
+    return {
+      label: 'Completato nei tempi',
+      className: 'bg-green-100 text-green-700',
+    }
+  }
+
+  if (today > planned.end) {
+    return {
+      label: 'In ritardo',
+      className: 'bg-red-100 text-red-700',
+    }
+  }
+
+  return {
+    label: 'In corso',
+    className: 'bg-blue-100 text-blue-700',
+  }
+}  
+  
 function getDurationLabel(interval) {
   if (!interval?.start || !interval?.end) return ''
 
@@ -652,13 +705,17 @@ function getDurationLabel(interval) {
 
   const yearGroups = groupColsByYear(columns)
 
-  const CELL_WIDTH = granularity === 'day'
+  const baseCellWidth = granularity === 'day'
     ? 42
     : granularity === 'week'
       ? 38
       : granularity === 'month'
         ? 54
         : 72
+
+  const zoomFactor = ZOOM_LEVELS.find(level => level.id === zoom)?.factor || 1
+  const CELL_WIDTH = Math.round(baseCellWidth * zoomFactor)
+  const today = new Date().toISOString().slice(0, 10)
 
   return (
     <div className="space-y-4">
@@ -761,13 +818,45 @@ function getDurationLabel(interval) {
               <span>{row.label}</span>
             </div>
           ))}
+
+          <div className="flex items-center gap-1 ml-4">
+            <span className="font-medium text-gray-600">Zoom:</span>
+            <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
+              {ZOOM_LEVELS.map(level => (
+                <button
+                  key={level.id}
+                  type="button"
+                  onClick={() => setZoom(level.id)}
+                  className={`px-2 py-1 rounded text-xs ${
+                    zoom === level.id
+                      ? 'bg-white text-primary font-medium shadow-sm'
+                      : 'text-gray-500 hover:bg-gray-200'
+                  }`}
+                >
+                  {level.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 ml-2">
+            <div className="w-0.5 h-4 bg-red-500" />
+            <span>Oggi</span>
+          </div>
+
           <span className="ml-auto text-gray-500 italic">Trascina sul vuoto per creare, al centro per spostare, sui bordi per ridimensionare</span>
         </div>
       </div>
 
       {/* Griglia Gant */}
-      <div className="bg-white rounded-xl shadow overflow-x-auto">
-        <div style={{ minWidth: columns.length * CELL_WIDTH + 412 }}>
+      <div className="w-full max-w-full min-w-0 bg-white rounded-xl shadow overflow-hidden">
+        <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
+          <div
+            style={{
+              width: 'max-content',
+              minWidth: columns.length * CELL_WIDTH + 412,
+            }}
+          >
           {/* Header anni */}
           <div className="flex border-b bg-primary text-white sticky top-0 z-10">
             <div className="w-12 px-2 py-2 text-xs font-bold text-center border-r border-blue-700"></div>
@@ -983,6 +1072,7 @@ function getDurationLabel(interval) {
               <p>Nessuno step. Aggiungi il primo!</p>
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>
