@@ -49,6 +49,7 @@ function buildTabsForLivello(livello) {
   base.push({ id: 'stdelements', label: '8 Standard Elements' })
   base.push({ id: 'cmladder', label: 'Countermeasure Ladder' })
   base.push({ id: 'figli', label: 'Quick Kaizen' })
+  base.push({ id: 'audit', label: 'Team Audit' })
   if (livello === 'Major') {
     base.push({ id: 'costbenefit', label: 'Cost & Benefit' })
   }
@@ -783,6 +784,10 @@ export default function KaizenDetailPage() {
             'Confronto stimato vs reale post-progetto',
             'Import template Excel Lindt',
           ]} phase="Futura" />
+      )}
+
+      {activeTab === 'audit' && (
+        <TeamAuditTab kaizen={kaizen} setKaizen={setKaizen} />
       )}
 
       {activeTab === 'lavagna' && (
@@ -1900,6 +1905,151 @@ function FMEATable({ value = [], onChange }) {
         <div className="mt-2 pt-2 border-t border-blue-200">
           <strong>Priorita RPN:</strong> Rosso &ge; 100 (agire subito) - Giallo 40-99 (monitorare) - Verde &lt; 40 (basso)
         </div>
+      </div>
+    </div>
+  )
+}
+
+const AUDIT_SECTIONS = [
+  {
+    key: "P", label: "Pianificazione", head: "bg-blue-100 text-blue-800", border: "border-blue-300", available: 15,
+    items: [
+      { id: "p1", cat: "Team", text: "I membri del team sono elencati? (se applicabile sulla lavagna)", score: 1 },
+      { id: "p2", cat: "Team", text: "A tutti i membri sono stati assegnati ruoli chiari (Leader, Verbalizzante, Timekeeper, ecc.)?", score: 1 },
+      { id: "p3", cat: "Collegamento al business", text: "E chiaro perche e stato scelto questo problema? C'e un chiaro collegamento a un KPI aziendale/di area? (Deployment dal Pillar)", score: 4 },
+      { id: "p4", cat: "Indicatori di performance", text: "I dati storici (periodo/punto di partenza e valore attuale) sono chiaramente mostrati?", score: 2 },
+      { id: "p5", cat: "Indicatori di performance", text: "Il target dell'indicatore (periodo e valore) e chiaramente mostrato?", score: 2 },
+      { id: "p6", cat: "Route e Master Plan", text: "I documenti dello Standard Kaizen sono visibili e aggiornati?", score: 5 },
+    ],
+  },
+  {
+    key: "D", label: "Metodo", head: "bg-purple-100 text-purple-800", border: "border-purple-300", available: 36,
+    items: [
+      { id: "d1", cat: "Metodo", text: "Sono state usate analisi quantitative/root-cause per capire il problema? Sono ben documentate?", score: 5 },
+      { id: "d2", cat: "Metodo", text: "Le cause sospette del problema sono state verificate e quantificate con dati?", score: 5 },
+      { id: "d3", cat: "Metodo", text: "La raccolta dati e fatta in modo coerente da tutti i turni? Tutti i dettagli sono catturati?", score: 2 },
+      { id: "d4", cat: "Metodo", text: "Il team ha usato i metodi/strumenti della route per attaccare i problemi?", score: 3 },
+      { id: "d5", cat: "Metodo", text: "Il gruppo ha trovato contromisure logiche per le cause radice identificate con logica solida?", score: 4 },
+      { id: "d6", cat: "Pianificazione ed esecuzione azioni", text: "Le azioni pianificate sono chiaramente visibili con date di completamento target?", score: 5 },
+      { id: "d7", cat: "Pianificazione ed esecuzione azioni", text: "C'e un responsabile per ogni azione?", score: 2 },
+      { id: "d8", cat: "Pianificazione ed esecuzione azioni", text: "Il piano d'azione e aggiornato?", score: 2 },
+      { id: "d9", cat: "Pianificazione ed esecuzione azioni", text: "La maggior parte delle azioni e completata nei tempi?", score: 4 },
+      { id: "d10", cat: "Pianificazione ed esecuzione azioni", text: "C'e evidenza delle azioni implementate (OPL, foto, standard, modifiche...)?", score: 4 },
+    ],
+  },
+  {
+    key: "C", label: "Risultati", head: "bg-green-100 text-green-800", border: "border-green-300", available: 18,
+    items: [
+      { id: "c1", cat: "Performance", text: "Il team ha raggiunto il suo obiettivo o fatto progressi sostanziali verso l'obiettivo?", score: 18 },
+    ],
+  },
+  {
+    key: "A", label: "Stabilizzazione", head: "bg-orange-100 text-orange-800", border: "border-orange-300", available: 19,
+    items: [
+      { id: "a1", cat: "Standard", text: "Ci sono procedure per mantenere i risultati ottenuti?", score: 5 },
+      { id: "a2", cat: "Standard", text: "I sistemi di monitoraggio (checklist, moduli, audit...) per le azioni chiave sono in atto e visibili?", score: 4 },
+      { id: "a3", cat: "Standard", text: "I dispositivi del sistema di monitoraggio sono usati e aggiornati?", score: 4 },
+      { id: "a4", cat: "OPL", text: "Sono state create OPL/SOP per ogni miglioramento significativo?", score: 2 },
+      { id: "a5", cat: "OPL", text: "C'e una training matrix per le OPL/SOP usate e un piano di formazione del personale coinvolto?", score: 2 },
+      { id: "a6", cat: "OPL", text: "I miglioramenti nelle aree target della macchina sono evidenti?", score: 2 },
+    ],
+  },
+  {
+    key: "I", label: "Coinvolgimento", head: "bg-teal-100 text-teal-800", border: "border-teal-300", available: 12,
+    items: [
+      { id: "i1", cat: "Coinvolgimento", text: "La metodologia Kaizen da seguire e ben compresa da tutti i membri del team?", score: 5 },
+      { id: "i2", cat: "Coinvolgimento", text: "Un membro del team scelto a caso sa spiegare le attivita (e la lavagna se applicabile)?", score: 3 },
+      { id: "i3", cat: "Coinvolgimento", text: "I meeting sono organizzati e la partecipazione e ai livelli attesi?", score: 4 },
+    ],
+  },
+]
+
+function TeamAuditTab({ kaizen, setKaizen }) {
+  const scores = kaizen.team_audit?.scores || {}
+
+  const setAchieved = (id, val) => setKaizen(prev => ({
+    ...prev,
+    team_audit: { ...prev.team_audit, scores: { ...(prev.team_audit?.scores || {}), val } },
+  }))
+
+  const allItems = AUDIT_SECTIONS.flatMap(s => s.items)
+  const totalAchieved = allItems.reduce((sum, it) => sum + (scores[it.id] ? it.score : 0), 0)
+  const percent = totalAchieved
+
+  let status = { label: "Da valutare", color: "bg-gray-100 text-gray-700" }
+  if (percent >= 80) status = { label: "PASS", color: "bg-green-600 text-white" }
+  else if (percent >= 60) status = { label: "IN PROGRESS", color: "bg-yellow-500 text-white" }
+  else if (percent > 0) status = { label: "FAIL", color: "bg-red-600 text-white" }
+
+  const sectionScore = (s) => s.items.reduce((sum, it) => sum + (scores[it.id] ? it.score : 0), 0)
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl shadow p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h3 className="text-xl font-bold mb-1">Improvement Team Audit</h3>
+            <p className="text-sm text-gray-500">Valutazione PDCA del progetto Kaizen - Lindt LPW</p>
+          </div>
+          <div className={`px-3 py-1.5 rounded-lg font-bold text-sm ${status.color}`}>{status.label}</div>
+        </div>
+
+        <div className="bg-gray-50 rounded-lg p-4">
+          <div className="flex items-baseline gap-2 mb-3">
+            <span className="text-4xl font-bold text-primary">{totalAchieved}</span>
+            <span className="text-xl text-gray-400">/ 100</span>
+            <span className="ml-auto text-lg font-semibold text-gray-600">{percent}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+            <div className={`h-full transition-all duration-500 ${percent >= 80 ? "bg-green-500" : percent >= 60 ? "bg-yellow-500" : percent > 0 ? "bg-orange-500" : "bg-gray-300"}`} style={{ width: `${percent}%` }} />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-4">
+            {AUDIT_SECTIONS.map(s => (
+              <div key={s.key} className="bg-white rounded-lg p-2 text-center border">
+                <div className="text-xs text-gray-500 uppercase">{s.label}</div>
+                <div className="text-sm font-bold text-primary">{sectionScore(s)} / {s.available}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {AUDIT_SECTIONS.map(s => (
+        <div key={s.key} className={`rounded-xl border-2 ${s.border} overflow-hidden`}>
+          <div className={`${s.head} px-4 py-2.5 font-bold text-sm flex items-center justify-between`}>
+            <span>{s.key} - {s.label.toUpperCase()}</span>
+            <span className="text-xs">{sectionScore(s)} / {s.available} punti</span>
+          </div>
+          <div className="bg-white">
+            {s.items.map((it, idx) => {
+              const achieved = !!scores[it.id]
+              return (
+                <div key={it.id} className={`p-3 flex items-start gap-3 ${idx < s.items.length - 1 ? "border-b" : ""}`}>
+                  <button
+                    onClick={() => setAchieved(it.id, !achieved)}
+                    className={`flex-shrink-0 w-8 h-8 rounded-lg border-2 flex items-center justify-center font-bold text-xs transition-all ${achieved ? "bg-green-500 border-green-500 text-white" : "bg-white border-gray-300 text-gray-300 hover:border-gray-400"}`}
+                    title={achieved ? "Raggiunto" : "Non raggiunto"}
+                  >
+                    {achieved ? <Check size={16} /> : ""}
+                  </button>
+                  <div className="flex-1">
+                    <div className="text-[10px] uppercase text-gray-400 font-semibold">{it.cat}</div>
+                    <p className="text-sm">{it.text}</p>
+                  </div>
+                  <div className={`flex-shrink-0 text-sm font-bold px-2 py-1 rounded ${achieved ? "text-green-600" : "text-gray-400"}`}>
+                    {achieved ? it.score : 0}<span className="text-gray-300">/{it.score}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+
+      <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-4 text-xs text-blue-700">
+        <div className="font-semibold mb-1">Come funziona</div>
+        <div>Clicca la casella a sinistra di ogni item per segnarlo come raggiunto (X). Ottieni il punteggio pieno dell'item solo se raggiunto, altrimenti 0.</div>
+        <div className="mt-2 pt-2 border-t border-blue-200"><strong>Soglie:</strong> PASS &ge; 80 - IN PROGRESS 60-79 - FAIL &lt; 60</div>
       </div>
     </div>
   )
