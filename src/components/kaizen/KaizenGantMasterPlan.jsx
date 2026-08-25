@@ -140,6 +140,7 @@ export default function KaizenGantMasterPlan({ kaizen, onSaved, value, onChange 
   const [saving, setSaving] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
+  const [dragState, setDragState] = useState(null)
   const dataRef = useRef(data)
 
   useEffect(() => { dataRef.current = data }, [data])
@@ -211,6 +212,51 @@ export default function KaizenGantMasterPlan({ kaizen, onSaved, value, onChange 
       return { ...prev, cells: newCells }
     })
   }
+  function getStepInterval(step, rowType) {
+  const interval = step?.[rowType]
+
+  if (interval?.start && interval?.end) {
+    return interval
+  }
+
+  const activeColumns = columns.filter(col =>
+    getCellValue(step.id, rowType, col.year, col.period)
+  )
+
+  if (activeColumns.length === 0) {
+    return {
+      start: null,
+      end: null,
+    }
+  }
+
+  return {
+    start: activeColumns[0].fullDate,
+    end: activeColumns[activeColumns.length - 1].fullDate,
+  }
+}
+
+function updateStepInterval(stepId, rowType, start, end) {
+  setData(prev => ({
+    ...prev,
+    steps: prev.steps.map(step => {
+      if (step.id !== stepId) return step
+
+      const updatedStep = { ...step }
+
+      Reflect.set(updatedStep, rowType, {
+        start,
+        end,
+      })
+
+      return updatedStep
+    }),
+  }))
+}
+
+function clearStepInterval(stepId, rowType) {
+  updateStepInterval(stepId, rowType, null, null)
+}
   function clearRow(stepId) {
     if (!confirm('Pulire tutte le celle di questa riga?')) return
     setData(prev => {
@@ -228,13 +274,29 @@ export default function KaizenGantMasterPlan({ kaizen, onSaved, value, onChange 
     }))
   }
   function addStep() {
-    const newId = `s${Date.now()}`
-    const newNum = data.steps.length + 1
-    setData(prev => ({
-      ...prev,
-      steps: [...prev.steps, { id: newId, num: newNum, label: `Step ${newNum}` }],
-    }))
-  }
+  const newId = `s${Date.now()}`
+  const newNum = data.steps.length + 1
+
+  setData(prev => ({
+    ...prev,
+    steps: [
+      ...prev.steps,
+      {
+        id: newId,
+        num: newNum,
+        label: `Step ${newNum}`,
+        planned: {
+          start: null,
+          end: null,
+        },
+        completed: {
+          start: null,
+          end: null,
+        },
+      },
+    ],
+  }))
+}
   function removeStep(stepId) {
     if (!confirm('Eliminare questo step e tutte le sue celle?')) return
     setData(prev => {
