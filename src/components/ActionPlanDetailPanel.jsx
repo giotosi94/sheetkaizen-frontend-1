@@ -1,7 +1,20 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
-  X, Edit2, Trash2, MessageSquare, Link2, AtSign, CheckSquare, Square,
-  Send, Calendar, AlertCircle, Bug, TrendingUp, Shield, Wrench, Paperclip, Camera, FileText, ImageIcon
+  X,
+  Edit2,
+  Trash2,
+  AtSign,
+  CheckSquare,
+  Square,
+  Send,
+  AlertCircle,
+  Bug,
+  TrendingUp,
+  Shield,
+  Wrench,
+  Paperclip,
+  Camera,
+  FileText,
 } from 'lucide-react'
 import api from '../services/api'
 import { useAllConfigurations } from '../hooks/useConfigurations'
@@ -32,14 +45,16 @@ const TIPO_COLORS = {
   Sicurezza: 'text-yellow-600',
 }
 
-// Compressione automatica immagini (max 1280px, qualità 80%)
 async function compressImage(file, maxSize = 1280, quality = 0.8) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
-    reader.onload = (e) => {
-      const img = new Image()
-      img.onload = () => {
-        let { width, height } = img
+
+    reader.onload = event => {
+      const image = new Image()
+
+      image.onload = () => {
+        let { width, height } = image
+
         if (width > maxSize || height > maxSize) {
           if (width > height) {
             height = Math.round((height * maxSize) / width)
@@ -49,17 +64,28 @@ async function compressImage(file, maxSize = 1280, quality = 0.8) {
             height = maxSize
           }
         }
+
         const canvas = document.createElement('canvas')
         canvas.width = width
         canvas.height = height
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(img, 0, 0, width, height)
+
+        const context = canvas.getContext('2d')
+
+        if (!context) {
+          reject(new Error('Impossibile elaborare l’immagine'))
+          return
+        }
+
+        context.drawImage(image, 0, 0, width, height)
+
         const dataUrl = canvas.toDataURL('image/jpeg', quality)
         resolve(dataUrl)
       }
-      img.onerror = reject
-      img.src = e.target.result
+
+      image.onerror = reject
+      image.src = event.target.result
     }
+
     reader.onerror = reject
     reader.readAsDataURL(file)
   })
@@ -68,168 +94,641 @@ async function compressImage(file, maxSize = 1280, quality = 0.8) {
 async function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
-    reader.onload = (e) => resolve(e.target.result)
+
+    reader.onload = event => resolve(event.target.result)
     reader.onerror = reject
     reader.readAsDataURL(file)
   })
 }
 
-export default function ActionPlanDetailPanel({ plan, onClose, onUpdated, onEdit, onCancel, onRestore, onDelete }) {
+export default function ActionPlanDetailPanel({
+  plan,
+  onClose,
+  onUpdated,
+  onEdit,
+  onCancel,
+  onRestore,
+  onDelete,
+}) {
   const [detail, setDetail] = useState(plan)
   const [nuovoCommento, setNuovoCommento] = useState('')
   const [nuovoChecklistItem, setNuovoChecklistItem] = useState('')
   const [uploadingAllegato, setUploadingAllegato] = useState(false)
   const [lightboxImg, setLightboxImg] = useState(null)
+  const [showCamera, setShowCamera] = useState(false)
+  const [cameraReady, setCameraReady] = useState(false)
+
+  const videoRef = useRef(null)
+  const streamRef = useRef(null)
+
   const { configs } = useAllConfigurations()
   const statiConfig = configs.stato_ap || []
 
-  // Detection stato terminale (read-only)
-  const statoCorrente = statiConfig.find(s => s.label === detail.stato)
-  const isLocked = !!(statoCorrente && statoCorrente.is_terminal)
+  const statoCorrente = statiConfig.find(
+    stato => stato.label === detail.stato
+  )
 
-  // Stato a cui tornare quando si riapre
+  const isLocked = Boolean(
+    statoCorrente && statoCorrente.is_terminal
+  )
+
   const statoRiapertura =
-    statiConfig.find(s => s.label === 'Aperto' && !s.is_terminal)?.label ||
-    statiConfig.find(s => !s.is_terminal)?.label ||
+    statiConfig.find(
+      stato => stato.label === 'Aperto' && !stato.is_terminal
+    )?.label ||
+    statiConfig.find(stato => !stato.is_terminal)?.label ||
     'Aperto'
 
-  async function riapriAP() {
-    if (!confirm(`Riaprire questo Action Plan?\nLo stato tornerà a "${statoRiapertura}".`)) return
-    await api.patch(`/action-plans/${plan._id}/stato`, { stato: statoRiapertura })
-    reload()
-  }
-
   useEffect(() => {
-    api.get(`/action-plans/${plan._id}`).then(res => setDetail(res.data)).catch(() => {})
+    api
+      .get(`/action-plans/${plan._id}`)
+      .then(response => setDetail(response.data))
+      .catch(error => console.error(error))
   }, [plan._id])
 
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current
+          .getTracks()
+          .forEach(track => track.stop())
+
+        streamRef.current = null
+      }
+    }
+  }, [])
+
   async function reload() {
-    const res = await api.get(`/action-plans/${plan._id}`)
-    setDetail(res.data)
+    const response = await api.get(
+      `/action-plans/${plan._id}`
+    )
+
+    setDetail(response.data)
     onUpdated?.()
+  }
+
+  async function riapriAP() {
+    if (
+      !confirm(
+        `Riaprire questo Action Plan?\nLo stato tornerà a "${statoRiapertura}".`
+      )
+    ) {
+      return
+    }
+
+    try {
+      await api.patch(
+        `/action-plans/${plan._id}/stato`,
+        {
+          stato: statoRiapertura,
+        }
+      )
+
+      await reload()
+    } catch (error) {
+      console.error(error)
+
+      alert(
+        'Errore durante la riapertura: ' +
+        (error.response?.data?.detail || error.message)
+      )
+    }
   }
 
   async function addCommento() {
     if (!nuovoCommento.trim()) return
-    await api.post(`/action-plans/${plan._id}/commenti`, { testo: nuovoCommento, autore: 'Default User' })
-    setNuovoCommento('')
-    reload()
+
+    try {
+      await api.post(
+        `/action-plans/${plan._id}/commenti`,
+        {
+          testo: nuovoCommento,
+          autore: 'Default User',
+        }
+      )
+
+      setNuovoCommento('')
+      await reload()
+    } catch (error) {
+      console.error(error)
+
+      alert(
+        'Errore durante l’aggiunta del commento: ' +
+        (error.response?.data?.detail || error.message)
+      )
+    }
   }
 
   async function addChecklistItem() {
     if (!nuovoChecklistItem.trim()) return
-    await api.post(`/action-plans/${plan._id}/checklist`, { testo: nuovoChecklistItem })
-    setNuovoChecklistItem('')
-    reload()
+
+    try {
+      await api.post(
+        `/action-plans/${plan._id}/checklist`,
+        {
+          testo: nuovoChecklistItem,
+        }
+      )
+
+      setNuovoChecklistItem('')
+      await reload()
+    } catch (error) {
+      console.error(error)
+
+      alert(
+        'Errore durante l’aggiunta dell’item: ' +
+        (error.response?.data?.detail || error.message)
+      )
+    }
   }
 
   async function toggleChecklist(itemId, completato) {
-    await api.patch(`/action-plans/${plan._id}/checklist/${itemId}`, { completato })
-    reload()
+    try {
+      await api.patch(
+        `/action-plans/${plan._id}/checklist/${itemId}`,
+        {
+          completato,
+        }
+      )
+
+      await reload()
+    } catch (error) {
+      console.error(error)
+
+      alert(
+        'Errore durante l’aggiornamento della checklist: ' +
+        (error.response?.data?.detail || error.message)
+      )
+    }
   }
 
   async function removeChecklist(itemId) {
-    await api.delete(`/action-plans/${plan._id}/checklist/${itemId}`)
-    reload()
+    try {
+      await api.delete(
+        `/action-plans/${plan._id}/checklist/${itemId}`
+      )
+
+      await reload()
+    } catch (error) {
+      console.error(error)
+
+      alert(
+        'Errore durante la rimozione dell’item: ' +
+        (error.response?.data?.detail || error.message)
+      )
+    }
   }
 
   async function changeStato(stato) {
-    await api.patch(`/action-plans/${plan._id}/stato`, { stato })
-    reload()
+    try {
+      await api.patch(
+        `/action-plans/${plan._id}/stato`,
+        {
+          stato,
+        }
+      )
+
+      await reload()
+    } catch (error) {
+      console.error(error)
+
+      alert(
+        'Errore durante il cambio stato: ' +
+        (error.response?.data?.detail || error.message)
+      )
+    }
   }
 
-  async function handleFileUpload(e) {
-    const files = Array.from(e.target.files || [])
+  async function uploadActionPlanFile(
+    file,
+    currentAttachmentCount
+  ) {
+    if (currentAttachmentCount >= 10) {
+      alert('Massimo 10 allegati per Action Plan')
+      return false
+    }
+
+    const isImage = file.type.startsWith('image/')
+    const isPdf = file.type === 'application/pdf'
+
+    const isWord =
+      file.type.includes('word') ||
+      file.name.toLowerCase().endsWith('.doc') ||
+      file.name.toLowerCase().endsWith('.docx')
+
+    const isExcel =
+      file.type.includes('excel') ||
+      file.type.includes('sheet') ||
+      file.name.toLowerCase().endsWith('.xls') ||
+      file.name.toLowerCase().endsWith('.xlsx')
+
+    if (!isImage && !isPdf && !isWord && !isExcel) {
+      alert(
+        `Tipo file non supportato: ${file.name}\nSupportati: immagini, PDF, Word ed Excel`
+      )
+
+      return false
+    }
+
+    const maxBytes = isImage
+      ? 10 * 1024 * 1024
+      : 2 * 1024 * 1024
+
+    if (file.size > maxBytes) {
+      alert(
+        `File troppo grande: ${file.name}\nMassimo consentito: ${
+          isImage
+            ? '10 MB per le immagini'
+            : '2 MB per i documenti'
+        }`
+      )
+
+      return false
+    }
+
+    const base64Data = isImage
+      ? await compressImage(file)
+      : await fileToBase64(file)
+
+    const base64Content =
+      typeof base64Data === 'string' &&
+      base64Data.includes(',')
+        ? base64Data.split(',')[1]
+        : base64Data
+
+    const dimensioneFinale = Math.round(
+      (base64Content.length * 3) / 4
+    )
+
+    await api.post(
+      `/action-plans/${plan._id}/allegati`,
+      {
+        nome: file.name,
+        tipo: file.type || 'application/octet-stream',
+        dimensione: dimensioneFinale,
+        data: base64Data,
+        autore: 'Default User',
+      }
+    )
+
+    return true
+  }
+
+  async function handleFileUpload(event) {
+    const files = Array.from(
+      event.target.files || []
+    )
+
     if (files.length === 0) return
 
+    const availableSlots =
+      10 - (detail.allegati || []).length
+
+    if (availableSlots <= 0) {
+      alert('Massimo 10 allegati per Action Plan')
+      event.target.value = ''
+      return
+    }
+
+    const selectedFiles = files.slice(
+      0,
+      availableSlots
+    )
+
+    if (files.length > availableSlots) {
+      alert(
+        `Puoi aggiungere ancora ${availableSlots} allegati. Verranno caricati soltanto i primi ${availableSlots} file.`
+      )
+    }
+
     setUploadingAllegato(true)
+
     try {
-      for (const file of files) {
-        const totaleAttuale = (detail.allegati || []).length
-        if (totaleAttuale >= 10) {
-          alert('Massimo 10 allegati per Action Plan')
-          break
+      let currentAttachmentCount =
+        (detail.allegati || []).length
+
+      for (const file of selectedFiles) {
+        const uploaded =
+          await uploadActionPlanFile(
+            file,
+            currentAttachmentCount
+          )
+
+        if (uploaded) {
+          currentAttachmentCount += 1
         }
-
-        const isImage = file.type.startsWith('image/')
-        const isPdf = file.type === 'application/pdf'
-        const isDoc = file.type.includes('word') || file.type.includes('excel') ||
-                      file.type.includes('sheet') || file.type.includes('document')
-
-        if (!isImage && !isPdf && !isDoc) {
-          alert(`Tipo file non supportato: ${file.name}\nSupportati: immagini, PDF, Word, Excel`)
-          continue
-        }
-
-        const maxBytes = isImage ? 10 * 1024 * 1024 : 2 * 1024 * 1024
-        if (file.size > maxBytes) {
-          alert(`File troppo grande: ${file.name}\nMax: ${isImage ? '10 MB (immagini)' : '2 MB'}`)
-          continue
-        }
-
-        const base64Data = isImage
-          ? await compressImage(file)
-          : await fileToBase64(file)
-
-        const dimensioneFinale = Math.round((base64Data.length * 3) / 4)
-
-        await api.post(`/action-plans/${plan._id}/allegati`, {
-          nome: file.name,
-          tipo: file.type,
-          dimensione: dimensioneFinale,
-          data: base64Data,
-          autore: 'Default User',
-        })
       }
-      reload()
-    } catch (err) {
-      console.error(err)
-      alert('Errore upload: ' + (err.response?.data?.detail || err.message))
+
+      await reload()
+    } catch (error) {
+      console.error(error)
+
+      alert(
+        'Errore durante il caricamento: ' +
+        (error.response?.data?.detail || error.message)
+      )
     } finally {
       setUploadingAllegato(false)
-      e.target.value = ''
+      event.target.value = ''
     }
   }
 
-  async function removeAllegato(allegatoId, nome) {
-    if (!confirm(`Eliminare l'allegato "${nome}"?`)) return
+  function stopCamera() {
+    if (streamRef.current) {
+      streamRef.current
+        .getTracks()
+        .forEach(track => track.stop())
+
+      streamRef.current = null
+    }
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+
+    setCameraReady(false)
+  }
+
+  async function openCamera() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      alert(
+        'La fotocamera non è supportata dal dispositivo o dal browser.'
+      )
+
+      return
+    }
+
+    if ((detail.allegati || []).length >= 10) {
+      alert('Massimo 10 allegati per Action Plan')
+      return
+    }
+
     try {
-      await api.delete(`/action-plans/${plan._id}/allegati/${allegatoId}`)
-      reload()
-    } catch (err) {
-      alert('Errore: ' + (err.response?.data?.detail || err.message))
+      stopCamera()
+
+      let stream
+
+      try {
+        stream =
+          await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: {
+                ideal: 'environment',
+              },
+            },
+            audio: false,
+          })
+      } catch {
+        stream =
+          await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          })
+      }
+
+      streamRef.current = stream
+      setShowCamera(true)
+
+      window.setTimeout(() => {
+        if (
+          videoRef.current &&
+          streamRef.current
+        ) {
+          videoRef.current.srcObject =
+            streamRef.current
+
+          videoRef.current
+            .play()
+            .catch(() => {})
+        }
+      }, 100)
+    } catch (error) {
+      console.error(error)
+
+      stopCamera()
+      setShowCamera(false)
+
+      if (error.name === 'NotAllowedError') {
+        alert(
+          'Accesso alla fotocamera non autorizzato. Abilita il permesso nelle impostazioni del browser.'
+        )
+      } else if (
+        error.name === 'NotFoundError'
+      ) {
+        alert(
+          'Nessuna fotocamera disponibile sul dispositivo.'
+        )
+      } else {
+        alert(
+          'Impossibile accedere alla fotocamera.'
+        )
+      }
     }
   }
 
-  const TipoIcon = TIPO_ICONS[detail.tipo] || CheckSquare
-  const checklistCompletati = detail.checklist?.filter(c => c.completato).length || 0
-  const checklistTotali = detail.checklist?.length || 0
-  const checklistPercent = checklistTotali ? Math.round((checklistCompletati / checklistTotali) * 100) : 0
+  function closeCamera() {
+    stopCamera()
+    setShowCamera(false)
+  }
+
+  function takePhoto() {
+    const video = videoRef.current
+
+    if (
+      !video ||
+      !video.videoWidth ||
+      !video.videoHeight
+    ) {
+      alert(
+        'La fotocamera non è ancora pronta.'
+      )
+
+      return
+    }
+
+    const canvas =
+      document.createElement('canvas')
+
+    const maxDimension = 1280
+
+    let width = video.videoWidth
+    let height = video.videoHeight
+
+    if (
+      width > maxDimension ||
+      height > maxDimension
+    ) {
+      const scale = Math.min(
+        maxDimension / width,
+        maxDimension / height
+      )
+
+      width = Math.round(width * scale)
+      height = Math.round(height * scale)
+    }
+
+    canvas.width = width
+    canvas.height = height
+
+    const context = canvas.getContext('2d')
+
+    if (!context) {
+      alert(
+        'Impossibile elaborare la fotografia.'
+      )
+
+      return
+    }
+
+    context.drawImage(
+      video,
+      0,
+      0,
+      width,
+      height
+    )
+
+    canvas.toBlob(
+      async blob => {
+        if (!blob) {
+          alert(
+            'Impossibile acquisire la fotografia.'
+          )
+
+          return
+        }
+
+        const file = new File(
+          [blob],
+          `action_plan_${Date.now()}.jpg`,
+          {
+            type: 'image/jpeg',
+          }
+        )
+
+        closeCamera()
+        setUploadingAllegato(true)
+
+        try {
+          const uploaded =
+            await uploadActionPlanFile(
+              file,
+              (detail.allegati || []).length
+            )
+
+          if (uploaded) {
+            await reload()
+          }
+        } catch (error) {
+          console.error(error)
+
+          alert(
+            'Errore durante il caricamento della fotografia: ' +
+            (
+              error.response?.data?.detail ||
+              error.message
+            )
+          )
+        } finally {
+          setUploadingAllegato(false)
+        }
+      },
+      'image/jpeg',
+      0.8
+    )
+  }
+
+  async function removeAllegato(
+    allegatoId,
+    nome
+  ) {
+    if (
+      !confirm(
+        `Eliminare l'allegato "${nome}"?`
+      )
+    ) {
+      return
+    }
+
+    try {
+      await api.delete(
+        `/action-plans/${plan._id}/allegati/${allegatoId}`
+      )
+
+      await reload()
+    } catch (error) {
+      console.error(error)
+
+      alert(
+        'Errore durante l’eliminazione: ' +
+        (error.response?.data?.detail || error.message)
+      )
+    }
+  }
+
+  const TipoIcon =
+    TIPO_ICONS[detail.tipo] || CheckSquare
+
+  const checklistCompletati =
+    detail.checklist?.filter(
+      item => item.completato
+    ).length || 0
+
+  const checklistTotali =
+    detail.checklist?.length || 0
+
+  const checklistPercent =
+    checklistTotali > 0
+      ? Math.round(
+          (
+            checklistCompletati /
+            checklistTotali
+          ) * 100
+        )
+      : 0
+
   const allegati = detail.allegati || []
-  const immagini = allegati.filter(a => a.tipo?.startsWith('image/'))
-  const documenti = allegati.filter(a => !a.tipo?.startsWith('image/'))
+
+  const immagini = allegati.filter(
+    allegato =>
+      allegato.tipo?.startsWith('image/')
+  )
+
+  const documenti = allegati.filter(
+    allegato =>
+      !allegato.tipo?.startsWith('image/')
+  )
 
   return (
-    <Modal onClose={onClose}>
-      <div className="grid grid-cols-3 gap-0 h-[85vh]">
-        {/* COLONNA SX */}
-        <div className="col-span-2 overflow-y-auto border-r">
+    <Modal>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-0 h-[85vh]">
+        <div className="lg:col-span-2 overflow-y-auto border-r">
           <div className="bg-gradient-to-r from-primary to-primary-light text-white p-4">
             <div className="flex items-center gap-2 text-sm opacity-90 mb-2">
               <TipoIcon size={16} />
               <span>{detail.tipo}</span>
               <span>·</span>
-              <span className="font-mono">{detail.numero}</span>
+              <span className="font-mono">
+                {detail.numero}
+              </span>
             </div>
-            <h2 className="text-xl font-bold">{detail.titolo}</h2>
+
+            <h2 className="text-xl font-bold">
+              {detail.titolo}
+            </h2>
           </div>
 
           {isLocked && (
             <div className="bg-yellow-50 border-l-4 border-yellow-400 px-4 py-3 flex items-center justify-between gap-3">
               <div className="text-sm text-yellow-900">
-                <strong>Action Plan chiuso</strong> — read-only. Per modificarlo riaprilo.
+                <strong>
+                  Action Plan chiuso
+                </strong>
+                {' '}· Modalità sola lettura. Per modificarlo, riapri l’Action Plan.
               </div>
+
               <button
+                type="button"
                 onClick={riapriAP}
                 className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded text-sm font-medium whitespace-nowrap"
               >
@@ -242,81 +741,188 @@ export default function ActionPlanDetailPanel({ plan, onClose, onUpdated, onEdit
             <Section title="Descrizione">
               {detail.descrizione ? (
                 <div className="bg-gray-50 p-3 rounded text-sm whitespace-pre-wrap">
-                  {renderWithMentionsTags(detail.descrizione)}
+                  {renderWithMentionsTags(
+                    detail.descrizione
+                  )}
                 </div>
               ) : (
-                <div className="text-sm text-gray-400 italic">Nessuna descrizione</div>
+                <div className="text-sm text-gray-400 italic">
+                  Nessuna descrizione
+                </div>
               )}
             </Section>
 
-            {(detail.tags?.length > 0 || detail.mentions?.length > 0) && (
+            {(
+              detail.tags?.length > 0 ||
+              detail.mentions?.length > 0
+            ) && (
               <Section title="Tags & Mentions">
                 <div className="flex flex-wrap gap-2">
-                  {detail.tags?.map(t => (
-                    <span key={t} className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs">#{t}</span>
-                  ))}
-                  {detail.mentions?.map(m => (
-                    <span key={m} className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs flex items-center gap-1">
-                      <AtSign size={10} />{m}
+                  {detail.tags?.map(tag => (
+                    <span
+                      key={tag}
+                      className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs"
+                    >
+                      #{tag}
                     </span>
                   ))}
+
+                  {detail.mentions?.map(
+                    mention => (
+                      <span
+                        key={mention}
+                        className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs flex items-center gap-1"
+                      >
+                        <AtSign size={10} />
+                        {mention}
+                      </span>
+                    )
+                  )}
                 </div>
               </Section>
             )}
 
-            <Section title={`Checklist ${checklistTotali > 0 ? `(${checklistCompletati}/${checklistTotali})` : ''}`}>
+            <Section
+              title={`Checklist ${
+                checklistTotali > 0
+                  ? `(${checklistCompletati}/${checklistTotali})`
+                  : ''
+              }`}
+            >
               {checklistTotali > 0 && (
                 <div className="mb-2">
                   <div className="w-full bg-gray-200 rounded-full h-1.5">
-                    <div className="bg-green-500 h-1.5 rounded-full transition-all" style={{ width: `${checklistPercent}%` }} />
+                    <div
+                      className="bg-green-500 h-1.5 rounded-full transition-all"
+                      style={{
+                        width: `${checklistPercent}%`,
+                      }}
+                    />
                   </div>
                 </div>
               )}
+
               <div className="space-y-1">
-                {(detail.checklist || []).map(item => (
-                  <div key={item.id} className="flex items-center gap-2 group">
-                    <button
-                      onClick={() => toggleChecklist(item.id, !item.completato)}
-                      disabled={isLocked}
-                      className={isLocked ? 'cursor-not-allowed' : ''}
+                {(detail.checklist || []).map(
+                  item => (
+                    <div
+                      key={item.id}
+                      className="flex items-center gap-2 group"
                     >
-                      {item.completato ? <CheckSquare size={18} className="text-green-600" /> : <Square size={18} className="text-gray-400" />}
-                    </button>
-                    <span className={`flex-1 text-sm ${item.completato ? 'line-through text-gray-400' : ''}`}>{item.testo}</span>
-                    {!isLocked && (
-                      <button onClick={() => removeChecklist(item.id)} className="opacity-0 group-hover:opacity-100 text-red-500">
-                        <Trash2 size={14} />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          toggleChecklist(
+                            item.id,
+                            !item.completato
+                          )
+                        }
+                        disabled={isLocked}
+                        className={
+                          isLocked
+                            ? 'cursor-not-allowed'
+                            : ''
+                        }
+                      >
+                        {item.completato ? (
+                          <CheckSquare
+                            size={18}
+                            className="text-green-600"
+                          />
+                        ) : (
+                          <Square
+                            size={18}
+                            className="text-gray-400"
+                          />
+                        )}
                       </button>
-                    )}
-                  </div>
-                ))}
+
+                      <span
+                        className={`flex-1 text-sm ${
+                          item.completato
+                            ? 'line-through text-gray-400'
+                            : ''
+                        }`}
+                      >
+                        {item.testo}
+                      </span>
+
+                      {!isLocked && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeChecklist(item.id)
+                          }
+                          className="opacity-0 group-hover:opacity-100 text-red-500"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  )
+                )}
               </div>
+
               {!isLocked && (
                 <div className="flex gap-2 mt-2">
-                  <input value={nuovoChecklistItem} onChange={(e) => setNuovoChecklistItem(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addChecklistItem())}
-                    placeholder="Aggiungi item..." className="flex-1 border rounded px-3 py-1.5 text-sm" />
-                  <button onClick={addChecklistItem} className="px-3 py-1.5 bg-gray-200 rounded text-sm hover:bg-gray-300">+ Item</button>
+                  <input
+                    value={nuovoChecklistItem}
+                    onChange={event =>
+                      setNuovoChecklistItem(
+                        event.target.value
+                      )
+                    }
+                    onKeyDown={event => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        addChecklistItem()
+                      }
+                    }}
+                    placeholder="Aggiungi item..."
+                    className="flex-1 border rounded px-3 py-1.5 text-sm"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={addChecklistItem}
+                    className="px-3 py-1.5 bg-gray-200 rounded text-sm hover:bg-gray-300"
+                  >
+                    + Item
+                  </button>
                 </div>
               )}
             </Section>
 
-            {/* ALLEGATI */}
-            <Section title={`Allegati ${allegati.length > 0 ? `(${allegati.length}/10)` : ''}`}>
+            <Section
+              title={`Allegati ${
+                allegati.length > 0
+                  ? `(${allegati.length}/10)`
+                  : ''
+              }`}
+            >
               {immagini.length > 0 && (
-                <div className="grid grid-cols-3 gap-2 mb-3">
-                  {immagini.map(img => (
-                    <div key={img.id} className="relative group">
-                      <img
-                        src={img.data}
-                        alt={img.nome}
-                        className="w-full h-24 object-cover rounded border cursor-pointer hover:opacity-80"
-                        onClick={() => setLightboxImg(img)}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
+                  {immagini.map(image => (
+                    <div
+                      key={image.id}
+                      className="relative group"
+                    >
+                      {image.data} =>
+                          setLightboxImg(image)
+                        }
                       />
+
                       {!isLocked && (
                         <button
-                          onClick={() => removeAllegato(img.id, img.nome)}
-                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          type="button"
+                          onClick={() =>
+                            removeAllegato(
+                              image.id,
+                              image.nome
+                            )
+                          }
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                          title="Elimina immagine"
                         >
                           <Trash2 size={12} />
                         </button>
@@ -328,23 +934,40 @@ export default function ActionPlanDetailPanel({ plan, onClose, onUpdated, onEdit
 
               {documenti.length > 0 && (
                 <div className="space-y-1 mb-3">
-                  {documenti.map(doc => (
-                    <div key={doc.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded text-sm group">
-                      <FileText size={16} className="text-gray-500 flex-shrink-0" />
-                      <a
-                        href={doc.data}
-                        download={doc.nome}
-                        className="flex-1 truncate text-blue-600 hover:underline"
-                      >
-                        {doc.nome}
+                  {documenti.map(documento => (
+                    <div
+                      key={documento.id}
+                      className="flex items-center gap-2 p-2 bg-gray-50 rounded text-sm group"
+                    >
+                      <FileText
+                        size={16}
+                        className="text-gray-500 flex-shrink-0"
+                      />
+
+                      {documento.data}
+                        {documento.nome}
                       </a>
+
                       <span className="text-xs text-gray-400">
-                        {(doc.dimensione / 1024).toFixed(0)} KB
+                        {documento.dimensione
+                          ? `${(
+                              documento.dimensione /
+                              1024
+                            ).toFixed(0)} KB`
+                          : ''}
                       </span>
+
                       {!isLocked && (
                         <button
-                          onClick={() => removeAllegato(doc.id, doc.nome)}
-                          className="opacity-0 group-hover:opacity-100 text-red-500"
+                          type="button"
+                          onClick={() =>
+                            removeAllegato(
+                              documento.id,
+                              documento.nome
+                            )
+                          }
+                          className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-red-500"
+                          title="Elimina documento"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -354,60 +977,135 @@ export default function ActionPlanDetailPanel({ plan, onClose, onUpdated, onEdit
                 </div>
               )}
 
-              {allegati.length < 10 && !isLocked && (
-                <div className="flex gap-2">
-                  <label className="flex-1 flex items-center justify-center gap-2 px-3 py-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm text-gray-600">
-                    <Paperclip size={16} />
-                    {uploadingAllegato ? 'Caricamento...' : 'Aggiungi file'}
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
-                      onChange={handleFileUpload}
-                      disabled={uploadingAllegato}
-                      className="hidden"
-                    />
-                  </label>
-                  <label className="flex items-center justify-center gap-2 px-3 py-2 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:bg-blue-50 text-sm text-blue-600">
-                    <Camera size={16} />
-                    Foto
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={handleFileUpload}
-                      disabled={uploadingAllegato}
-                      className="hidden"
-                    />
-                  </label>
+              {allegati.length === 0 && (
+                <div className="text-sm text-gray-400 italic mb-3">
+                  Nessun allegato
+                </div>
+              )}
+
+              {allegati.length < 10 &&
+                !isLocked && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <label className="flex items-center justify-center gap-2 px-3 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 hover:border-primary text-sm text-gray-600 transition-colors">
+                      <Paperclip size={16} />
+
+                      {uploadingAllegato
+                        ? 'Caricamento...'
+                        : 'Aggiungi file'}
+
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                        onChange={
+                          handleFileUpload
+                        }
+                        disabled={
+                          uploadingAllegato
+                        }
+                        className="hidden"
+                      />
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={openCamera}
+                      disabled={
+                        uploadingAllegato
+                      }
+                      className="flex items-center justify-center gap-2 px-3 py-3 border-2 border-dashed border-primary rounded-lg hover:bg-yellow-50 text-sm text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Camera size={16} />
+                      Scatta foto
+                    </button>
+                  </div>
+                )}
+
+              {uploadingAllegato && (
+                <div className="mt-3">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                    <div className="h-full w-1/2 rounded-full bg-primary animate-pulse" />
+                  </div>
+
+                  <div className="text-xs text-gray-500 mt-1">
+                    Caricamento allegato in corso...
+                  </div>
                 </div>
               )}
             </Section>
 
-            <Section title={`Commenti (${detail.commenti?.length || 0})`}>
+            <Section
+              title={`Commenti (${
+                detail.commenti?.length || 0
+              })`}
+            >
               <div className="space-y-3 mb-3">
-                {(detail.commenti || []).slice().reverse().map(c => (
-                  <div key={c.id} className="flex gap-2">
-                    <Avatar name={c.autore} size={32} />
-                    <div className="flex-1 bg-gray-50 p-3 rounded-lg">
-                      <div className="flex justify-between items-center mb-1">
-                        <strong className="text-sm">{c.autore}</strong>
-                        <span className="text-xs text-gray-400">{new Date(c.timestamp).toLocaleString('it-IT')}</span>
+                {(detail.commenti || [])
+                  .slice()
+                  .reverse()
+                  .map(commento => (
+                    <div
+                      key={commento.id}
+                      className="flex gap-2"
+                    >
+                      <Avatar
+                        name={commento.autore}
+                        size={32}
+                      />
+
+                      <div className="flex-1 bg-gray-50 p-3 rounded-lg">
+                        <div className="flex justify-between items-center gap-3 mb-1">
+                          <strong className="text-sm">
+                            {commento.autore}
+                          </strong>
+
+                          <span className="text-xs text-gray-400">
+                            {new Date(
+                              commento.timestamp
+                            ).toLocaleString(
+                              'it-IT'
+                            )}
+                          </span>
+                        </div>
+
+                        <div className="text-sm whitespace-pre-wrap">
+                          {renderWithMentionsTags(
+                            commento.testo
+                          )}
+                        </div>
                       </div>
-                      <div className="text-sm whitespace-pre-wrap">{renderWithMentionsTags(c.testo)}</div>
                     </div>
+                  ))}
+
+                {(
+                  !detail.commenti ||
+                  detail.commenti.length === 0
+                ) && (
+                  <div className="text-sm text-gray-400 italic">
+                    Nessun commento
                   </div>
-                ))}
-                {(!detail.commenti || detail.commenti.length === 0) && (
-                  <div className="text-sm text-gray-400 italic">Nessun commento</div>
                 )}
               </div>
+
               {!isLocked && (
                 <div className="flex gap-2">
-                  <textarea value={nuovoCommento} onChange={(e) => setNuovoCommento(e.target.value)}
+                  <textarea
+                    value={nuovoCommento}
+                    onChange={event =>
+                      setNuovoCommento(
+                        event.target.value
+                      )
+                    }
                     placeholder="Scrivi un commento"
-                    rows={2} className="flex-1 border rounded-lg px-3 py-2 text-sm" />
-                  <button onClick={addCommento} className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-light self-end">
+                    rows={2}
+                    className="flex-1 border rounded-lg px-3 py-2 text-sm"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={addCommento}
+                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-light self-end"
+                  >
                     <Send size={16} />
                   </button>
                 </div>
@@ -416,32 +1114,75 @@ export default function ActionPlanDetailPanel({ plan, onClose, onUpdated, onEdit
           </div>
         </div>
 
-        {/* COLONNA DX */}
         <div className="overflow-y-auto bg-gray-50 p-4 space-y-4">
           <div className="flex justify-between items-center pb-2 border-b">
-            <span className="text-sm font-medium">Dettagli</span>
+            <span className="text-sm font-medium">
+              Dettagli
+            </span>
+
             <div className="flex gap-1">
-              {!isLocked && !detail.is_cancelled && onCancel && (
-                <button onClick={() => onCancel(detail)} className="p-1.5 hover:bg-orange-100 rounded text-orange-600" title="Annulla">
-                  <AlertCircle size={14} />
-                </button>
-              )}
-              {!isLocked && detail.is_cancelled && onRestore && (
-                <button onClick={() => onRestore(detail)} className="p-1.5 hover:bg-green-100 rounded text-green-600" title="Ripristina">
-                  ↺
-                </button>
-              )}
+              {!isLocked &&
+                !detail.is_cancelled &&
+                onCancel && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onCancel(detail)
+                    }
+                    className="p-1.5 hover:bg-orange-100 rounded text-orange-600"
+                    title="Annulla"
+                  >
+                    <AlertCircle size={14} />
+                  </button>
+                )}
+
+              {!isLocked &&
+                detail.is_cancelled &&
+                onRestore && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onRestore(detail)
+                    }
+                    className="p-1.5 hover:bg-green-100 rounded text-green-600"
+                    title="Ripristina"
+                  >
+                    ↺
+                  </button>
+                )}
+
               {!isLocked && onDelete && (
-                <button onClick={() => onDelete(detail._id)} className="p-1.5 hover:bg-red-100 rounded text-red-600" title="Elimina">
+                <button
+                  type="button"
+                  onClick={() =>
+                    onDelete(detail._id)
+                  }
+                  className="p-1.5 hover:bg-red-100 rounded text-red-600"
+                  title="Elimina"
+                >
                   <Trash2 size={14} />
                 </button>
               )}
+
               {!isLocked && onEdit && (
-                <button onClick={() => onEdit(detail)} className="p-1.5 hover:bg-gray-200 rounded" title="Modifica">
+                <button
+                  type="button"
+                  onClick={() =>
+                    onEdit(detail)
+                  }
+                  className="p-1.5 hover:bg-gray-200 rounded"
+                  title="Modifica"
+                >
                   <Edit2 size={14} />
                 </button>
               )}
-              <button onClick={onClose} className="p-1.5 hover:bg-gray-200 rounded" title="Chiudi">
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 hover:bg-gray-200 rounded"
+                title="Chiudi"
+              >
                 <X size={14} />
               </button>
             </div>
@@ -449,40 +1190,83 @@ export default function ActionPlanDetailPanel({ plan, onClose, onUpdated, onEdit
 
           {detail.is_cancelled && (
             <div className="bg-red-100 border border-red-300 rounded p-2 text-xs">
-              <div className="font-bold text-red-800 mb-1">Action Plan annullato</div>
-              {detail.cancelled_reason && <div className="text-red-700 italic">"{detail.cancelled_reason}"</div>}
+              <div className="font-bold text-red-800 mb-1">
+                Action Plan annullato
+              </div>
+
+              {detail.cancelled_reason && (
+                <div className="text-red-700 italic">
+                  “{detail.cancelled_reason}”
+                </div>
+              )}
+
               {detail.cancelled_at && (
                 <div className="text-red-600 mt-1">
-                  {new Date(detail.cancelled_at).toLocaleDateString('it-IT')}
-                  {detail.cancelled_by && ` da ${detail.cancelled_by}`}
+                  {new Date(
+                    detail.cancelled_at
+                  ).toLocaleDateString('it-IT')}
+
+                  {detail.cancelled_by &&
+                    ` da ${detail.cancelled_by}`}
                 </div>
               )}
             </div>
           )}
 
           <SidebarRow label="Stato">
-            <select value={detail.stato || ''} onChange={(e) => changeStato(e.target.value)}
-              className="text-xs px-2 py-1 rounded border bg-gray-100 text-gray-700 border-gray-300">
+            <select
+              value={detail.stato || ''}
+              onChange={event =>
+                changeStato(
+                  event.target.value
+                )
+              }
+              disabled={isLocked}
+              className="text-xs px-2 py-1 rounded border bg-gray-100 text-gray-700 border-gray-300 disabled:opacity-60"
+            >
               {statiConfig.length === 0 ? (
-                <option value={detail.stato || ''}>{detail.stato || 'Configura stati'}</option>
+                <option
+                  value={detail.stato || ''}
+                >
+                  {detail.stato ||
+                    'Configura stati'}
+                </option>
               ) : (
-                statiConfig.map(s => (
-                  <option key={s._id} value={s.label}>{s.label}</option>
+                statiConfig.map(stato => (
+                  <option
+                    key={stato._id}
+                    value={stato.label}
+                  >
+                    {stato.label}
+                  </option>
                 ))
               )}
             </select>
           </SidebarRow>
 
           <SidebarRow label="Priorità">
-            <span className={`px-2 py-0.5 rounded text-xs ${PRIORITA_BG[detail.priorita] || ''}`}>
+            <span
+              className={`px-2 py-0.5 rounded text-xs ${
+                PRIORITA_BG[
+                  detail.priorita
+                ] || ''
+              }`}
+            >
               {detail.priorita || '—'}
             </span>
           </SidebarRow>
 
           {detail.tipo && (
             <SidebarRow label="Tipo">
-              <span className={`text-xs flex items-center gap-1 ${TIPO_COLORS[detail.tipo] || ''}`}>
-                <TipoIcon size={12} /> {detail.tipo}
+              <span
+                className={`text-xs flex items-center gap-1 ${
+                  TIPO_COLORS[
+                    detail.tipo
+                  ] || ''
+                }`}
+              >
+                <TipoIcon size={12} />
+                {detail.tipo}
               </span>
             </SidebarRow>
           )}
@@ -490,105 +1274,293 @@ export default function ActionPlanDetailPanel({ plan, onClose, onUpdated, onEdit
           <SidebarRow label="Responsabile">
             {detail.responsabile ? (
               <div className="flex items-center gap-1">
-                <Avatar name={detail.responsabile} size={20} />
-                <span className="text-xs">{detail.responsabile}</span>
+                <Avatar
+                  name={detail.responsabile}
+                  size={20}
+                />
+
+                <span className="text-xs">
+                  {detail.responsabile}
+                </span>
               </div>
-            ) : <span className="text-xs text-gray-400">—</span>}
+            ) : (
+              <span className="text-xs text-gray-400">
+                —
+              </span>
+            )}
           </SidebarRow>
 
           <SidebarRow label="Reporter">
-            <span className="text-xs">{detail.reporter || '—'}</span>
+            <span className="text-xs">
+              {detail.reporter || '—'}
+            </span>
           </SidebarRow>
 
           <SidebarRow label="Scadenza">
-            <span className={`text-xs ${detail.stato_visuale === 'In Ritardo' ? 'text-red-600 font-bold' : ''}`}>
-              {detail.data_scadenza ? new Date(detail.data_scadenza).toLocaleDateString('it-IT') : '—'}
+            <span
+              className={`text-xs ${
+                detail.stato_visuale ===
+                'In Ritardo'
+                  ? 'text-red-600 font-bold'
+                  : ''
+              }`}
+            >
+              {detail.data_scadenza
+                ? new Date(
+                    detail.data_scadenza
+                  ).toLocaleDateString(
+                    'it-IT'
+                  )
+                : '—'}
             </span>
           </SidebarRow>
 
           <SidebarRow label="Categoria Perdita">
-            <span className="text-xs">{detail.categoria_perdita || detail.tipo_perdita || '—'}</span>
+            <span className="text-xs">
+              {detail.categoria_perdita ||
+                detail.tipo_perdita ||
+                '—'}
+            </span>
           </SidebarRow>
 
-          {detail.parent_type && detail.parent_type !== 'standalone' && (
-            <SidebarRow label="Collegato a">
-              <div className="text-xs text-right">
-                <span className={`px-2 py-0.5 rounded ${
-                  detail.parent_type === 'pillar' ? 'bg-indigo-100 text-indigo-700' :
-                  detail.parent_type === 'kaizen' ? 'bg-emerald-100 text-emerald-700' :
-                  detail.parent_type === 'dashboard' ? 'bg-purple-100 text-purple-700' :
-                  'bg-gray-100 text-gray-700'
-                }`}>
-                  {detail.parent_type === 'pillar' && 'Pillar'}
-                  {detail.parent_type === 'kaizen' && 'Kaizen'}
-                  {detail.parent_type === 'dashboard' && 'Dashboard'}
-                  {detail.parent_label && ` · ${detail.parent_label}`}
+          {detail.parent_type &&
+            detail.parent_type !==
+              'standalone' && (
+              <SidebarRow label="Collegato a">
+                <div className="text-xs text-right">
+                  <span
+                    className={`px-2 py-0.5 rounded ${
+                      detail.parent_type ===
+                      'pillar'
+                        ? 'bg-indigo-100 text-indigo-700'
+                        : detail.parent_type ===
+                            'kaizen'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : detail.parent_type ===
+                              'dashboard'
+                            ? 'bg-purple-100 text-purple-700'
+                            : 'bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    {detail.parent_type ===
+                      'pillar' && 'Pillar'}
+
+                    {detail.parent_type ===
+                      'kaizen' && 'Kaizen'}
+
+                    {detail.parent_type ===
+                      'dashboard' &&
+                      'Dashboard'}
+
+                    {detail.parent_label &&
+                      ` · ${detail.parent_label}`}
+                  </span>
+                </div>
+              </SidebarRow>
+            )}
+
+          {detail.pillar_id &&
+            detail.parent_type !==
+              'pillar' && (
+              <SidebarRow label="Pillar">
+                <span className="text-xs text-gray-600">
+                  {detail.pillar_id.slice(
+                    0,
+                    8
+                  )}
+                  ...
                 </span>
-              </div>
-            </SidebarRow>
-          )}
+              </SidebarRow>
+            )}
 
-          {detail.pillar_id && detail.parent_type !== 'pillar' && (
-            <SidebarRow label="Pillar">
-              <span className="text-xs text-gray-600">{detail.pillar_id.slice(0, 8)}...</span>
-            </SidebarRow>
-          )}
-
-          {(detail.reparto || detail.linea || detail.macchina) && (
+          {(
+            detail.reparto ||
+            detail.linea ||
+            detail.macchina
+          ) && (
             <SidebarRow label="Location">
               <div className="text-xs text-right">
-                {detail.reparto && <div>{detail.reparto}</div>}
-                {detail.linea && <div>{detail.linea}</div>}
-                {detail.macchina && <div>{detail.macchina}</div>}
+                {detail.reparto && (
+                  <div>
+                    {detail.reparto}
+                  </div>
+                )}
+
+                {detail.linea && (
+                  <div>
+                    {detail.linea}
+                  </div>
+                )}
+
+                {detail.macchina && (
+                  <div>
+                    {detail.macchina}
+                  </div>
+                )}
               </div>
             </SidebarRow>
           )}
 
           {detail.links?.length > 0 && (
-            <SidebarRow label={`Links (${detail.links.length})`}>
+            <SidebarRow
+              label={`Links (${detail.links.length})`}
+            >
               <div className="text-xs space-y-1">
-                {detail.links.map((l, i) => (
-                  <div key={i} className="bg-white px-2 py-1 rounded border">
-                    <span className="text-gray-500">{l.entity_type}:</span> {l.entity_label || l.entity_id}
-                  </div>
-                ))}
+                {detail.links.map(
+                  (link, index) => (
+                    <div
+                      key={`${link.entity_id}_${index}`}
+                      className="bg-white px-2 py-1 rounded border"
+                    >
+                      <span className="text-gray-500">
+                        {link.entity_type}:
+                      </span>{' '}
+                      {link.entity_label ||
+                        link.entity_id}
+                    </div>
+                  )
+                )}
               </div>
             </SidebarRow>
           )}
 
           <div className="pt-3 border-t">
-            <div className="text-xs font-medium mb-2">Attività</div>
+            <div className="text-xs font-medium mb-2">
+              Attività
+            </div>
+
             <div className="space-y-2 max-h-64 overflow-y-auto">
-              {(detail.feed || []).slice().reverse().slice(0, 20).map((f, i) => (
-                <div key={i} className="text-xs border-l-2 border-primary pl-2">
-                  <div className="text-gray-500">{new Date(f.timestamp).toLocaleString('it-IT')}</div>
-                  <div><strong>{f.utente}</strong> · {f.azione}</div>
-                </div>
-              ))}
+              {(detail.feed || [])
+                .slice()
+                .reverse()
+                .slice(0, 20)
+                .map((activity, index) => (
+                  <div
+                    key={`${activity.timestamp}_${index}`}
+                    className="text-xs border-l-2 border-primary pl-2"
+                  >
+                    <div className="text-gray-500">
+                      {new Date(
+                        activity.timestamp
+                      ).toLocaleString(
+                        'it-IT'
+                      )}
+                    </div>
+
+                    <div>
+                      <strong>
+                        {activity.utente}
+                      </strong>
+                      {' · '}
+                      {activity.azione}
+                    </div>
+                  </div>
+                ))}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Lightbox per immagini */}
+      {showCamera && (
+        <div className="fixed inset-0 bg-black bg-opacity-95 z-[70] flex flex-col items-center justify-center p-4">
+          <div className="w-full max-w-4xl">
+            <div className="flex items-center justify-between text-white mb-3">
+              <div>
+                <div className="font-bold">
+                  Fotografia Action Plan
+                </div>
+
+                <div className="text-xs text-gray-300">
+                  Inquadra la condizione, il problema o il risultato dell’azione
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeCamera}
+                className="p-2 rounded-full bg-white bg-opacity-10 hover:bg-opacity-20"
+                title="Chiudi fotocamera"
+              >
+                <X size={22} />
+              </button>
+            </div>
+
+            <div className="relative overflow-hidden rounded-xl bg-black">
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                playsInline
+                onLoadedMetadata={() =>
+                  setCameraReady(true)
+                }
+                className="w-full max-h-[70vh] object-contain"
+              />
+
+              {!cameraReady && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black text-white text-sm">
+                  Avvio fotocamera...
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-center gap-3 mt-4">
+              <button
+                type="button"
+                onClick={takePhoto}
+                disabled={
+                  !cameraReady ||
+                  uploadingAllegato
+                }
+                className="bg-primary text-white px-6 py-3 rounded-full flex items-center gap-2 font-medium hover:bg-primary-light disabled:opacity-50"
+              >
+                <Camera size={20} />
+
+                {uploadingAllegato
+                  ? 'Caricamento...'
+                  : 'Scatta e carica'}
+              </button>
+
+              <button
+                type="button"
+                onClick={closeCamera}
+                className="bg-gray-700 text-white px-6 py-3 rounded-full hover:bg-gray-600"
+              >
+                Annulla
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {lightboxImg && (
         <div
           className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[60] p-4"
-          onClick={() => setLightboxImg(null)}
+          onClick={() =>
+            setLightboxImg(null)
+          }
         >
           <button
-            onClick={() => setLightboxImg(null)}
+            type="button"
+            onClick={() =>
+              setLightboxImg(null)
+            }
             className="absolute top-4 right-4 text-white hover:bg-white hover:bg-opacity-20 p-2 rounded-full"
+            title="Chiudi anteprima"
           >
             <X size={24} />
           </button>
+
           <img
             src={lightboxImg.data}
             alt={lightboxImg.nome}
             className="max-w-full max-h-full object-contain"
-            onClick={(e) => e.stopPropagation()}
+            onClick={event =>
+              event.stopPropagation()
+            }
           />
-          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-50 text-white px-4 py-2 rounded text-sm">
+
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black bg-opacity-50 text-white px-4 py-2 rounded text-sm">
             {lightboxImg.nome}
           </div>
         </div>
@@ -597,10 +1569,7 @@ export default function ActionPlanDetailPanel({ plan, onClose, onUpdated, onEdit
   )
 }
 
-// ──────────────────────────────────────────────────────────
-// HELPERS
-// ──────────────────────────────────────────────────────────
-function Modal({ children, onClose }) {
+function Modal({ children }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[95vh] overflow-hidden">
@@ -610,44 +1579,112 @@ function Modal({ children, onClose }) {
   )
 }
 
-function Avatar({ name, size = 24 }) {
+function Avatar({
+  name,
+  size = 24,
+}) {
   if (!name) return null
-  const initials = name.split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase()
-  const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-yellow-500', 'bg-orange-500']
-  const color = colors[name.charCodeAt(0) % colors.length]
+
+  const initials = name
+    .split(' ')
+    .map(part => part[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+
+  const colors = [
+    'bg-blue-500',
+    'bg-green-500',
+    'bg-purple-500',
+    'bg-pink-500',
+    'bg-indigo-500',
+    'bg-yellow-500',
+    'bg-orange-500',
+  ]
+
+  const color =
+    colors[
+      name.charCodeAt(0) %
+      colors.length
+    ]
+
   return (
-    <div style={{ width: size, height: size, fontSize: size * 0.45 }}
+    <div
+      style={{
+        width: size,
+        height: size,
+        fontSize: size * 0.45,
+      }}
       className={`${color} text-white rounded-full flex items-center justify-center font-bold flex-shrink-0`}
-      title={name}>
+      title={name}
+    >
       {initials}
     </div>
   )
 }
 
-function Section({ title, children }) {
+function Section({
+  title,
+  children,
+}) {
   return (
     <div>
-      <h3 className="text-sm font-bold mb-2">{title}</h3>
+      <h3 className="text-sm font-bold mb-2">
+        {title}
+      </h3>
+
       {children}
     </div>
   )
 }
 
-function SidebarRow({ label, children }) {
+function SidebarRow({
+  label,
+  children,
+}) {
   return (
-    <div className="flex justify-between items-center text-sm">
-      <span className="text-gray-600 text-xs uppercase">{label}</span>
-      <div>{children}</div>
+    <div className="flex justify-between items-center gap-3 text-sm">
+      <span className="text-gray-600 text-xs uppercase">
+        {label}
+      </span>
+
+      <div>
+        {children}
+      </div>
     </div>
   )
 }
 
 function renderWithMentionsTags(text) {
   if (!text) return null
-  const parts = text.split(/(@[a-zA-Z0-9._-]+|#[a-zA-Z0-9_-]+)/g)
-  return parts.map((p, i) => {
-    if (p.startsWith('@')) return <span key={i} className="text-blue-600 font-medium">{p}</span>
-    if (p.startsWith('#')) return <span key={i} className="text-purple-600 font-medium">{p}</span>
-    return p
+
+  const parts = text.split(
+    /(@[a-zA-Z0-9._-]+|#[a-zA-Z0-9_-]+)/g
+  )
+
+  return parts.map((part, index) => {
+    if (part.startsWith('@')) {
+      return (
+        <span
+          key={index}
+          className="text-blue-600 font-medium"
+        >
+          {part}
+        </span>
+      )
+    }
+
+    if (part.startsWith('#')) {
+      return (
+        <span
+          key={index}
+          className="text-purple-600 font-medium"
+        >
+          {part}
+        </span>
+      )
+    }
+
+    return part
   })
 }
