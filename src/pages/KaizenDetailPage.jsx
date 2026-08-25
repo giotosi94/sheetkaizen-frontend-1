@@ -12,6 +12,7 @@ import FiveWhysFlowChart from '../components/kaizen/FiveWhysFlowChart'
 import KaizenGantMasterPlan from '../components/kaizen/KaizenGantMasterPlan'
 import KaizenAzioniList from '../components/kaizen/KaizenAzioniList'
 import UserPicker from '../components/UserPicker'
+import ImageUpload from '../components/ImageUpload'
 import { useAllConfigurations } from '../hooks/useConfigurations'
 import ParetoChart from '../components/pillar/ParetoChart'
 
@@ -1757,8 +1758,42 @@ function GembaObiettiviTab({ kaizen, setKaizen, updateField }) {
         </div>
 
         <div className="pt-4 border-t mt-4">
-          <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Osservazioni Gemba (cosa e stato visto sul campo)</label>
-          <textarea value={kaizen.gemba?.osservazioni || ''} onChange={(e) => updateField('gemba', 'osservazioni', e.target.value)} rows={3} placeholder="Documenta cosa hai osservato direttamente su macchina, linea, processo" className="w-full border rounded-lg px-3 py-2 text-sm" />
+          <label className="block text-xs font-bold text-gray-600 uppercase mb-1">
+            Osservazioni Gemba (cosa è stato visto sul campo)
+          </label>
+
+          <textarea
+            value={kaizen.gemba?.osservazioni || ''}
+            onChange={(e) => updateField('gemba', 'osservazioni', e.target.value)}
+            rows={3}
+            placeholder="Documenta cosa hai osservato direttamente su macchina, linea e processo"
+            className="w-full border rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+
+        <div className="pt-4 border-t mt-4">
+          <div className="mb-3">
+            <div className="text-xs font-bold text-gray-600 uppercase">
+              Evidenze dal campo
+            </div>
+
+            <div className="text-xs text-gray-500 mt-1">
+              Scatta fotografie direttamente dal dispositivo oppure carica immagini già presenti.
+            </div>
+          </div>
+
+          <ImageUpload
+            images={kaizen.gemba?.immagini || []}
+            onChange={(immagini) => {
+              setKaizen(prev => ({
+                ...prev,
+                gemba: {
+                  ...prev.gemba,
+                  immagini,
+                },
+              }))
+            }}
+          />
         </div>
       </div>
 
