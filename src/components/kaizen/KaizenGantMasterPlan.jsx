@@ -145,6 +145,20 @@ export default function KaizenGantMasterPlan({ kaizen, onSaved, value, onChange 
 
   useEffect(() => { dataRef.current = data }, [data])
 
+  useEffect(() => {
+    const handleMouseUp = () => {
+      if (dragState) {
+        finishDrag()
+      }
+    }
+
+    window.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [dragState])
+
   async function doSave(silent = false) {
     // Modalità controlled (widget): salva via onChange, no chiamata API
     if (isControlled) {
@@ -258,54 +272,140 @@ function clearStepInterval(stepId, rowType) {
   updateStepInterval(stepId, rowType, null, null)
 }
 
-function startDrag(stepId, rowType, columnIndex, event) {
+function findColumnIndexByDate(date) {
+  if (!date) return -1
+
+  const exactIndex = columns.findIndex(column => column.fullDate === date)
+
+  if (exactIndex >= 0) {
+    return exactIndex
+  }
+
+  return columns.findIndex((column, index) => {
+    const nextColumn = columns[index + 1]
+
+    if (!nextColumn) {
+      return date >= column.fullDate
+    }
+
+    return date >= column.fullDate && date < nextColumn.fullDate
+  })
+}
+
+function startDrag(step, rowType, columnIndex, event) {
   event.preventDefault()
 
+  const interval = getStepInterval(step, rowType)
+  const startIndex = findColumnIndexByDate(interval.start)
+  const endIndex = findColumnIndexByDate(interval.end)
+  const hasInterval = startIndex >= 0 && endIndex >= 0
+
+  let mode = 'create'
+
+  if (hasInterval && columnIndex >= startIndex && columnIndex <= endIndex) {
+    if (startIndex !== endIndex && columnIndex === startIndex) {
+      mode = 'resize-start'
+    } else if (startIndex !== endIndex && columnIndex === endIndex) {
+      mode = 'resize-end'
+    } else {
+      mode = 'move'
+    }
+  }
+
   setDragState({
-    stepId,
+    stepId: step.id,
     rowType,
-    startIndex: columnIndex,
-    endIndex: columnIndex,
+    mode,
+    anchorIndex: columnIndex,
+    currentIndex: columnIndex,
+    originalStartIndex: hasInterval ? startIndex : columnIndex,
+    originalEndIndex: hasInterval ? endIndex : columnIndex,
   })
 }
 
 function updateDrag(stepId, rowType, columnIndex) {
-  if (!dragState) return
-  if (dragState.stepId !== stepId) return
-  if (dragState.rowType !== rowType) return
+  setDragState(prev => {
+    if (!prev) return prev
+    if (prev.stepId !== stepId) return prev
+    if (prev.rowType !== rowType) return prev
 
-  setDragState(prev => ({
-    ...prev,
-    endIndex: columnIndex,
-  }))
+    return {
+      ...prev,
+      currentIndex: columnIndex,
+    }
+  })
+}
+
+function getDragIndexes(state) {
+  if (!state) {
+    return {
+      startIndex: -1,
+      endIndex: -1,
+    }
+  }
+
+  if (state.mode === 'create') {
+    return {
+      startIndex: Math.min(state.anchorIndex, state.currentIndex),
+      endIndex: Math.max(state.anchorIndex, state.currentIndex),
+    }
+  }
+
+  if (state.mode === 'resize-start') {
+    return {
+      startIndex: Math.min(state.currentIndex, state.originalEndIndex),
+      endIndex: state.originalEndIndex,
+    }
+  }
+
+  if (state.mode === 'resize-end') {
+    return {
+      startIndex: state.originalStartIndex,
+      endIndex: Math.max(state.currentIndex, state.originalStartIndex),
+    }
+  }
+
+  const offset = state.currentIndex - state.anchorIndex
+  const originalLength = state.originalEndIndex - state.originalStartIndex
+
+  let startIndex = state.originalStartIndex + offset
+  let endIndex = startIndex + originalLength
+
+  if (startIndex < 0) {
+    startIndex = 0
+    endIndex = originalLength
+  }
+
+  if (endIndex >= columns.length) {
+    endIndex = columns.length - 1
+    startIndex = Math.max(0, endIndex - originalLength)
+  }
+
+  return {
+    startIndex,
+    endIndex,
+  }
 }
 
 function finishDrag() {
-  if (!dragState) return
+  setDragState(currentDrag => {
+    if (!currentDrag) return null
 
-  const firstIndex = Math.min(
-    dragState.startIndex,
-    dragState.endIndex
-  )
+    const indexes = getDragIndexes(currentDrag)
+    const firstColumn = columns[indexes.startIndex]
+    const lastColumn = columns[indexes.endIndex]
 
-  const lastIndex = Math.max(
-    dragState.startIndex,
-    dragState.endIndex
-  )
+    if (firstColumn && lastColumn) {
+      updateStepInterval(
+        currentDrag.stepId,
+        currentDrag.rowType,
+        firstColumn.fullDate,
+        lastColumn.fullDate
+      )
+    }
 
-  const firstColumn = columns[firstIndex]
-  const lastColumn = columns[lastIndex]
-
-  if (firstColumn && lastColumn) {
-    updateStepInterval(
-      dragState.stepId,
-      dragState.rowType,
-      firstColumn.fullDate,
-      lastColumn.fullDate
-    )
-  }
-
-  setDragState(null)
+    return null
+  })
 }
 
 function getDisplayInterval(step, rowType) {
@@ -314,19 +414,11 @@ function getDisplayInterval(step, rowType) {
     dragState.stepId === step.id &&
     dragState.rowType === rowType
   ) {
-    const firstIndex = Math.min(
-      dragState.startIndex,
-      dragState.endIndex
-    )
-
-    const lastIndex = Math.max(
-      dragState.startIndex,
-      dragState.endIndex
-    )
+    const indexes = getDragIndexes(dragState)
 
     return {
-      start: columns[firstIndex]?.fullDate || null,
-      end: columns[lastIndex]?.fullDate || null,
+      start: columns[indexes.startIndex]?.fullDate || null,
+      end: columns[indexes.endIndex]?.fullDate || null,
     }
   }
 
@@ -653,7 +745,7 @@ function getDurationLabel(interval) {
               <span>{row.label}</span>
             </div>
           ))}
-          <span className="ml-auto text-gray-500 italic">Premi sulla prima cella, trascina fino all'ultima e rilascia</span>
+          <span className="ml-auto text-gray-500 italic">Trascina sul vuoto per creare, al centro per spostare, sui bordi per ridimensionare</span>
         </div>
       </div>
 
@@ -756,15 +848,7 @@ function getDurationLabel(interval) {
                 </button>
               </div>
 
-              <div
-                className="flex flex-col select-none"
-                onMouseUp={finishDrag}
-                onMouseLeave={(event) => {
-                  if (event.buttons === 0 && dragState) {
-                    finishDrag()
-                  }
-                }}
-              >
+                            <div className="flex flex-col select-none">
                 {ROW_TYPES.map(row => {
                   const interval = getDisplayInterval(step, row.id)
                   const durationLabel = getDurationLabel(interval)
@@ -775,23 +859,34 @@ function getDurationLabel(interval) {
                       className={`flex ${row.id === 'planned' ? 'border-b' : ''}`}
                     >
                       {columns.map((col, columnIndex) => {
-                        const active = isColumnInInterval(
-                          col,
-                          interval
-                        )
+                        const active = isColumnInInterval(col, interval)
+                        const isStart = active && col.fullDate === interval?.start
+                        const isEnd = active && col.fullDate === interval?.end
 
-                        const isStart = active &&
-                          col.fullDate === interval?.start
+                        let cursor = 'crosshair'
 
-                        const isEnd = active &&
-                          col.fullDate === interval?.end
+                        if (active) {
+                          if (isStart && !isEnd) {
+                            cursor = 'w-resize'
+                          } else if (isEnd && !isStart) {
+                            cursor = 'e-resize'
+                          } else {
+                            cursor = 'grab'
+                          }
+                        }
+
+                        const currentOperation =
+                          dragState?.stepId === step.id &&
+                          dragState?.rowType === row.id
+                            ? dragState.mode
+                            : null
 
                         return (
                           <button
                             key={`${row.id}_${columnIndex}`}
                             type="button"
                             onMouseDown={(event) => startDrag(
-                              step.id,
+                              step,
                               row.id,
                               columnIndex,
                               event
@@ -801,12 +896,11 @@ function getDurationLabel(interval) {
                               row.id,
                               columnIndex
                             )}
-                            onMouseUp={finishDrag}
-                            className="relative border-r transition-opacity hover:opacity-80 cursor-crosshair"
+                            className="relative border-r transition-opacity hover:opacity-90"
                             style={{
                               width: CELL_WIDTH,
                               minWidth: CELL_WIDTH,
-                              height: '22px',
+                              height: '24px',
                               backgroundColor: active
                                 ? row.color
                                 : 'transparent',
@@ -814,28 +908,41 @@ function getDurationLabel(interval) {
                                 ? row.color
                                 : undefined,
                               borderTopLeftRadius: isStart
-                                ? '5px'
+                                ? '6px'
                                 : '0',
                               borderBottomLeftRadius: isStart
-                                ? '5px'
+                                ? '6px'
                                 : '0',
                               borderTopRightRadius: isEnd
-                                ? '5px'
+                                ? '6px'
                                 : '0',
                               borderBottomRightRadius: isEnd
-                                ? '5px'
+                                ? '6px'
                                 : '0',
+                              cursor,
                             }}
                             title={
                               active
                                 ? `${row.label}: ${interval.start} - ${interval.end} (${durationLabel})`
-                                : `${row.label}: trascina da qui`
+                                : `${row.label}: trascina per creare`
                             }
                           >
+                            {isStart && active && !isEnd && (
+                              <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-white bg-opacity-70 rounded-l pointer-events-none" />
+                            )}
+
+                            {isEnd && active && !isStart && (
+                              <span className="absolute right-0 top-0 bottom-0 w-1.5 bg-white bg-opacity-70 rounded-r pointer-events-none" />
+                            )}
+
                             {isStart && active && (
-                              <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[8px] font-bold text-white whitespace-nowrap pointer-events-none">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[8px] font-bold text-white whitespace-nowrap pointer-events-none">
                                 {durationLabel}
                               </span>
+                            )}
+
+                            {currentOperation && active && (
+                              <span className="absolute inset-0 ring-2 ring-yellow-300 ring-inset pointer-events-none" />
                             )}
                           </button>
                         )
