@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../services/api'
 import {
@@ -11,6 +11,8 @@ import IshikawaDiagram from '../components/kaizen/IshikawaDiagram'
 import FiveWhysFlowChart from '../components/kaizen/FiveWhysFlowChart'
 import KaizenGantMasterPlan from '../components/kaizen/KaizenGantMasterPlan'
 import KaizenAzioniList from '../components/kaizen/KaizenAzioniList'
+import UserPicker from '../components/UserPicker'
+import { useAllConfigurations } from '../hooks/useConfigurations'
 
 const LIVELLI = ['Quick', 'Standard', 'Major']
 
@@ -31,15 +33,19 @@ function getLivelloFromKaizen(kaizen) {
 
 function buildTabsForLivello(livello) {
   const base = []
-  base.push({
-    id: 'quickkaizen',
-    label: livello === 'Quick' ? 'Quick Kaizen' : 'Problem Solving',
-  })
+  if (livello === 'Quick') {
+    base.push({ id: 'quickkaizen', label: 'Quick Kaizen' })
+    base.push({ id: 'stdelements', label: '8 Standard Elements' })
+    base.push({ id: 'cmladder', label: 'Countermeasure Ladder' })
+    base.push({ id: 'lavagna', label: 'Lavagna' })
+    base.push({ id: 'feed', label: 'Feed' })
+    return base
+  }
+  base.push({ id: 'setup', label: 'Team & Setup' })
+  base.push({ id: 'quickkaizen', label: 'Problem Solving' })
   base.push({ id: 'stdelements', label: '8 Standard Elements' })
   base.push({ id: 'cmladder', label: 'Countermeasure Ladder' })
-  if (livello !== 'Quick') {
-    base.push({ id: 'figli', label: 'Quick Kaizen' })
-  }
+  base.push({ id: 'figli', label: 'Quick Kaizen' })
   if (livello === 'Major') {
     base.push({ id: 'costbenefit', label: 'Cost & Benefit' })
   }
@@ -59,6 +65,27 @@ export default function KaizenDetailPage() {
   const [motivoTrasforma, setMotivoTrasforma] = useState('')
   const [showStoria, setShowStoria] = useState(false)
   const [transforming, setTransforming] = useState(false)
+
+  const { configs } = useAllConfigurations()
+  const [reparti, setReparti] = useState([])
+  useEffect(() => {
+    api.get('/reparti/').then(res => setReparti(res.data || [])).catch(() => setReparti([]))
+  }, [])
+
+  const lineeDisponibili = useMemo(() => {
+    if (!kaizen?.reparto) return []
+    const rep = reparti.find(r => r.nome === kaizen.reparto)
+    return rep?.linee?.filter(l => l.attivo !== false) || []
+  }, [kaizen?.reparto, reparti])
+
+  const macchineDisponibili = useMemo(() => {
+    if (!kaizen?.linea) return []
+    const linea = lineeDisponibili.find(l => l.nome === kaizen.linea)
+    return linea?.macchine?.filter(m => m.attivo !== false) || []
+  }, [kaizen?.linea, lineeDisponibili])
+
+  const handleRepartoChange = (v) => setKaizen(prev => ({ ...prev, reparto: v, linea: '', macchina: '' }))
+  const handleLineaChange = (v) => setKaizen(prev => ({ ...prev, linea: v, macchina: '' }))
 
   // Flusso Ishikawa -> Crea Action Plan da Root Cause
   const [showAPFormFromRootCause, setShowAPFormFromRootCause] = useState(false)
@@ -471,6 +498,82 @@ export default function KaizenDetailPage() {
 
       {/* Wrapper che disabilita tutti i campi quando isLocked */}
       <fieldset disabled={isLocked} className={isLocked ? 'opacity-90 pointer-events-none' : ''}>
+
+      {activeTab === 'setup' && (
+        <div className="space-y-6">
+
+          <div className="bg-white rounded-xl shadow p-6">
+            <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">SETUP - LINEA, MACCHINA E TIPO DI PERDITA</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Reparto</label>
+                <select value={kaizen.reparto || ''} onChange={(e) => handleRepartoChange(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
+                  <option value="">Seleziona</option>
+                  {reparti.filter(r => r.attivo !== false).map(r => (
+                    <option key={r._id} value={r.nome}>{r.nome}{r.codice ? ` [${r.codice}]` : ''}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Linea</label>
+                <select value={kaizen.linea || ''} onChange={(e) => handleLineaChange(e.target.value)} disabled={!kaizen.reparto} className="w-full border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100">
+                  <option value="">{!kaizen.reparto ? 'Prima il reparto' : 'Seleziona'}</option>
+                  {lineeDisponibili.map(l => (
+                    <option key={l.id} value={l.nome}>{l.nome}{l.codice ? ` [${l.codice}]` : ''}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Macchina</label>
+                <select value={kaizen.macchina || ''} onChange={(e) => setKaizen(prev => ({ ...prev, macchina: e.target.value }))} disabled={!kaizen.linea} className="w-full border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100">
+                  <option value="">{!kaizen.linea ? 'Prima la linea' : 'Seleziona'}</option>
+                  {macchineDisponibili.map(m => (
+                    <option key={m.id} value={m.nome}>{m.nome}{m.codice ? ` [${m.codice}]` : ''}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="mt-4">
+              <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Categoria Perdita (TPM)</label>
+              <select value={kaizen.tipo_perdita || ''} onChange={(e) => setKaizen(prev => ({ ...prev, tipo_perdita: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm">
+                <option value="">Nessuna</option>
+                {(configs.categorie_perdita || []).map(p => (
+                  <option key={p._id} value={p.label}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow p-6">
+            <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">TEAM KAIZEN</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Team Leader</label>
+                <UserPicker
+                  value={kaizen.team_leader_id ? { id: kaizen.team_leader_id, name: kaizen.team_leader_nome } : null}
+                  onChange={(sel) => {
+                    if (sel) setKaizen(prev => ({ ...prev, team_leader_id: sel.id, team_leader_nome: sel.name }))
+                    else setKaizen(prev => ({ ...prev, team_leader_id: null, team_leader_nome: '' }))
+                  }}
+                  mode="single"
+                  placeholder="Cerca team leader..."
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Team Members ({kaizen.team_members_ids?.length || 0})</label>
+                <UserPicker
+                  value={(kaizen.team_members_ids || []).map((id, i) => ({ id, name: kaizen.team_members_nomi?.[i] || '' }))}
+                  onChange={(sel) => setKaizen(prev => ({ ...prev, team_members_ids: sel.map(s => s.id), team_members_nomi: sel.map(s => s.name) }))}
+                  mode="multi"
+                  placeholder="Aggiungi membri al team..."
+                />
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-3">Ricorda di premere Salva in alto per confermare setup e team.</p>
+          </div>
+
+        </div>
+      )}
 
       {activeTab === 'quickkaizen' && (
         <div className="space-y-6">
