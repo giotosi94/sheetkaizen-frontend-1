@@ -142,9 +142,7 @@ export default function KaizenGantMasterPlan({ kaizen, onSaved, value, onChange 
       const currentValue = getCellValue(stepId, rowType, year, period)
       const newCells = { ...prev.cells }
 
-      Object.assign(newCells, {
-        !currentValue,
-      })
+      Reflect.set(newCells, key, !currentValue)
 
       return { ...prev, cells: newCells }
     })
