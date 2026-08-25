@@ -904,6 +904,7 @@ export default function ActionPlanDetailPanel({
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
                   {immagini.map(image => (
                     <div
+                    <div
                       key={image.id}
                       className="relative group"
                     >
@@ -942,8 +943,8 @@ export default function ActionPlanDetailPanel({
                         className="text-gray-500 flex-shrink-0"
                       />
                       <a
-                        href={documento.data}
-   nome}
+                      {documento.data}
+                        {documento.nome}
                       </a>
 
                       <span className="text-xs text-gray-400">
