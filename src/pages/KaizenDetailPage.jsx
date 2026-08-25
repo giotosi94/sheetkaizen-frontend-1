@@ -13,6 +13,7 @@ import KaizenGantMasterPlan from '../components/kaizen/KaizenGantMasterPlan'
 import KaizenAzioniList from '../components/kaizen/KaizenAzioniList'
 import UserPicker from '../components/UserPicker'
 import { useAllConfigurations } from '../hooks/useConfigurations'
+import ParetoChart from '../components/pillar/ParetoChart'
 
 const LIVELLI = ['Quick', 'Standard', 'Major']
 
@@ -42,6 +43,7 @@ function buildTabsForLivello(livello) {
     return base
   }
   base.push({ id: 'setup', label: 'Team & Setup' })
+  base.push({ id: 'loss', label: 'Loss Deployment' })
   base.push({ id: 'quickkaizen', label: 'Problem Solving' })
   base.push({ id: 'stdelements', label: '8 Standard Elements' })
   base.push({ id: 'cmladder', label: 'Countermeasure Ladder' })
@@ -575,6 +577,19 @@ export default function KaizenDetailPage() {
         </div>
       )}
 
+      {activeTab === 'loss' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl shadow p-6">
+            <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-2">LOSS DEPLOYMENT - PARETO DELLE PERDITE</h3>
+            <p className="text-xs text-gray-500 text-center mb-4">Step 2 - Stratifica le perdite e identifica il 20% di cause che genera l'80% dell'impatto</p>
+            <LossPareto
+              value={kaizen.loss_pareto?.items || []}
+              onChange={(items) => setKaizen(prev => ({ ...prev, loss_pareto: { ...prev.loss_pareto, items } }))}
+            />
+          </div>
+        </div>
+      )}
+
       {activeTab === 'quickkaizen' && (
         <div className="space-y-6">
 
@@ -628,17 +643,6 @@ export default function KaizenDetailPage() {
               </div>
             </div>
           )}
-
-{/* PARETO DELLE PERDITE (solo Standard/Major) */}
-{livelloAttuale !== 'Quick' && (
-<div className="bg-white rounded-xl shadow p-6">
-<h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">LOSS DEPLOYMENT - PARETO DELLE PERDITE</h3>
-<LossPareto
-value={kaizen.loss_pareto?.items || []}
-onChange={(items) => setKaizen(prev => ({ ...prev, loss_pareto: { ...prev.loss_pareto, items } }))}
-/>
-</div>
-)}
 
 {/* PASSO 2 - Ishikawa */}
           <div className="bg-white rounded-xl shadow p-6">
@@ -1645,103 +1649,56 @@ function CountermeasureLadderTab({ kaizen }) {
 // LOSS PARETO - grafico delle perdite (Standard Kaizen step 2)
 // ----------------------------------------------------------
 function LossPareto({ value = [], onChange }) {
-const [label, setLabel] = useState('')
-const [val, setVal] = useState('')
+  const [label, setLabel] = useState('')
+  const [val, setVal] = useState('')
 
-const add = () => {
-const n = parseFloat(val)
-if (!label.trim() || isNaN(n) || n <= 0) return
-onChange([...value, { id: Date.now().toString(), label: label.trim(), value: n }])
-setLabel('')
-setVal('')
-}
+  const add = () => {
+    const n = parseFloat(val)
+    if (!label.trim() || isNaN(n) || n <= 0) return
+    onChange([...value, { id: Date.now().toString(), label: label.trim(), value: n }])
+    setLabel('')
+    setVal('')
+  }
 
-const remove = (id) => onChange(value.filter(i => i.id !== id))
+  const remove = (id) => onChange(value.filter(i => i.id !== id))
 
-const sorted = [...value].sort((a, b) => b.value - a.value)
-const total = sorted.reduce((s, i) => s + i.value, 0)
-const maxV = sorted.length > 0 ? sorted[0].value : 1
-let cum = 0
-const withCum = sorted.map(i => {
-cum += i.value
-return { ...i, cumPct: total > 0 ? (cum / total) * 100 : 0 }
-})
+  const total = value.reduce((s, i) => s + (parseFloat(i.value) || 0), 0)
+  const sorted = [...value].sort((a, b) => (parseFloat(b.value) || 0) - (parseFloat(a.value) || 0))
 
-const chartH = 220
-const barW = 60
-const gap = 24
-const padL = 40
-const padB = 70
-const padT = 20
-const chartW = padL + withCum.length * (barW + gap) + 20
-const x = idx => padL + idx * (barW + gap)
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <input value={label} onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} placeholder="Categoria perdita (es. Start-up, Cambio formato...)" className="flex-1 border rounded-lg px-3 py-2 text-sm" />
+        <input type="number" value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} placeholder="Valore" className="w-32 border rounded-lg px-3 py-2 text-sm" />
+        <button onClick={add} className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-light">Aggiungi</button>
+      </div>
 
-return (
-<div className="space-y-4">
-<div className="flex gap-2">
-<input value={label} onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} placeholder="Categoria perdita (es. Start-up, Cambio formato...)" className="flex-1 border rounded-lg px-3 py-2 text-sm" />
-<input type="number" value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} placeholder="Valore" className="w-32 border rounded-lg px-3 py-2 text-sm" />
-<button onClick={add} className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-light">Aggiungi</button>
-</div>
+      {value.length === 0 ? (
+        <div className="bg-gray-50 rounded-lg p-8 text-center text-sm text-gray-400">Aggiungi le categorie di perdita per generare il Pareto</div>
+      ) : (
+        <>
+          <ParetoChart
+            losses={value}
+            title="Pareto delle Perdite"
+            subtitle="Loss Deployment - Standard Kaizen"
+            targetPercent={80}
+            unit=""
+          />
 
-{withCum.length === 0 ? (
-<div className="bg-gray-50 rounded-lg p-8 text-center text-sm text-gray-400">Aggiungi le categorie di perdita per generare il Pareto</div>
-) : (
-<>
-<div className="overflow-x-auto">
-<svg width={Math.max(chartW, 320)} height={chartH + padB} className="min-w-full">
-{[0, 25, 50, 75, 100].map(g => (
-<g key={g}>
-<line x1={padL} y1={padT + (chartH * (100 - g) / 100)} x2={chartW} y2={padT + (chartH * (100 - g) / 100)} stroke="#e5e7eb" strokeWidth="1" />
-<text x={padL - 8} y={padT + (chartH * (100 - g) / 100) + 4} textAnchor="end" fontSize="10" fill="#9ca3af">{g}%</text>
-</g>
-))}
-{withCum.map((item, idx) => {
-const h = (item.value / maxV) * chartH
-return (
-<g key={item.id}>
-<rect x={x(idx)} y={padT + chartH - h} width={barW} height={h} rx="3" fill="#1e3a8a" />
-<text x={x(idx) + barW / 2} y={padT + chartH - h - 6} textAnchor="middle" fontSize="11" fontWeight="bold" fill="#1e3a8a">{item.value}</text>
-<text x={x(idx) + barW / 2} y={padT + chartH + 16} textAnchor="middle" fontSize="10" fill="#374151">{item.label.length > 10 ? item.label.slice(0, 9) + '.' : item.label}</text>
-<text x={x(idx) + barW / 2} y={padT + chartH + 30} textAnchor="middle" fontSize="9" fill="#9ca3af">{((item.value / total) * 100).toFixed(0)}%</text>
-</g>
-)
-})}
-<polyline
-fill="none"
-stroke="#f59e0b"
-strokeWidth="2"
-points={withCum.map((item, idx) => `${x(idx) + barW / 2},${padT + chartH - (item.cumPct / 100) * chartH}`).join(' ')}
-/>
-{withCum.map((item, idx) => (
-<g key={'p' + item.id}>
-<circle cx={x(idx) + barW / 2} cy={padT + chartH - (item.cumPct / 100) * chartH} r="4" fill="#f59e0b" />
-<text x={x(idx) + barW / 2} y={padT + chartH - (item.cumPct / 100) * chartH - 10} textAnchor="middle" fontSize="10" fontWeight="bold" fill="#d97706">{item.cumPct.toFixed(0)}%</text>
-</g>
-))}
-</svg>
-</div>
-
-<div className="flex items-center gap-4 text-xs text-gray-500">
-<span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block" style={{ background: '#1e3a8a' }}></span> Perdita</span>
-<span className="flex items-center gap-1"><span className="w-3 h-1 inline-block" style={{ background: '#f59e0b' }}></span> Cumulata %</span>
-<span className="ml-auto font-semibold text-gray-700">Totale: {total}</span>
-</div>
-
-<div className="space-y-1">
-{withCum.map(item => (
-<div key={item.id} className="flex items-center justify-between text-sm bg-gray-50 rounded px-3 py-1.5">
-<span className="font-medium">{item.label}</span>
-<div className="flex items-center gap-3">
-<span className="text-gray-500">{((item.value / total) * 100).toFixed(1)}%</span>
-<span className="font-bold text-primary">{item.value}</span>
-<button onClick={() => remove(item.id)} className="text-red-500 hover:bg-red-50 p-1 rounded"><X size={14} /></button>
-</div>
-</div>
-))}
-</div>
-</>
-)}
-</div>
-)
+          <div className="space-y-1">
+            {sorted.map(item => (
+              <div key={item.id} className="flex items-center justify-between text-sm bg-gray-50 rounded px-3 py-1.5">
+                <span className="font-medium">{item.label}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-gray-500">{total > 0 ? ((parseFloat(item.value) / total) * 100).toFixed(1) : 0}%</span>
+                  <span className="font-bold text-primary">{item.value}</span>
+                  <button onClick={() => remove(item.id)} className="text-red-500 hover:bg-red-50 p-1 rounded"><X size={14} /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
 }
