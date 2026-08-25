@@ -1965,36 +1965,54 @@ const AUDIT_SECTIONS = [
 ]
 
 function TeamAuditTab({ kaizen, setKaizen }) {
-  const scores = kaizen.team_audit?.scores || {}
-
-  const setAchieved = (id, val) => setKaizen(prev => ({
-  ...prev,
-  team_audit: { ...prev.team_audit, scores: { ...(prev.team_audit?.scores || {}), [id]: val } },
-  }))
-
-
-  const allItems = AUDIT_SECTIONS.flatMap(s => s.items)
-  const totalAchieved = allItems.reduce((sum, it) => sum + (scores[it.id] ? it.score : 0), 0)
-  const percent = totalAchieved
-
-  let status = { label: "Da valutare", color: "bg-gray-100 text-gray-700" }
-  if (percent >= 80) status = { label: "PASS", color: "bg-green-600 text-white" }
-  else if (percent >= 60) status = { label: "IN PROGRESS", color: "bg-yellow-500 text-white" }
-  else if (percent > 0) status = { label: "FAIL", color: "bg-red-600 text-white" }
-
-  const sectionScore = (s) => s.items.reduce((sum, it) => sum + (scores[it.id] ? it.score : 0), 0)
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-xl shadow p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h3 className="text-xl font-bold mb-1">Improvement Team Audit</h3>
-            <p className="text-sm text-gray-500">Valutazione PDCA del progetto Kaizen - Lindt LPW</p>
-          </div>
-          <div className={`px-3 py-1.5 rounded-lg font-bold text-sm ${status.color}`}>{status.label}</div>
-        </div>
-
+const scores = kaizen.team_audit?.scores || {}
+const weekly = kaizen.team_audit?.weekly || []
+const setScore = (id, raw, max) => {
+let n = parseInt(raw)
+if (isNaN(n)) n = 0
+if (n < 0) n = 0
+if (n > max) n = max
+setKaizen(prev => ({
+...prev,
+team_audit: { ...prev.team_audit, scores: { ...(prev.team_audit?.scores || {}), [id]: n } },
+}))
+}
+const valOf = (it) => Math.min(parseInt(scores[it.id]) || 0, it.score)
+const allItems = AUDIT_SECTIONS.flatMap(s => s.items)
+const totalAchieved = allItems.reduce((sum, it) => sum + valOf(it), 0)
+const percent = totalAchieved
+const sectionScore = (s) => s.items.reduce((sum, it) => sum + valOf(it), 0)
+let status = { label: "Da valutare", color: "bg-gray-100 text-gray-700" }
+if (percent >= 80) status = { label: "PASS", color: "bg-green-600 text-white" }
+else if (percent >= 60) status = { label: "IN PROGRESS", color: "bg-yellow-500 text-white" }
+else if (percent > 0) status = { label: "FAIL", color: "bg-red-600 text-white" }
+const lightColor = (pct) => pct >= 80 ? "bg-green-500" : pct >= 60 ? "bg-yellow-500" : pct > 0 ? "bg-red-500" : "bg-gray-200"
+const registraSettimana = (week) => {
+const snap = { week, total: totalAchieved }
+AUDIT_SECTIONS.forEach(s => { snap[s.key] = sectionScore(s) })
+setKaizen(prev => {
+const prevWeekly = prev.team_audit?.weekly || []
+const filtered = prevWeekly.filter(w => w.week !== week)
+return { ...prev, team_audit: { ...prev.team_audit, weekly: [...filtered, snap].sort((a, b) => a.week - b.week) } }
+})
+}
+const rimuoviSettimana = (week) => {
+setKaizen(prev => ({
+...prev,
+team_audit: { ...prev.team_audit, weekly: (prev.team_audit?.weekly || []).filter(w => w.week !== week) },
+}))
+}
+const weekData = (w) => weekly.find(x => x.week === w)
+return (
+<div className="space-y-4">
+<div className="bg-white rounded-xl shadow p-6">
+<div className="flex items-start justify-between mb-4">
+<div>
+<h3 className="text-xl font-bold mb-1">Improvement Team Audit</h3>
+<p className="text-sm text-gray-500">Valutazione PDCA del progetto Kaizen - Lindt LPW</p>
+</div>
+<div className={`px-3 py-1.5 rounded-lg font-bold text-sm ${status.color}`}>{status.label}</div>
+</div>
         <div className="bg-gray-50 rounded-lg p-4">
           <div className="flex items-baseline gap-2 mb-3">
             <span className="text-4xl font-bold text-primary">{totalAchieved}</span>
@@ -2015,6 +2033,61 @@ function TeamAuditTab({ kaizen, setKaizen }) {
         </div>
       </div>
 
+      <div className="bg-white rounded-xl shadow p-6">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="font-bold">Traffic Light settimanale</h3>
+            <p className="text-xs text-gray-500">Registra il punteggio audit settimana per settimana (8 settimane)</p>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="text-xs uppercase text-gray-500">
+                <th className="p-2 text-left">Settimana</th>
+                {[1,2,3,4,5,6,7,8].map(w => <th key={w} className="p-2 text-center">{w}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-t">
+                <td className="p-2 font-medium text-gray-600">Semaforo</td>
+                {[1,2,3,4,5,6,7,8].map(w => {
+                  const d = weekData(w)
+                  return (
+                    <td key={w} className="p-2 text-center">
+                      <div className={`w-6 h-6 rounded-full mx-auto ${lightColor(d ? d.total : -1)}`} title={d ? `${d.total}/100` : "Non registrata"} />
+                    </td>
+                  )
+                })}
+              </tr>
+              <tr className="border-t">
+                <td className="p-2 font-medium text-gray-600">Punteggio</td>
+                {[1,2,3,4,5,6,7,8].map(w => {
+                  const d = weekData(w)
+                  return <td key={w} className="p-2 text-center font-bold text-primary">{d ? d.total : "-"}</td>
+                })}
+              </tr>
+              <tr className="border-t">
+                <td className="p-2 font-medium text-gray-600">Azione</td>
+                {[1,2,3,4,5,6,7,8].map(w => {
+                  const d = weekData(w)
+                  return (
+                    <td key={w} className="p-2 text-center">
+                      {d ? (
+                        <button onClick={() => rimuoviSettimana(w)} className="text-xs text-red-500 hover:underline">Rimuovi</button>
+                      ) : (
+                        <button onClick={() => registraSettimana(w)} className="text-xs text-primary hover:underline">Registra</button>
+                      )}
+                    </td>
+                  )
+                })}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="text-xs text-gray-400 mt-2">Verde &ge; 80 - Giallo 60-79 - Rosso &lt; 60. "Registra" salva il punteggio attuale nella settimana scelta.</div>
+      </div>
+
       {AUDIT_SECTIONS.map(s => (
         <div key={s.key} className={`rounded-xl border-2 ${s.border} overflow-hidden`}>
           <div className={`${s.head} px-4 py-2.5 font-bold text-sm flex items-center justify-between`}>
@@ -2023,22 +2096,24 @@ function TeamAuditTab({ kaizen, setKaizen }) {
           </div>
           <div className="bg-white">
             {s.items.map((it, idx) => {
-              const achieved = !!scores[it.id]
+              const v = valOf(it)
+              const full = v >= it.score
               return (
                 <div key={it.id} className={`p-3 flex items-start gap-3 ${idx < s.items.length - 1 ? "border-b" : ""}`}>
-                  <button
-                    onClick={() => setAchieved(it.id, !achieved)}
-                    className={`flex-shrink-0 w-8 h-8 rounded-lg border-2 flex items-center justify-center font-bold text-xs transition-all ${achieved ? "bg-green-500 border-green-500 text-white" : "bg-white border-gray-300 text-gray-300 hover:border-gray-400"}`}
-                    title={achieved ? "Raggiunto" : "Non raggiunto"}
-                  >
-                    {achieved ? <Check size={16} /> : ""}
-                  </button>
                   <div className="flex-1">
                     <div className="text-[10px] uppercase text-gray-400 font-semibold">{it.cat}</div>
                     <p className="text-sm">{it.text}</p>
                   </div>
-                  <div className={`flex-shrink-0 text-sm font-bold px-2 py-1 rounded ${achieved ? "text-green-600" : "text-gray-400"}`}>
-                    {achieved ? it.score : 0}<span className="text-gray-300">/{it.score}</span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <input
+                      type="number"
+                      min="0"
+                      max={it.score}
+                      value={scores[it.id] ?? ""}
+                      onChange={(e) => setScore(it.id, e.target.value, it.score)}
+                      className={`w-16 border-2 rounded-lg px-2 py-1 text-sm text-center font-bold ${full ? "border-green-400 text-green-600" : v > 0 ? "border-yellow-400 text-yellow-700" : "border-gray-200 text-gray-400"}`}
+                    />
+                    <span className="text-xs text-gray-400 font-medium">/ {it.score}</span>
                   </div>
                 </div>
               )
@@ -2049,9 +2124,9 @@ function TeamAuditTab({ kaizen, setKaizen }) {
 
       <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-4 text-xs text-blue-700">
         <div className="font-semibold mb-1">Come funziona</div>
-        <div>Clicca la casella a sinistra di ogni item per segnarlo come raggiunto (X). Ottieni il punteggio pieno dell'item solo se raggiunto, altrimenti 0.</div>
+        <div>Per ogni item scrivi il punteggio da 0 fino al massimo indicato a destra. Il totale su 100 e il semaforo si aggiornano da soli.</div>
         <div className="mt-2 pt-2 border-t border-blue-200"><strong>Soglie:</strong> PASS &ge; 80 - IN PROGRESS 60-79 - FAIL &lt; 60</div>
       </div>
     </div>
-  )
+)
 }
