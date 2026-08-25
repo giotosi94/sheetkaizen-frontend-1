@@ -1,7 +1,6 @@
 import { Plus, Search, Filter, ChevronDown, Archive, Trash2, RotateCcw } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import api from '../services/api'
-import { Plus, Search, Filter, ChevronDown } from 'lucide-react'
 import { useAllConfigurations } from '../hooks/useConfigurations'
 import { usePillars } from '../hooks/usePillars'
 import { useAuth } from '../context/AuthContext'
