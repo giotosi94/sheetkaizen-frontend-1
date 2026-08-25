@@ -3,19 +3,22 @@ import api from '../../services/api'
 import { Plus, Trash2 } from 'lucide-react'
 
 const ROW_TYPES = [
-  { id: 'planned', label: 'Pianificato', color: '#10b981' },
-  { id: 'completed', label: 'Completato', color: '#2563eb' },
+  { id: 'planned', label: 'Pianificato', color: '#2563eb' },
+  { id: 'completed', label: 'Completato', color: '#10b981' },
 ]
 
 // Granularità configurabile dall'utente
 const GRANULARITIES = [
-  { id: 'week',    label: 'Settimana' },
-  { id: 'month',   label: 'Mese' },
+  { id: 'day', label: 'Giorno' },
+  { id: 'week', label: 'Settimana' },
+  { id: 'month', label: 'Mese' },
   { id: 'quarter', label: 'Trimestre' },
 ]
 
 function getDefaultGantData() {
   const currentYear = new Date().getFullYear()
+  const today = new Date().toISOString().slice(0, 10)
+
   return {
     steps: [
       { id: 's1', num: 1, label: 'Analisi del problema' },
@@ -25,33 +28,94 @@ function getDefaultGantData() {
     ],
     cells: {},
     start_year: currentYear,
-    end_year: currentYear,  // default solo 1 anno
-    granularity: 'month',   // default mese
+    end_year: currentYear,
+    start_date: today,
+    duration_count: 12,
+    granularity: 'month',
   }
 }
 
 // Genera le colonne in base alla granularità
-function buildColumns(granularity, startYear, endYear) {
+function getWeekNumber(date) {
+  const value = new Date(Date.UTC(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate()
+  ))
+
+  const dayNumber = value.getUTCDay() || 7
+  value.setUTCDate(value.getUTCDate() + 4 - dayNumber)
+
+  const yearStart = new Date(Date.UTC(value.getUTCFullYear(), 0, 1))
+
+  return Math.ceil((((value - yearStart) / 86400000) + 1) / 7)
+}
+
+function buildColumns(granularity, startDateValue, durationCount) {
   const cols = []
-  for (let y = startYear; y <= endYear; y++) {
+  const monthLabels = [
+    'Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu',
+    'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'
+  ]
+
+  const startDate = startDateValue
+    ? new Date(`${startDateValue}T12:00:00`)
+    : new Date()
+
+  const count = Math.max(1, parseInt(durationCount) || 1)
+
+  for (let index = 0; index < count; index++) {
+    const date = new Date(startDate)
+
+    if (granularity === 'day') {
+      date.setDate(startDate.getDate() + index)
+
+      cols.push({
+        year: date.getFullYear(),
+        period: date.toISOString().slice(0, 10),
+        label: `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`,
+        group: String(date.getFullYear()),
+        fullDate: date.toISOString().slice(0, 10),
+      })
+    }
+
     if (granularity === 'week') {
-      // 52 settimane per anno
-      for (let w = 1; w <= 52; w++) {
-        cols.push({ year: y, period: w, label: `W${w}`, group: String(y) })
-      }
-    } else if (granularity === 'month') {
-      // 12 mesi per anno
-      const labels = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic']
-      for (let m = 1; m <= 12; m++) {
-        cols.push({ year: y, period: m, label: labels[m - 1], group: String(y) })
-      }
-    } else {
-      // 4 trimestri per anno
-      for (let q = 1; q <= 4; q++) {
-        cols.push({ year: y, period: q, label: `Q${q}`, group: String(y) })
-      }
+      date.setDate(startDate.getDate() + (index * 7))
+
+      cols.push({
+        year: date.getFullYear(),
+        period: `${date.getFullYear()}-W${getWeekNumber(date)}`,
+        label: `W${getWeekNumber(date)}`,
+        group: String(date.getFullYear()),
+        fullDate: date.toISOString().slice(0, 10),
+      })
+    }
+
+    if (granularity === 'month') {
+      date.setMonth(startDate.getMonth() + index)
+
+      cols.push({
+        year: date.getFullYear(),
+        period: `${date.getFullYear()}-${date.getMonth() + 1}`,
+        label: monthLabels[date.getMonth()],
+        group: String(date.getFullYear()),
+        fullDate: date.toISOString().slice(0, 10),
+      })
+    }
+
+    if (granularity === 'quarter') {
+      date.setMonth(startDate.getMonth() + (index * 3))
+
+      cols.push({
+        year: date.getFullYear(),
+        period: `${date.getFullYear()}-Q${Math.floor(date.getMonth() / 3) + 1}`,
+        label: `Q${Math.floor(date.getMonth() / 3) + 1}`,
+        group: String(date.getFullYear()),
+        fullDate: date.toISOString().slice(0, 10),
+      })
     }
   }
+
   return cols
 }
 
@@ -203,15 +267,79 @@ export default function KaizenGantMasterPlan({ kaizen, onSaved, value, onChange 
     setData(prev => ({ ...prev, [field]: v }))
   }
   function setGranularity(g) {
-    setData(prev => ({ ...prev, granularity: g }))
+    const defaultDuration = g === 'day'
+      ? 30
+      : g === 'week'
+        ? 17
+        : g === 'month'
+          ? 12
+          : 4
+
+    setData(prev => ({
+      ...prev,
+      granularity: g,
+      duration_count: defaultDuration,
+    }))
+  }
+
+  function setStartDate(value) {
+    if (!value) return
+
+    const selectedDate = new Date(`${value}T12:00:00`)
+
+    setData(prev => ({
+      ...prev,
+      start_date: value,
+      start_year: selectedDate.getFullYear(),
+    }))
+  }
+
+  function setDurationCount(value) {
+    const parsed = parseInt(value)
+
+    if (isNaN(parsed)) return
+
+    const maximum = granularity === 'day'
+      ? 366
+      : granularity === 'week'
+        ? 104
+        : granularity === 'month'
+          ? 60
+          : 20
+
+    setData(prev => ({
+      ...prev,
+      duration_count: Math.min(Math.max(parsed, 1), maximum),
+    }))
   }
 
   const granularity = data.granularity || 'month'
-  const columns = buildColumns(granularity, data.start_year, data.end_year)
+  const startDate = data.start_date || `${data.start_year || new Date().getFullYear()}-01-01`
+  const durationCount = data.duration_count || (
+    granularity === 'day'
+      ? 30
+      : granularity === 'week'
+        ? 17
+        : granularity === 'month'
+          ? 12
+          : 4
+  )
+
+  const columns = buildColumns(
+    granularity,
+    startDate,
+    durationCount
+  )
+
   const yearGroups = groupColsByYear(columns)
 
-  // Dimensione cella dinamica
-  const CELL_WIDTH = granularity === 'week' ? 32 : granularity === 'month' ? 50 : 70
+  const CELL_WIDTH = granularity === 'day'
+    ? 42
+    : granularity === 'week'
+      ? 38
+      : granularity === 'month'
+        ? 54
+        : 72
 
   return (
     <div className="space-y-4">
@@ -257,26 +385,43 @@ export default function KaizenGantMasterPlan({ kaizen, onSaved, value, onChange 
 
           {/* Anno inizio */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Anno inizio</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Data iniziale</label>
             <input
-              type="number"
-              min="2000"
-              max="2100"
-              value={data.start_year}
-              onChange={(e) => updateYearRange('start_year', e.target.value)}
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
               className="w-full border rounded px-2 py-1 text-sm"
             />
           </div>
 
           {/* Anno fine */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Anno fine</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Numero di {
+                granularity === 'day'
+                  ? 'giorni'
+                  : granularity === 'week'
+                    ? 'settimane'
+                    : granularity === 'month'
+                      ? 'mesi'
+                      : 'trimestri'
+              }
+            </label>
+
             <input
               type="number"
-              min="2000"
-              max="2100"
-              value={data.end_year}
-              onChange={(e) => updateYearRange('end_year', e.target.value)}
+              min="1"
+              max={
+                granularity === 'day'
+                  ? 366
+                  : granularity === 'week'
+                    ? 104
+                    : granularity === 'month'
+                      ? 60
+                      : 20
+              }
+              value={durationCount}
+              onChange={(e) => setDurationCount(e.target.value)}
               className="w-full border rounded px-2 py-1 text-sm"
             />
           </div>
