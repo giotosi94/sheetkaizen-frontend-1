@@ -257,14 +257,163 @@ function updateStepInterval(stepId, rowType, start, end) {
 function clearStepInterval(stepId, rowType) {
   updateStepInterval(stepId, rowType, null, null)
 }
+
+function startDrag(stepId, rowType, columnIndex, event) {
+  event.preventDefault()
+
+  setDragState({
+    stepId,
+    rowType,
+    startIndex: columnIndex,
+    endIndex: columnIndex,
+  })
+}
+
+function updateDrag(stepId, rowType, columnIndex) {
+  if (!dragState) return
+  if (dragState.stepId !== stepId) return
+  if (dragState.rowType !== rowType) return
+
+  setDragState(prev => ({
+    ...prev,
+    endIndex: columnIndex,
+  }))
+}
+
+function finishDrag() {
+  if (!dragState) return
+
+  const firstIndex = Math.min(
+    dragState.startIndex,
+    dragState.endIndex
+  )
+
+  const lastIndex = Math.max(
+    dragState.startIndex,
+    dragState.endIndex
+  )
+
+  const firstColumn = columns[firstIndex]
+  const lastColumn = columns[lastIndex]
+
+  if (firstColumn && lastColumn) {
+    updateStepInterval(
+      dragState.stepId,
+      dragState.rowType,
+      firstColumn.fullDate,
+      lastColumn.fullDate
+    )
+  }
+
+  setDragState(null)
+}
+
+function getDisplayInterval(step, rowType) {
+  if (
+    dragState &&
+    dragState.stepId === step.id &&
+    dragState.rowType === rowType
+  ) {
+    const firstIndex = Math.min(
+      dragState.startIndex,
+      dragState.endIndex
+    )
+
+    const lastIndex = Math.max(
+      dragState.startIndex,
+      dragState.endIndex
+    )
+
+    return {
+      start: columns[firstIndex]?.fullDate || null,
+      end: columns[lastIndex]?.fullDate || null,
+    }
+  }
+
+  return getStepInterval(step, rowType)
+}
+
+function isColumnInInterval(column, interval) {
+  if (!interval?.start || !interval?.end) return false
+
+  return (
+    column.fullDate >= interval.start &&
+    column.fullDate <= interval.end
+  )
+}
+
+function getDurationLabel(interval) {
+  if (!interval?.start || !interval?.end) return ''
+
+  const start = new Date(`${interval.start}T12:00:00`)
+  const end = new Date(`${interval.end}T12:00:00`)
+  const days = Math.round((end - start) / 86400000) + 1
+
+  if (granularity === 'day') {
+    return `${days} giorni`
+  }
+
+  if (granularity === 'week') {
+    const weeks = Math.max(1, Math.round(days / 7))
+    return `${weeks} settimane`
+  }
+
+  if (granularity === 'month') {
+    const months = Math.max(
+      1,
+      ((end.getFullYear() - start.getFullYear()) * 12)
+        + end.getMonth()
+        - start.getMonth()
+        + 1
+    )
+
+    return `${months} mesi`
+  }
+
+  const quarters = Math.max(
+    1,
+    Math.round(
+      (
+        ((end.getFullYear() - start.getFullYear()) * 12)
+        + end.getMonth()
+        - start.getMonth()
+      ) / 3
+    ) + 1
+  )
+
+  return `${quarters} trimestri`
+}
   function clearRow(stepId) {
-    if (!confirm('Pulire tutte le celle di questa riga?')) return
+    if (!confirm('Pulire pianificato e completato di questa attività?')) return
+
     setData(prev => {
       const newCells = { ...prev.cells }
-      Object.keys(newCells).forEach(k => {
-        if (k.startsWith(`${stepId}_`)) delete newCells[k]
+
+      Object.keys(newCells).forEach(key => {
+        if (key.startsWith(`${stepId}_`)) {
+          delete newCells[key]
+        }
       })
-      return { ...prev, cells: newCells }
+
+      return {
+        ...prev,
+        cells: newCells,
+        steps: prev.steps.map(step => {
+          if (step.id !== stepId) return step
+
+          return {
+            ...step,
+            planned: {
+              start: null,
+              end: null,
+            },
+            completed: {
+              start: null,
+              end: null,
+            },
+          }
+        }),
+      }
     })
   }
   function updateStepLabel(stepId, newLabel) {
@@ -504,7 +653,7 @@ function clearStepInterval(stepId, rowType) {
               <span>{row.label}</span>
             </div>
           ))}
-          <span className="ml-auto text-gray-500 italic">Riga superiore pianificata, riga inferiore completata</span>
+          <span className="ml-auto text-gray-500 italic">Premi sulla prima cella, trascina fino all'ultima e rilascia</span>
         </div>
       </div>
 
@@ -607,44 +756,93 @@ function clearStepInterval(stepId, rowType) {
                 </button>
               </div>
 
-              <div className="flex flex-col">
-                {ROW_TYPES.map(row => (
-                  <div
-                    key={row.id}
-                    className={`flex ${row.id === 'planned' ? 'border-b' : ''}`}
-                  >
-                    {columns.map((col, ci) => {
-                      const active = getCellValue(
-                        step.id,
-                        row.id,
-                        col.year,
-                        col.period
-                      )
+              <div
+                className="flex flex-col select-none"
+                onMouseUp={finishDrag}
+                onMouseLeave={(event) => {
+                  if (event.buttons === 0 && dragState) {
+                    finishDrag()
+                  }
+                }}
+              >
+                {ROW_TYPES.map(row => {
+                  const interval = getDisplayInterval(step, row.id)
+                  const durationLabel = getDurationLabel(interval)
 
-                      return (
-                        <button
-                          key={`${row.id}_${ci}`}
-                          onClick={() => toggleCell(
-                            step.id,
-                            row.id,
-                            col.year,
-                            col.period
-                          )}
-                          className="border-r hover:opacity-75 transition-opacity"
-                          style={{
-                            width: CELL_WIDTH,
-                            minWidth: CELL_WIDTH,
-                            height: '22px',
-                            backgroundColor: active
-                              ? row.color
-                              : 'transparent',
-                          }}
-                          title={`${row.label} - ${col.year} ${col.label}`}
-                        />
-                      )
-                    })}
-                  </div>
-                ))}
+                  return (
+                    <div
+                      key={row.id}
+                      className={`flex ${row.id === 'planned' ? 'border-b' : ''}`}
+                    >
+                      {columns.map((col, columnIndex) => {
+                        const active = isColumnInInterval(
+                          col,
+                          interval
+                        )
+
+                        const isStart = active &&
+                          col.fullDate === interval?.start
+
+                        const isEnd = active &&
+                          col.fullDate === interval?.end
+
+                        return (
+                          <button
+                            key={`${row.id}_${columnIndex}`}
+                            type="button"
+                            onMouseDown={(event) => startDrag(
+                              step.id,
+                              row.id,
+                              columnIndex,
+                              event
+                            )}
+                            onMouseEnter={() => updateDrag(
+                              step.id,
+                              row.id,
+                              columnIndex
+                            )}
+                            onMouseUp={finishDrag}
+                            className="relative border-r transition-opacity hover:opacity-80 cursor-crosshair"
+                            style={{
+                              width: CELL_WIDTH,
+                              minWidth: CELL_WIDTH,
+                              height: '22px',
+                              backgroundColor: active
+                                ? row.color
+                                : 'transparent',
+                              borderRightColor: active
+                                ? row.color
+                                : undefined,
+                              borderTopLeftRadius: isStart
+                                ? '5px'
+                                : '0',
+                              borderBottomLeftRadius: isStart
+                                ? '5px'
+                                : '0',
+                              borderTopRightRadius: isEnd
+                                ? '5px'
+                                : '0',
+                              borderBottomRightRadius: isEnd
+                                ? '5px'
+                                : '0',
+                            }}
+                            title={
+                              active
+                                ? `${row.label}: ${interval.start} - ${interval.end} (${durationLabel})`
+                                : `${row.label}: trascina da qui`
+                            }
+                          >
+                            {isStart && active && (
+                              <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[8px] font-bold text-white whitespace-nowrap pointer-events-none">
+                                {durationLabel}
+                              </span>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           ))}
