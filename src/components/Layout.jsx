@@ -42,8 +42,8 @@ export default function Layout() {
   const roleColor = roleColors[user?.role] || 'bg-gray-500'
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-16'} bg-primary text-white transition-all duration-300 flex flex-col`}>
+    <div className="flex h-screen bg-background text-warm-text">
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-16'} bg-primary text-white transition-all duration-300 flex flex-col shadow-warm-lg`}>
         {/* Header sidebar */}
         <div className="p-4 flex justify-between items-center border-b border-primary-light">
           {sidebarOpen && <h1 className="text-lg font-bold">{APP_NAME}</h1>}
@@ -61,9 +61,11 @@ export default function Layout() {
               <Link
                 key={link.to}
                 to={link.to}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                  isActive ? 'bg-primary-light' : 'hover:bg-primary-light'
-                }`}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${
+  isActive
+    ? 'bg-gold-dark text-white shadow-warm-sm'
+    : 'hover:bg-chocolate-light'
+}`}
               >
                 <Icon size={20} />
                 {sidebarOpen && <span className="text-sm">{link.label}</span>}
