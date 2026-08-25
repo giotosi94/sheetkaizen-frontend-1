@@ -592,7 +592,7 @@ export default function KaizenDetailPage() {
       )}
 
       {activeTab === 'gemba' && (
-        <GembaObiettiviTab kaizen={kaizen} setKaizen={setKaizen} configs={configs} updateField={updateField} />
+        <GembaObiettiviTab kaizen={kaizen} setKaizen={setKaizen} updateField={updateField} />
       )}
 
       {activeTab === 'quickkaizen' && (
@@ -1644,7 +1644,172 @@ function LossPareto({ value = [], onChange }) {
   )
 }
 
-function GembaObiettiviTab({ kaizen, setKaizen, configs, updateField }) {
+function GembaObiettiviTab({ kaizen, setKaizen, updateField }) {
+  const gp = kaizen.gemba_plan || {}
+  const perditeItems = kaizen.loss_pareto?.items || []
+
+  const updateGemba = (field, value) => setKaizen(prev => ({ ...prev, gemba_plan: { ...prev.gemba_plan, value } }))
+
+  const handlePerditaChange = (label) => {
+    const found = perditeItems.find(i => i.label === label)
+    setKaizen(prev => ({
+      ...prev,
+      obiettivi: {
+        ...prev.obiettivi,
+        perdita: label,
+        start: found ? found.value : prev.obiettivi?.start,
+      },
+    }))
+  }
+
+  const start = parseFloat(kaizen.obiettivi?.start)
+  const target = parseFloat(kaizen.obiettivi?.target)
+  const miglioramentoPct = (!isNaN(start) && !isNaN(target) && start !== 0)
+    ? Math.abs(((target - start) / start) * 100)
+    : null
+
+  const genSmart = () => {
+    const o = kaizen.obiettivi || {}
+    const perdita = o.perdita || 'la perdita'
+    const scope = o.scope || kaizen.macchina || kaizen.linea || 'area target'
+    const unit = o.unit ? ` ${o.unit}` : ''
+    const scad = o.scadenza ? new Date(o.scadenza).toLocaleDateString('it-IT') : 'la scadenza'
+    const frase = `Ridurre ${perdita} su ${scope} da ${o.start ?? '...'} a ${o.target ?? '...'}${unit} entro ${scad}`
+    updateField('obiettivi', 'smart', frase)
+  }
+
+  const smartOk = kaizen.obiettivi?.kpi && kaizen.obiettivi?.start !== undefined && kaizen.obiettivi?.start !== '' && kaizen.obiettivi?.target !== undefined && kaizen.obiettivi?.target !== '' && kaizen.obiettivi?.scadenza
+
+  const checklistItems = [
+    { key: 'condizioni_base_rispettate', label: 'Le condizioni di base sono rispettate (5S, Pulizia e lubrificazione)?' },
+    { key: 'conoscenza_macchina_processo', label: 'Le persone dimostrano conoscenza di macchina e processo?' },
+    { key: 'standard_esistenti', label: 'Esistono standard legati al problema (OPL, SOP)?' },
+    { key: 'standard_chiari', label: 'Gli standard sono chiari e comprensibili?' },
+    { key: 'standard_applicati', label: 'Gli standard sono applicati correttamente?' },
+    { key: 'persone_conoscono_standard', label: 'Le persone conoscono gli standard?' },
+  ]
+
+  return (
+    <div className="space-y-6">
+
+      <div className="bg-white rounded-xl shadow p-6">
+        <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">PLAN A GEMBA - VAI SUL POSTO REALE</h3>
+
+        <div className="mb-4">
+          <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Scopo del Gemba</label>
+          <textarea value={gp.purpose || ''} onChange={(e) => updateGemba('purpose', e.target.value)} rows={2} placeholder="Cosa vado a osservare e perche (fenomeno, area, condizione)" className="w-full border rounded-lg px-3 py-2 text-sm" />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Data e turno</label>
+            <div className="flex gap-2">
+              <input type="date" value={gp.schedule_data || ''} onChange={(e) => updateGemba('schedule_data', e.target.value)} className="flex-1 border rounded-lg px-3 py-2 text-sm" />
+              <input value={gp.schedule_turno || ''} onChange={(e) => updateGemba('schedule_turno', e.target.value)} placeholder="Turno" className="w-28 border rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Partecipanti</label>
+            <UserPicker
+              value={(gp.roles_ids || []).map((id, i) => ({ id, name: gp.roles_nomi?.[i] || '' }))}
+              onChange={(sel) => setKaizen(prev => ({ ...prev, gemba_plan: { ...prev.gemba_plan, roles_ids: sel.map(s => s.id), roles_nomi: sel.map(s => s.name) } }))}
+              mode="multi"
+              placeholder="Chi partecipa al gemba..."
+            />
+          </div>
+        </div>
+
+        <div className="pt-4 border-t">
+          <label className="block text-xs font-bold text-gray-600 uppercase mb-3">Checklist Gemba - Verifica del processo</label>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-3">
+            {checklistItems.map(item => (
+              <div key={item.key} className="pb-3 border-b">
+                <p className="text-sm font-medium mb-1">{item.label}</p>
+                <div className="flex gap-2 mb-1">
+                  {['Si', 'No', 'N/A'].map(v => (
+                    <button key={v} onClick={() => updateField('verifica_processo', item.key, { ...kaizen.verifica_processo?.[item.key], valore: v })}
+                      className={`px-3 py-1 rounded text-xs font-medium border ${
+                        kaizen.verifica_processo?.[item.key]?.valore === v ? 'bg-primary text-white' : 'bg-white text-gray-600'
+                      }`}>{v}</button>
+                  ))}
+                </div>
+                <input placeholder="Osservazioni" value={kaizen.verifica_processo?.[item.key]?.osservazioni || ''}
+                  onChange={(e) => updateField('verifica_processo', item.key, { ...kaizen.verifica_processo?.[item.key], osservazioni: e.target.value })}
+                  className="w-full border rounded px-2 py-1 text-xs" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="pt-4 border-t mt-4">
+          <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Osservazioni Gemba (cosa e stato visto sul campo)</label>
+          <textarea value={kaizen.gemba?.osservazioni || ''} onChange={(e) => updateField('gemba', 'osservazioni', e.target.value)} rows={3} placeholder="Documenta cosa hai osservato direttamente su macchina, linea, processo" className="w-full border rounded-lg px-3 py-2 text-sm" />
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow p-6">
+        <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">ESTABLISH OBJECTIVES - OBIETTIVO SMART</h3>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Perdita da attaccare</label>
+            <select value={kaizen.obiettivi?.perdita || ''} onChange={(e) => handlePerditaChange(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="">{perditeItems.length === 0 ? 'Nessuna perdita nel Loss Deployment' : 'Seleziona dal Pareto'}</option>
+              {perditeItems.map(i => (
+                <option key={i.id} value={i.label}>{i.label} ({i.value})</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Scope (macchina/linea)</label>
+            <input value={kaizen.obiettivi?.scope || ''} onChange={(e) => updateField('obiettivi', 'scope', e.target.value)} placeholder="Es. Bindler 100" className="w-full border rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-600 uppercase mb-1">KPI / OPI</label>
+            <input value={kaizen.obiettivi?.kpi || ''} onChange={(e) => updateField('obiettivi', 'kpi', e.target.value)} placeholder="es. min, ppm, %" className="w-full border rounded-lg px-3 py-2 text-sm" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Start</label>
+            <input type="number" value={kaizen.obiettivi?.start ?? ''} onChange={(e) => updateField('obiettivi', 'start', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Target</label>
+            <input type="number" value={kaizen.obiettivi?.target ?? ''} onChange={(e) => updateField('obiettivi', 'target', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Unita</label>
+            <input value={kaizen.obiettivi?.unit || ''} onChange={(e) => updateField('obiettivi', 'unit', e.target.value)} placeholder="min, %, kg" className="w-full border rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Scadenza</label>
+            <input type="date" value={kaizen.obiettivi?.scadenza || ''} onChange={(e) => updateField('obiettivi', 'scadenza', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+          </div>
+        </div>
+
+        {miglioramentoPct !== null && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 mb-4">
+            Miglioramento richiesto: <strong>{miglioramentoPct.toFixed(1)}%</strong> (da {kaizen.obiettivi.start} a {kaizen.obiettivi.target})
+          </div>
+        )}
+
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-xs font-bold text-gray-600 uppercase">Frase Obiettivo SMART</label>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${smartOk ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+              {smartOk ? 'SMART completo' : 'Campi mancanti'}
+            </span>
+            <button type="button" onClick={genSmart} className="bg-primary text-white px-3 py-1 rounded text-xs font-medium hover:bg-primary-light">Genera frase</button>
+          </div>
+        </div>
+        <textarea value={kaizen.obiettivi?.smart || ''} onChange={(e) => updateField('obiettivi', 'smart', e.target.value)} rows={2} placeholder='Genera automaticamente o scrivi: "Ridurre setup Bindler 100 da 45 a 25 min entro 30/06"' className="w-full border rounded-lg px-3 py-2 text-sm" />
+      </div>
+
+    </div>
+  )
+}
   const [chkInput, setChkInput] = useState('')
 
   const gp = kaizen.gemba_plan || {}
