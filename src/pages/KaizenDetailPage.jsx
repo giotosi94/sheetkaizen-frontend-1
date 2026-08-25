@@ -648,7 +648,17 @@ export default function KaizenDetailPage() {
           </div>
 
 
-          {/* PASSO 5 — Piano Azioni */}
+          {livelloAttuale !== 'Quick' && (
+            <div className="bg-white rounded-xl shadow p-6">
+              <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-2">PASSO 4 - FMEA (ANALISI DEI MODI DI GUASTO)</h3>
+              <p className="text-xs text-gray-500 text-center mb-4">Priorizza le cause per rischio: RPN = Gravita x Frequenza x Rilevabilita</p>
+              <FMEATable
+                value={kaizen.fmea?.items || []}
+                onChange={(items) => setKaizen(prev => ({ ...prev, fmea: { ...prev.fmea, items } }))}
+              />
+            </div>
+          )}
+
           <div className="bg-white rounded-xl shadow p-6">
             <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">PASSO 5 - PIANO AZIONI</h3>
 
@@ -1807,6 +1817,90 @@ function GembaObiettiviTab({ kaizen, setKaizen, updateField }) {
         <textarea value={kaizen.obiettivi?.smart || ''} onChange={(e) => updateField('obiettivi', 'smart', e.target.value)} rows={2} placeholder='Genera automaticamente o scrivi: "Ridurre setup Bindler 100 da 45 a 25 min entro 30/06"' className="w-full border rounded-lg px-3 py-2 text-sm" />
       </div>
 
+    </div>
+  )
+}
+
+function FMEATable({ value = [], onChange }) {
+  const addRow = () => onChange([...value, { id: Date.now().toString(), modo: '', effetto: '', causa: '', s: 5, o: 5, d: 5, azione: '', responsabile: '' }])
+  const removeRow = (id) => onChange(value.filter(r => r.id !== id))
+  const updateRow = (id, field, val) => onChange(value.map(r => r.id === id ? { ...r, val } : r))
+
+  const rpnOf = (r) => (parseInt(r.s) || 0) * (parseInt(r.o) || 0) * (parseInt(r.d) || 0)
+  const rpnStyle = (rpn) => rpn >= 100 ? 'bg-red-100 text-red-700 border-red-300' : rpn >= 40 ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : 'bg-green-100 text-green-700 border-green-300'
+
+  const maxRpn = value.reduce((m, r) => Math.max(m, rpnOf(r)), 0)
+
+  return (
+    <div className="space-y-4">
+      {value.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-gray-50 text-left text-xs uppercase text-gray-600">
+                <th className="p-2 border-b font-bold min-w-[160px]">Modo di guasto</th>
+                <th className="p-2 border-b font-bold min-w-[160px]">Effetto</th>
+                <th className="p-2 border-b font-bold min-w-[160px]">Causa</th>
+                <th className="p-2 border-b font-bold text-center" title="Gravita">G</th>
+                <th className="p-2 border-b font-bold text-center" title="Frequenza">F</th>
+                <th className="p-2 border-b font-bold text-center" title="Rilevabilita">R</th>
+                <th className="p-2 border-b font-bold text-center">RPN</th>
+                <th className="p-2 border-b font-bold min-w-[180px]">Contromisura</th>
+                <th className="p-2 border-b font-bold min-w-[140px]">Responsabile</th>
+                <th className="p-2 border-b"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {value.map(r => {
+                const rpn = rpnOf(r)
+                return (
+                  <tr key={r.id} className="border-b hover:bg-gray-50">
+                    <td className="p-1"><textarea value={r.modo || ''} onChange={(e) => updateRow(r.id, 'modo', e.target.value)} rows={2} className="w-full border rounded px-2 py-1 text-xs resize-none" /></td>
+                    <td className="p-1"><textarea value={r.effetto || ''} onChange={(e) => updateRow(r.id, 'effetto', e.target.value)} rows={2} className="w-full border rounded px-2 py-1 text-xs resize-none" /></td>
+                    <td className="p-1"><textarea value={r.causa || ''} onChange={(e) => updateRow(r.id, 'causa', e.target.value)} rows={2} className="w-full border rounded px-2 py-1 text-xs resize-none" /></td>
+                    <td className="p-1"><input type="number" min="1" max="10" value={r.s ?? ''} onChange={(e) => updateRow(r.id, 's', e.target.value)} className="w-14 border rounded px-2 py-1 text-xs text-center" /></td>
+                    <td className="p-1"><input type="number" min="1" max="10" value={r.o ?? ''} onChange={(e) => updateRow(r.id, 'o', e.target.value)} className="w-14 border rounded px-2 py-1 text-xs text-center" /></td>
+                    <td className="p-1"><input type="number" min="1" max="10" value={r.d ?? ''} onChange={(e) => updateRow(r.id, 'd', e.target.value)} className="w-14 border rounded px-2 py-1 text-xs text-center" /></td>
+                    <td className="p-1 text-center">
+                      <span className={`inline-block px-2 py-1 rounded-lg font-bold text-xs border ${rpnStyle(rpn)}`}>{rpn}</span>
+                    </td>
+                    <td className="p-1"><textarea value={r.azione || ''} onChange={(e) => updateRow(r.id, 'azione', e.target.value)} rows={2} className="w-full border rounded px-2 py-1 text-xs resize-none" /></td>
+                    <td className="p-1"><input value={r.responsabile || ''} onChange={(e) => updateRow(r.id, 'responsabile', e.target.value)} className="w-full border rounded px-2 py-1 text-xs" /></td>
+                    <td className="p-1 text-center">
+                      <button onClick={() => removeRow(r.id)} className="text-red-500 hover:bg-red-50 p-1 rounded"><X size={14} /></button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between">
+        <button onClick={addRow} className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-light">Aggiungi riga FMEA</button>
+        {value.length > 0 && (
+          <div className="text-xs text-gray-500">
+            RPN massimo: <span className={`font-bold px-2 py-0.5 rounded ${rpnStyle(maxRpn)}`}>{maxRpn}</span>
+          </div>
+        )}
+      </div>
+
+      {value.length === 0 && (
+        <div className="bg-gray-50 rounded-lg p-6 text-center text-sm text-gray-400">Aggiungi una riga per iniziare l'analisi FMEA</div>
+      )}
+
+      <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-3 text-xs text-blue-700">
+        <div className="font-semibold mb-1">Come si compila (scala 1-10)</div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-1">
+          <div><strong>G</strong> Gravita: quanto e grave l'effetto</div>
+          <div><strong>F</strong> Frequenza: quanto spesso accade la causa</div>
+          <div><strong>R</strong> Rilevabilita: quanto e difficile accorgersene (10 = non rilevabile)</div>
+        </div>
+        <div className="mt-2 pt-2 border-t border-blue-200">
+          <strong>Priorita RPN:</strong> Rosso &ge; 100 (agire subito) - Giallo 40-99 (monitorare) - Verde &lt; 40 (basso)
+        </div>
+      </div>
     </div>
   )
 }
