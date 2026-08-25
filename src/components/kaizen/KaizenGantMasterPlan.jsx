@@ -718,9 +718,9 @@ function getDurationLabel(interval) {
   const today = new Date().toISOString().slice(0, 10)
 
   return (
-    <div className="space-y-4">
+    <div className="w-full max-w-full min-w-0 overflow-hidden space-y-4">
       {/* Header config */}
-      <div className="bg-white rounded-xl shadow p-4">
+      <div className="w-full max-w-full min-w-0 bg-white rounded-xl shadow p-4 overflow-hidden">
         <div className="flex justify-between items-start mb-3">
           <p className="text-xs text-gray-500">Pianificazione multi-anno per macro-fasi del Kaizen</p>
           <div className="flex items-center gap-3 text-xs">
@@ -850,11 +850,18 @@ function getDurationLabel(interval) {
 
       {/* Griglia Gant */}
       <div className="w-full max-w-full min-w-0 bg-white rounded-xl shadow overflow-hidden">
-        <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
+        <div
+          className="block w-full max-w-full min-w-0 overflow-x-auto overflow-y-hidden overscroll-x-contain"
+          style={{
+            WebkitOverflowScrolling: 'touch',
+            scrollbarGutter: 'stable',
+          }}
+        >
           <div
+            className="inline-block align-top"
             style={{
-              width: 'max-content',
-              minWidth: columns.length * CELL_WIDTH + 412,
+              width: columns.length * CELL_WIDTH + 432,
+              minWidth: columns.length * CELL_WIDTH + 432,
             }}
           >
           {/* Header anni */}
