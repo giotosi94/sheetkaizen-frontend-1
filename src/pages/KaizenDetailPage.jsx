@@ -305,7 +305,6 @@ export default function KaizenDetailPage() {
             ) : (
               <>
                 <button
-                                  <button
                   type="button"
                   onClick={() => saveKaizen(true)}
                   disabled={saving}
