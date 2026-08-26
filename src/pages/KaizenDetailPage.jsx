@@ -14,6 +14,7 @@ import KaizenAzioniList from '../components/kaizen/KaizenAzioniList'
 import UserPicker from '../components/UserPicker'
 import ImageUpload from '../components/ImageUpload'
 import { useAllConfigurations } from '../hooks/useConfigurations'
+import useUnsavedChangesGuard from '../hooks/useUnsavedChangesGuard'
 import ParetoChart from '../components/pillar/ParetoChart'
 
 const LIVELLI = ['Quick', 'Standard', 'Major']
@@ -70,6 +71,7 @@ export default function KaizenDetailPage() {
   const [motivoTrasforma, setMotivoTrasforma] = useState('')
   const [showStoria, setShowStoria] = useState(false)
   const [transforming, setTransforming] = useState(false)
+const [savedSnapshot, setSavedSnapshot] = useState(null)
 
   const { configs } = useAllConfigurations()
   const [reparti, setReparti] = useState([])
@@ -132,23 +134,62 @@ export default function KaizenDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [livelloAttuale])
 
+  const hasUnsavedChanges = useMemo(() => {
+    if (!kaizen || !savedSnapshot || isLocked) return false
+
+    return JSON.stringify(kaizen) !== savedSnapshot
+  }, [kaizen, savedSnapshot, isLocked])
+
+  const {
+    showPrompt: showUnsavedPrompt,
+    saving: savingBeforeNavigation,
+    saveAndContinue,
+    discardAndContinue,
+    stay: stayOnPage,
+  } = useUnsavedChangesGuard({
+    when: hasUnsavedChanges,
+    onSave: () => saveKaizen(false),
+  })
+
   const loadKaizen = async () => {
     try {
       const res = await api.get(`/kaizens/${id}`)
       setKaizen(res.data)
-    } catch (err) { console.error(err) }
-  }
-
-  const saveKaizen = async () => {
-    setSaving(true)
-    try {
-      await api.put(`/kaizens/${id}`, kaizen)
-      alert('Kaizen salvato correttamente.')
+      setSavedSnapshot(JSON.stringify(res.data))
     } catch (err) {
       console.error(err)
-      alert('Errore durante il salvataggio: ' + (err.response?.data?.detail || err.message))
     }
-    setSaving(false)
+  }
+
+  const saveKaizen = async (showSuccessMessage = true) => {
+    if (!kaizen || saving) return false
+
+    setSaving(true)
+
+    try {
+      const res = await api.put(`/kaizens/${id}`, kaizen)
+      const savedKaizen = res.data || kaizen
+
+      setKaizen(savedKaizen)
+      setSavedSnapshot(JSON.stringify(savedKaizen))
+
+      if (showSuccessMessage) {
+        alert('Kaizen salvato correttamente.')
+      }
+
+      return true
+    } catch (err) {
+      console.error(err)
+
+      alert(
+        'Errore durante il salvataggio: ' +
+        (err.response?.data?.detail || err.message)
+      )
+
+      return false
+    } finally {
+      setSaving(false)
+    }
   }
 
   const riapriKaizen = async () => {
@@ -264,11 +305,25 @@ export default function KaizenDetailPage() {
             ) : (
               <>
                 <button
-                  onClick={saveKaizen}
+                  onClick={() => saveKaizen(true)}
                   disabled={saving}
-                  className="bg-white text-primary px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-100 disabled:opacity-50"
+                  className={`px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 ${
+  hasUnsavedChanges
+    ? 'bg-gold text-white hover:bg-gold-dark'
+    : 'bg-white text-primary hover:bg-gray-100'
+}`}
                 >
-                  <Save size={18} /> {saving ? 'Salvataggio...' : 'Salva'}
+                  <Save size={18} />
+2
+{saving
+3
+? 'Salvataggio...'
+4
+: hasUnsavedChanges
+5
+? 'Salva modifiche'
+6
+: 'Salvato'}
                 </button>
                 <button
                   onClick={chiudiKaizen}
@@ -814,6 +869,69 @@ export default function KaizenDetailPage() {
       )}
 
       </fieldset>
+
+            {showUnsavedPrompt && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-60 p-4">
+          <div className="w-full max-w-md overflow-hidden rounded-xl bg-white shadow-2xl">
+            <div className="bg-primary px-5 py-4 text-white">
+              <div className="flex items-center gap-3">
+                <AlertTriangle size={22} />
+
+                <div>
+                  <h2 className="font-bold">
+                    Modifiche non salvate
+                  </h2>
+
+                  <p className="mt-0.5 text-xs text-white text-opacity-80">
+                    Hai modificato il Kaizen ma non hai ancora salvato.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <p className="text-sm text-gray-700">
+                Vuoi salvare le modifiche prima di uscire da questa pagina?
+              </p>
+
+              <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-xs text-yellow-800">
+                Uscendo senza salvare perderai tutte le modifiche effettuate dopo l’ultimo salvataggio.
+              </div>
+
+              <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={stayOnPage}
+                  disabled={savingBeforeNavigation}
+                  className="rounded-lg border px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Resta nel Kaizen
+                </button>
+
+                <button
+                  type="button"
+                  onClick={discardAndContinue}
+                  disabled={savingBeforeNavigation}
+                  className="rounded-lg bg-gray-600 px-4 py-2 text-sm text-white hover:bg-gray-700 disabled:opacity-50"
+                >
+                  Esci senza salvare
+                </button>
+
+                <button
+                  type="button"
+                  onClick={saveAndContinue}
+                  disabled={savingBeforeNavigation}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-light disabled:opacity-50"
+                >
+                  {savingBeforeNavigation
+                    ? 'Salvataggio...'
+                    : 'Salva e continua'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Form AP creato da Root Cause dei 5 Perché */}
       {showAPFormFromRootCause && rootCausePrefill && (
