@@ -1228,6 +1228,7 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newTitolo, setNewTitolo] = useState('')
   const [creating, setCreating] = useState(false)
+  const [apByChild, setApByChild] = useState({})
 
   useEffect(() => { loadFigli() }, [kaizenId])
 
@@ -1235,9 +1236,30 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
     setLoading(true)
     try {
       const res = await api.get(`/kaizens/${kaizenId}/children`)
-      setFigli(res.data || [])
-    } catch (err) { console.error(err) }
+      const children = res.data || []
+      setFigli(children)
+      loadActionPlans(children)
+    } catch (err) {
+      console.error(err)
+    }
     setLoading(false)
+  }
+
+  const loadActionPlans = async (children) => {
+    const result = {}
+
+    await Promise.all(
+      children.map(async (child) => {
+        try {
+          const res = await api.get(`/kaizens/${child._id}/action-plans`)
+          result[child._id] = res.data || []
+        } catch {
+          result[child._id] = []
+        }
+      })
+    )
+
+    setApByChild(result)
   }
 
   const createFiglio = async () => {
@@ -1269,7 +1291,9 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
     try {
       await api.delete(`/kaizens/${kaizenId}/link-child/${childId}`)
       loadFigli()
-    } catch (err) { alert('Errore: ' + (err.response?.data?.detail || err.message)) }
+    } catch (err) {
+      alert('Errore: ' + (err.response?.data?.detail || err.message))
+    }
   }
 
   const STATO_COLORS = {
@@ -1277,12 +1301,55 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
     'In Corso': 'bg-yellow-100 text-yellow-700',
     'Chiuso': 'bg-green-100 text-green-700',
     'Done': 'bg-green-100 text-green-700',
+    'Cancelled': 'bg-gray-200 text-gray-600',
+  }
+
+  const getRootCause = (child) => {
+    const rami = child.passo2_cause_probabili?.rami || {}
+    let found = null
+
+    const walk = (node) => {
+      if (!node || found) return
+      if (node.is_root_cause && node.label) {
+        found = node.label
+        return
+      }
+      ;(node.children || []).forEach(walk)
+    }
+
+    Object.values(rami).forEach(cause => {
+      if (Array.isArray(cause)) cause.forEach(walk)
+    })
+
+    return found
+  }
+
+  const getApStats = (childId) => {
+    const list = apByChild[childId] || []
+    const total = list.length
+
+    const late = list.filter(ap => {
+      if (!ap.data_scadenza) return false
+      if (ap.stato_visuale === 'In Ritardo') return true
+
+      const scad = new Date(ap.data_scadenza)
+      const oggi = new Date()
+      const chiuso = ['Chiuso', 'Done', 'Completato'].includes(ap.stato)
+
+      return !chiuso && scad < oggi
+    }).length
+
+    return { total, late }
+  }
+
+  const openChild = (childId) => {
+    window.location.href = `/kaizen/${childId}`
   }
 
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-xl shadow p-4">
-        <div className="flex justify-between items-center mb-2">
+        <div className="flex justify-between items-center gap-3">
           <div>
             <h3 className="font-bold text-lg">
               Quick Kaizen del progetto {kaizenNumero}
@@ -1290,11 +1357,14 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
             <p className="text-xs text-gray-500">
               {figli.length === 0
                 ? 'Nessun Quick Kaizen ancora collegato a questo progetto'
-                : `${figli.length} Quick Kaizen ${figli.length === 1 ? 'collegato' : 'collegati'} a questo ${kaizenLivello}`
-              }
+                : `${figli.length} Quick Kaizen ${figli.length === 1 ? 'collegato' : 'collegati'} a questo ${kaizenLivello}`}
             </p>
           </div>
-          <button onClick={() => setShowCreateModal(true)} className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-light text-sm font-medium">
+
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-light text-sm font-medium whitespace-nowrap"
+          >
             Crea Quick Kaizen
           </button>
         </div>
@@ -1305,22 +1375,34 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
           <div className="bg-white rounded-xl w-full max-w-md shadow-2xl">
             <div className="bg-green-600 text-white px-5 py-3 rounded-t-xl flex justify-between items-center">
               <h2 className="text-lg font-bold">Crea Quick Kaizen</h2>
-              <button onClick={() => setShowCreateModal(false)} className="hover:bg-white hover:bg-opacity-20 p-1 rounded"><X size={20} /></button>
+              <button onClick={() => setShowCreateModal(false)} className="hover:bg-white hover:bg-opacity-20 p-1 rounded">
+                <X size={20} />
+              </button>
             </div>
+
             <div className="p-5 space-y-3">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
                 <strong className="text-blue-700">Verrà collegato a {kaizenNumero}</strong>
                 <p className="text-blue-600 text-xs mt-1">Reparto e linea vengono ereditati dal progetto padre quando possibile.</p>
               </div>
+
               <div>
-                <label className="block text-sm font-medium mb-1">Titolo <span className="text-red-500">*</span></label>
-                <input value={newTitolo} onChange={(e) => setNewTitolo(e.target.value)} placeholder="Es: Pulizia ugelli linea 3" className="w-full border rounded-lg px-3 py-2" autoFocus />
+                <label className="block text-sm font-medium mb-1">
+                  Titolo <span className="text-red-500">*</span>
+                </label>
+                <input
+                  value={newTitolo}
+                  onChange={(e) => setNewTitolo(e.target.value)}
+                  placeholder="Es: Pulizia ugelli linea 3"
+                  className="w-full border rounded-lg px-3 py-2"
+                  autoFocus
+                />
               </div>
-              <div className="text-xs text-gray-500">
-                Per personalizzare ulteriormente (macchina, partecipanti, ecc.), apri il Quick Kaizen dopo la creazione.
-              </div>
+
               <div className="flex justify-end gap-2 pt-3 border-t">
-                <button onClick={() => setShowCreateModal(false)} className="px-4 py-2 border rounded-lg" disabled={creating}>Annulla</button>
+                <button onClick={() => setShowCreateModal(false)} className="px-4 py-2 border rounded-lg" disabled={creating}>
+                  Annulla
+                </button>
                 <button onClick={createFiglio} disabled={creating} className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
                   {creating ? 'Creazione...' : 'Crea Quick Kaizen'}
                 </button>
@@ -1338,45 +1420,86 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
           <p className="text-sm text-gray-500 mb-4">
             Un {kaizenLivello} Kaizen può includere Quick Kaizen più piccoli per gestire sotto-problemi specifici.
           </p>
-          <button onClick={() => setShowCreateModal(true)} className="text-primary hover:underline">Crea il primo Quick Kaizen</button>
+          <button onClick={() => setShowCreateModal(true)} className="text-primary hover:underline">
+            Crea il primo Quick Kaizen
+          </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {figli.map(child => (
-            <div key={child._id} className="bg-white rounded-xl shadow p-4 border-l-4 border-green-500 hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Zap size={18} className="text-green-600" />
-                    <span className="font-mono text-xs text-primary font-bold">{child.numero}</span>
-                  </div>
-                  <h4 className="font-semibold mb-1">{child.titolo || 'Senza titolo'}</h4>
-                  <div className="flex flex-wrap gap-1 text-xs">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {figli.map(child => {
+            const rootCause = getRootCause(child)
+            const apStats = getApStats(child._id)
+            const perdita = child.tipo_perdita || child.categoria || null
+            const risultato = child.risultati?.attuale
+
+            return (
+              <div key={child._id} className="bg-white rounded-xl shadow border-l-4 border-green-500 hover:shadow-md transition-shadow">
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                      <Zap size={18} className="text-green-600" />
+                      <span className="font-mono text-xs text-primary font-bold">{child.numero}</span>
+                    </div>
+
                     {child.stato && (
-                      <span className={`px-2 py-0.5 rounded-full ${STATO_COLORS[child.stato] || 'bg-gray-100 text-gray-700'}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATO_COLORS[child.stato] || 'bg-gray-100 text-gray-700'}`}>
                         {child.stato}
                       </span>
                     )}
-                    {child.reparto && <span className="text-gray-600 flex items-center gap-1"><Factory size={12} /> {child.reparto}</span>}
-                    {child.linea && <span className="text-gray-600 flex items-center gap-1"><MapPin size={12} /> {child.linea}</span>}
+                  </div>
+
+                  <h4 className="font-semibold mb-3">{child.titolo || 'Senza titolo'}</h4>
+
+                  <div className="space-y-1.5 text-xs text-gray-600">
+                    {child.team_leader_nome && (
+                      <div className="flex items-center gap-2">
+                        <User size={13} className="text-gray-400" />
+                        <span>Leader: <strong className="text-gray-700">{child.team_leader_nome}</strong></span>
+                      </div>
+                    )}
+
+                    {perdita && (
+                      <div className="flex items-center gap-2">
+                        <Target size={13} className="text-gray-400" />
+                        <span>Perdita: {perdita}</span>
+                      </div>
+                    )}
+
+                    {(child.reparto || child.linea) && (
+                      <div className="flex items-center gap-2">
+                        <Factory size={13} className="text-gray-400" />
+                        <span>{[child.reparto, child.linea].filter(Boolean).join(' · ')}</span>
+                      </div>
+                    )}
+
+                    {rootCause && (
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle size={13} className="text-red-500 mt-0.5 flex-shrink-0" />
+                        <span>Root Cause: <strong className="text-red-700">{rootCause}</strong></span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                      Action Plan: {apStats.total}
+                    </span>
+
+                    {apStats.late > 0 && (
+                      <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-medium">
+                        {apStats.late} in ritardo
+                      </span>
+                    )}
+
+                    {risultato !== undefined && risultato !== '' && risultato !== null && (
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                        Attuale: {risultato}
+                      </span>
+                    )}
                   </div>
                 </div>
-              </div>
-              <div className="flex gap-2 pt-2 border-t mt-2">
-                <a href={`/kaizen/${child._id}`} className="text-xs px-3 py-1.5 bg-blue-50 hover:bg-blue-100 rounded text-blue-700 flex-1 text-center">
-                  Apri Kaizen
-                </a>
-                <button onClick={() => scollegaFiglio(child._id, child.numero)} className="text-xs px-3 py-1.5 bg-red-50 hover:bg-red-100 rounded text-red-600" title="Scollega dal progetto">
-                  Scollega
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
+
+                <div 
 
 // ──────────────────────────────────────────────────────────
 // 8 STANDARD ELEMENTS TAB — Lindt FI Pillar
