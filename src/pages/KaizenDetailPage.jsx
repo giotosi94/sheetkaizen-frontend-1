@@ -71,7 +71,7 @@ export default function KaizenDetailPage() {
   const [motivoTrasforma, setMotivoTrasforma] = useState('')
   const [showStoria, setShowStoria] = useState(false)
   const [transforming, setTransforming] = useState(false)
-const [savedSnapshot, setSavedSnapshot] = useState(null)
+  const [savedSnapshot, setSavedSnapshot] = useState(null)
 
   const { configs } = useAllConfigurations()
   const [reparti, setReparti] = useState([])
@@ -305,25 +305,22 @@ const [savedSnapshot, setSavedSnapshot] = useState(null)
             ) : (
               <>
                 <button
+                                  <button
+                  type="button"
                   onClick={() => saveKaizen(true)}
                   disabled={saving}
                   className={`px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 ${
-  hasUnsavedChanges
-    ? 'bg-gold text-white hover:bg-gold-dark'
-    : 'bg-white text-primary hover:bg-gray-100'
-}`}
+                    hasUnsavedChanges
+                      ? 'bg-gold text-white hover:bg-gold-dark'
+                      : 'bg-white text-primary hover:bg-gray-100'
+                  }`}
                 >
                   <Save size={18} />
-2
-{saving
-3
-? 'Salvataggio...'
-4
-: hasUnsavedChanges
-5
-? 'Salva modifiche'
-6
-: 'Salvato'}
+                  {saving
+                    ? 'Salvataggio...'
+                    : hasUnsavedChanges
+                      ? 'Salva modifiche'
+                      : 'Salvato'}
                 </button>
                 <button
                   onClick={chiudiKaizen}
