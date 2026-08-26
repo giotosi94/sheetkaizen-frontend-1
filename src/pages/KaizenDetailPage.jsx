@@ -167,11 +167,11 @@ export default function KaizenDetailPage() {
     setSaving(true)
 
     try {
-      const res = await api.put(`/kaizens/${id}`, kaizen)
-      const savedKaizen = res.data || kaizen
+      const dataToSave = JSON.parse(JSON.stringify(kaizen))
 
-      setKaizen(savedKaizen)
-      setSavedSnapshot(JSON.stringify(savedKaizen))
+      await api.put(`/kaizens/${id}`, dataToSave)
+
+      setSavedSnapshot(JSON.stringify(dataToSave))
 
       if (showSuccessMessage) {
         alert('Kaizen salvato correttamente.')
