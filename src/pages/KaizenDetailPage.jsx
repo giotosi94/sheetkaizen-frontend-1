@@ -1496,6 +1496,28 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
                         Attuale: {risultato}
                       </span>
                     )}
+                  </div>
+                </div>
+
+                <div className="flex gap-2 px-4 py-2 border-t bg-gray-50 rounded-b-xl">
+                  <button
+                    onClick={() => openChild(child._id)}
+                    className="text-xs px-3 py-1.5 bg-blue-50 hover:bg-blue-100 rounded text-blue-700 flex-1 text-center font-medium"
+                  >
+                    Apri Quick Kaizen
+                  </button>
+
+                  <button
+                    onClick={() => scollegaFiglio(child._id, child.numero)}
+                    className="text-xs px-3 py-1.5 bg-red-50 hover:bg-red-100 rounded text-red-600"
+                    title="Scollega dal progetto"
+                  >
+                    Scollega
+                  </button>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
