@@ -168,8 +168,24 @@ export default function KaizenDetailPage() {
   const [showAPFormFromRootCause, setShowAPFormFromRootCause] = useState(false)
   const [rootCausePrefill, setRootCausePrefill] = useState(null)
 
-  function handleCreateAPFromRootCause(rootCauseNode, problema) {
-    const desc = `Problema: ${problema}\n\nRoot cause identificata: ${rootCauseNode.label}`
+  async function handleCreateAPFromRootCause(rootCauseNode, problema) {
+    if (hasUnsavedChanges) {
+      const ok = await saveKaizen(false)
+      if (!ok) {
+        alert('Salva prima le modifiche al Kaizen, poi crea l’Action Plan.')
+        return
+      }
+    }
+
+    const rpn =
+      (parseInt(rootCauseNode?.severity) || 0) *
+      (parseInt(rootCauseNode?.occurrence) || 0) *
+      (parseInt(rootCauseNode?.detection) || 0)
+
+    const descRpn = rpn > 0 ? `\n\nRPN: ${rpn}` : ''
+
+    const desc = `Problema: ${problema}\n\nRoot cause identificata: ${rootCauseNode.label}${descRpn}`
+
     setRootCausePrefill({
       titolo: `Azione per: ${(rootCauseNode.label || 'Root Cause').slice(0, 60)}`,
       descrizione: desc,
