@@ -96,35 +96,6 @@ export default function RiskPrioritizationChart({ rami = {}, effetto = '', onCre
           <div className="text-2xl font-bold text-gray-700">{maxRpn}</div>
         </div>
       </div>
-
-      <div>
-        <h4 className="font-bold text-sm text-gray-700 mb-3">Classifica RPN</h4>
-        <div className="space-y-2">
-          {risks.map(risk => {
-            const info = rpnClass(risk.rpn)
-            const width = Math.round((risk.rpn / maxRpn) * 100)
-
-            return (
-              <div key={risk.id} className="flex items-center gap-3">
-                <div className="w-40 flex-shrink-0 text-xs truncate" title={risk.label}>
-                  {risk.isRoot && <span className="text-red-600 font-bold mr-1">RC</span>}
-                  {risk.label}
-                </div>
-                <div className="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden relative">
-                  <div
-                    className="h-full rounded-full flex items-center justify-end pr-2"
-                    style={{ width: `${width}%`, backgroundColor: info.color }}
-                  >
-                    <span className="text-[10px] font-bold text-white">{risk.rpn}</span>
-                  </div>
-                </div>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${info.badge} w-16 text-center`}>
-                  {info.label}
-                </span>
-              </div>
-            )
-          })}
-        </div>
       </div>
 
       <div>
