@@ -15,6 +15,7 @@ import UserPicker from '../components/UserPicker'
 import ImageUpload from '../components/ImageUpload'
 import { useAllConfigurations } from '../hooks/useConfigurations'
 import useUnsavedChangesGuard from '../hooks/useUnsavedChangesGuard'
+import { useAuth } from '../context/AuthContext'
 import ParetoChart from '../components/pillar/ParetoChart'
 
 const LIVELLI = ['Quick', 'Standard', 'Major']
@@ -34,34 +35,54 @@ function getLivelloFromKaizen(kaizen) {
   return 'Quick'
 }
 
-function buildTabsForLivello(livello) {
-  const base = []
+function buildTabsForLivello(livello, isAdmin) {
   if (livello === 'Quick') {
-    base.push({ id: 'quickkaizen', label: 'Quick Kaizen' })
-    base.push({ id: 'stdelements', label: '8 Standard Elements' })
-    base.push({ id: 'cmladder', label: 'Countermeasure Ladder' })
-    base.push({ id: 'lavagna', label: 'Lavagna' })
-    base.push({ id: 'feed', label: 'Feed' })
-    return base
+    const quickTabs = [
+      { id: 'quickkaizen', label: 'Problem Solving' },
+    ]
+
+    if (isAdmin) {
+      quickTabs.push(
+        { id: 'stdelements', label: '8 Standard Elements' },
+        { id: 'cmladder', label: 'Countermeasure Ladder' }
+      )
+    }
+
+    quickTabs.push(
+      { id: 'lavagna', label: 'Lavagna & Allegati' },
+      { id: 'feed', label: 'Storico' }
+    )
+
+    return quickTabs
   }
-  base.push({ id: 'setup', label: 'Team & Setup' })
-  base.push({ id: 'loss', label: 'Loss Deployment' })
-  base.push({ id: 'gemba', label: 'Gemba & Obiettivi' })
-  base.push({ id: 'quickkaizen', label: 'Problem Solving' })
-  base.push({ id: 'stdelements', label: '8 Standard Elements' })
-  base.push({ id: 'cmladder', label: 'Countermeasure Ladder' })
-  base.push({ id: 'figli', label: 'Quick Kaizen' })
-  base.push({ id: 'audit', label: 'Team Audit' })
+
+  const projectTabs = [
+    { id: 'setup', label: 'Ambito & Team' },
+    { id: 'loss', label: 'Loss Deployment' },
+    { id: 'gemba', label: 'Gemba & Obiettivi' },
+    { id: 'masterplan', label: 'Master Plan' },
+    { id: 'figli', label: 'Quick Kaizen' },
+    { id: 'actionplans', label: 'Action Plan' },
+    { id: 'audit', label: 'Team Audit' },
+  ]
+
   if (livello === 'Major') {
-    base.push({ id: 'costbenefit', label: 'Cost & Benefit' })
+    projectTabs.push(
+      { id: 'costbenefit', label: 'Cost & Benefit' }
+    )
   }
-  base.push({ id: 'lavagna', label: 'Lavagna' })
-  base.push({ id: 'feed', label: 'Feed' })
-  return base
+
+  projectTabs.push(
+    { id: 'lavagna', label: 'Lavagna & Allegati' },
+    { id: 'feed', label: 'Storico' }
+  )
+
+  return projectTabs
 }
 
 export default function KaizenDetailPage() {
   const { id } = useParams()
+  const { isAdmin } = useAuth()
   const [kaizen, setKaizen] = useState(null)
   const [activeTab, setActiveTab] = useState('quickkaizen')
   const [saving, setSaving] = useState(false)
@@ -123,7 +144,7 @@ export default function KaizenDetailPage() {
 
   const livelloAttuale = getLivelloFromKaizen(kaizen)
   const indiceLivello = LIVELLI.indexOf(livelloAttuale)
-  const tabs = buildTabsForLivello(livelloAttuale)
+  const tabs = buildTabsForLivello(livelloAttuale, isAdmin)
 
   const isLocked = kaizen?.stato === 'Chiuso' || kaizen?.stato === 'Cancelled'
 
@@ -648,6 +669,27 @@ export default function KaizenDetailPage() {
         <GembaObiettiviTab kaizen={kaizen} setKaizen={setKaizen} updateField={updateField} />
       )}
 
+            {activeTab === 'masterplan' && (
+        <div className="w-full max-w-full min-w-0 bg-white rounded-xl shadow p-6 overflow-hidden">
+          <div className="mb-5">
+            <h2 className="text-xl font-bold text-gray-800">
+              Master Plan
+            </h2>
+
+            <p className="text-sm text-gray-500 mt-1">
+              Pianificazione generale, milestone e avanzamento del progetto Standard Kaizen.
+            </p>
+          </div>
+
+          <div className="w-full max-w-full min-w-0 overflow-hidden">
+            <KaizenGantMasterPlan
+              kaizen={kaizen}
+              onSaved={loadKaizen}
+            />
+          </div>
+        </div>
+      )}
+
       {activeTab === 'quickkaizen' && (
         <div className="space-y-6">
 
@@ -714,16 +756,6 @@ export default function KaizenDetailPage() {
 
           <div className="w-full max-w-full min-w-0 bg-white rounded-xl shadow p-6 overflow-hidden">
             <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">PASSO 5 - PIANO AZIONI</h3>
-
-            {livelloAttuale !== 'Quick' && (
-              <>
-                <div className="w-full max-w-full min-w-0 mb-6 overflow-hidden">
-                  <h4 className="font-bold text-sm uppercase text-gray-700 mb-2">Gant macro</h4>
-                  <KaizenGantMasterPlan kaizen={kaizen} onSaved={loadKaizen} />
-                </div>
-                <div className="border-t pt-6" />
-              </>
-            )}
 
             <KaizenAzioniList
               kaizen={kaizen}
@@ -817,12 +849,56 @@ export default function KaizenDetailPage() {
         />
       )}
 
-      {activeTab === 'stdelements' && (
-        <StandardElementsTab kaizen={kaizen} onSaved={loadKaizen} />
+            {activeTab === 'actionplans' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl shadow p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">
+                  Action Plan consolidati
+                </h2>
+
+                <p className="text-sm text-gray-500 mt-1">
+                  Vista generale degli Action Plan del progetto e dei Quick Kaizen collegati.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow p-6 border-l-4 border-primary">
+            <h3 className="font-bold text-gray-800">
+              Action Plan generali del progetto
+            </h3>
+
+            <p className="text-sm text-gray-500 mt-1">
+              In questa sezione saranno visualizzate le azioni trasversali appartenenti direttamente allo Standard Kaizen.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow p-6">
+            <h3 className="font-bold text-gray-800">
+              Action Plan dei Quick Kaizen
+            </h3>
+
+            <p className="text-sm text-gray-500 mt-1">
+              Ogni Quick Kaizen collegato avrà una card con i propri Action Plan, stati, responsabili e scadenze.
+            </p>
+          </div>
+        </div>
       )}
 
-      {activeTab === 'cmladder' && (
-        <CountermeasureLadderTab kaizen={kaizen} onSaved={loadKaizen} />
+      {activeTab === 'stdelements' && isAdmin && (
+        <StandardElementsTab
+          kaizen={kaizen}
+          onSaved={loadKaizen}
+        />
+      )}
+
+      {activeTab === 'cmladder' && isAdmin && (
+        <CountermeasureLadderTab
+          kaizen={kaizen}
+          onSaved={loadKaizen}
+        />
       )}
 
       {activeTab === 'costbenefit' && (
