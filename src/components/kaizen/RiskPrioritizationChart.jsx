@@ -96,10 +96,10 @@ export default function RiskPrioritizationChart({ rami = {}, effetto = '', onCre
           <div className="text-2xl font-bold text-gray-700">{maxRpn}</div>
         </div>
       </div>
-      </div>
 
       <div>
         <h4 className="font-bold text-sm text-gray-700 mb-3">Matrice Severità × Occorrenza</h4>
+
         <div className="overflow-x-auto">
           <div className="inline-flex">
             <div className="flex flex-col justify-between py-2 pr-2 text-[10px] text-gray-500">
