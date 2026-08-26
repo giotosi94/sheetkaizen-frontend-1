@@ -238,8 +238,7 @@ function NodoView({ nodo, depth, isCausa, expandedNodes, onUpdate, onAddChild, o
           value={nodo.voti || 0}
           onChange={(v) => onUpdate(nodo.id, { voti: v })}
         />
-        
-        <button
+
         {hasRisk && (
           <span
             className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${rpnInfo.badge}`}
@@ -248,6 +247,7 @@ function NodoView({ nodo, depth, isCausa, expandedNodes, onUpdate, onAddChild, o
             {rpn}
           </span>
         )}
+
 
         <button
           onClick={() => setShowRisk(v => !v)}
