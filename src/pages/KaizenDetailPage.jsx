@@ -94,6 +94,7 @@ export default function KaizenDetailPage() {
   const [showStoria, setShowStoria] = useState(false)
   const [transforming, setTransforming] = useState(false)
   const [savedSnapshot, setSavedSnapshot] = useState(null)
+  const [parentKaizen, setParentKaizen] = useState(null)
 
   const { configs } = useAllConfigurations()
   const { pillars, loading: loadingPillars } = usePillars()
@@ -224,6 +225,17 @@ export default function KaizenDetailPage() {
       const res = await api.get(`/kaizens/${id}`)
       setKaizen(res.data)
       setSavedSnapshot(JSON.stringify(res.data))
+
+      if (res.data.parent_kaizen_id) {
+        try {
+          const parentRes = await api.get(`/kaizens/${res.data.parent_kaizen_id}`)
+          setParentKaizen(parentRes.data)
+        } catch {
+          setParentKaizen(null)
+        }
+      } else {
+        setParentKaizen(null)
+      }
     } catch (err) {
       console.error(err)
     }
@@ -622,6 +634,30 @@ export default function KaizenDetailPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {parentKaizen && (
+        <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-3 mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <BarChart3 size={22} className="text-blue-600 flex-shrink-0" />
+            <div>
+              <div className="text-sm font-semibold text-blue-900">
+                Questo Quick Kaizen fa parte del progetto {parentKaizen.numero}
+              </div>
+              <div className="text-xs text-blue-700">
+                {parentKaizen.titolo || 'Progetto Standard'}
+              </div>
+            </div>
+          </div>
+
+          <Link
+            to={`/kaizen/${parentKaizen._id}`}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 whitespace-nowrap flex items-center gap-2"
+          >
+            <RotateCcw size={16} />
+            Torna al progetto
+          </Link>
         </div>
       )}
 
