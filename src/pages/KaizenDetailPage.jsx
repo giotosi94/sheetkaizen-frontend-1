@@ -1496,10 +1496,11 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
                         Attuale: {risultato}
                       </span>
                     )}
-                  </div>
-                </div>
-
-                <div 
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ──────────────────────────────────────────────────────────
 // 8 STANDARD ELEMENTS TAB — Lindt FI Pillar
