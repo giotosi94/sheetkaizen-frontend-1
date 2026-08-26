@@ -14,6 +14,7 @@ import KaizenAzioniList from '../components/kaizen/KaizenAzioniList'
 import UserPicker from '../components/UserPicker'
 import ImageUpload from '../components/ImageUpload'
 import { useAllConfigurations } from '../hooks/useConfigurations'
+import { usePillars } from '../hooks/usePillars'
 import useUnsavedChangesGuard from '../hooks/useUnsavedChangesGuard'
 import { useAuth } from '../context/AuthContext'
 import ParetoChart from '../components/pillar/ParetoChart'
@@ -95,6 +96,7 @@ export default function KaizenDetailPage() {
   const [savedSnapshot, setSavedSnapshot] = useState(null)
 
   const { configs } = useAllConfigurations()
+  const { pillars, loading: loadingPillars } = usePillars()
   const [reparti, setReparti] = useState([])
   useEffect(() => {
     api.get('/reparti/').then(res => setReparti(res.data || [])).catch(() => setReparti([]))
@@ -114,6 +116,51 @@ export default function KaizenDetailPage() {
 
   const handleRepartoChange = (v) => setKaizen(prev => ({ ...prev, reparto: v, linea: '', macchina: '' }))
   const handleLineaChange = (v) => setKaizen(prev => ({ ...prev, linea: v, macchina: '' }))
+    const getPillarLabel = (pillar) => {
+    return pillar?.nome || pillar?.label || pillar?.titolo || ''
+  }
+
+  const handlePillarOwnerChange = (pillarId) => {
+    const pillar = pillars.find(item => item._id === pillarId)
+
+    setKaizen(prev => ({
+      ...prev,
+      pillar_id: pillar?._id || null,
+      pillar_sigla: pillar?.sigla || '',
+      pillar_label: getPillarLabel(pillar),
+    }))
+  }
+
+  const togglePillarCoinvolto = (pillar) => {
+    setKaizen(prev => {
+      const currentIds = prev.pillar_ids || []
+      const isSelected = currentIds.includes(pillar._id)
+
+      if (isSelected) {
+        const nextPillars = currentIds
+          .map((pillarId, index) => ({
+            id: pillarId,
+            nome: prev.pillar_nomi?.[index] || '',
+            sigla: prev.pillar_sigle?.[index] || '',
+          }))
+          .filter(item => item.id !== pillar._id)
+
+        return {
+          ...prev,
+          pillar_ids: nextPillars.map(item => item.id),
+          pillar_nomi: nextPillars.map(item => item.nome),
+          pillar_sigle: nextPillars.map(item => item.sigla),
+        }
+      }
+
+      return {
+        ...prev,
+        pillar_ids: [...currentIds, pillar._id],
+        pillar_nomi: [...(prev.pillar_nomi || []), getPillarLabel(pillar)],
+        pillar_sigle: [...(prev.pillar_sigle || []), pillar.sigla || ''],
+      }
+    })
+  }
 
   // Flusso Ishikawa -> Crea Action Plan da Root Cause
   const [showAPFormFromRootCause, setShowAPFormFromRootCause] = useState(false)
@@ -299,11 +346,25 @@ export default function KaizenDetailPage() {
                 <Link
                   to={`/pillars/${kaizen.pillar_id}`}
                   className="flex items-center gap-1 bg-white bg-opacity-20 hover:bg-opacity-30 px-2 py-0.5 rounded-full font-mono font-bold transition-colors"
-                  title={`Apri Pillar ${kaizen.pillar_sigla}`}
+                  title={`Pillar Owner: ${kaizen.pillar_sigla}`}
                 >
-                  <Building2 size={14} /> {kaizen.pillar_sigla}
+                  <Building2 size={14} />
+                  {kaizen.pillar_sigla} · Owner
                 </Link>
               )}
+
+              {(kaizen.pillar_ids || [])
+                .filter(pillarId => pillarId !== kaizen.pillar_id)
+                .map((pillarId, index) => (
+                  <Link
+                    key={pillarId}
+                    to={`/pillars/${pillarId}`}
+                    className="flex items-center gap-1 bg-white bg-opacity-10 hover:bg-opacity-20 px-2 py-0.5 rounded-full font-mono text-xs transition-colors"
+                  >
+                    <Building2 size={12} />
+                    {kaizen.pillar_sigle?.[index] || 'Pillar'}
+                  </Link>
+                ))}
               {kaizen.dashboard_id && kaizen.dashboard_nome && (
                 <Link
                   to={`/dashboard/${kaizen.dashboard_id}`}
@@ -580,7 +641,7 @@ export default function KaizenDetailPage() {
         <div className="space-y-6">
 
           <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">SETUP - LINEA, MACCHINA E TIPO DI PERDITA</h3>
+            <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">AMBITO DEL PROGETTO</h3>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Reparto</label>
@@ -610,14 +671,97 @@ export default function KaizenDetailPage() {
                 </select>
               </div>
             </div>
-            <div className="mt-4">
-              <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Categoria Perdita (TPM)</label>
-              <select value={kaizen.tipo_perdita || ''} onChange={(e) => setKaizen(prev => ({ ...prev, tipo_perdita: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm">
+                        <div className="mt-4">
+              <label className="block text-xs font-bold text-gray-600 uppercase mb-1">
+                Categoria Perdita (TPM)
+              </label>
+
+              <select
+                value={kaizen.tipo_perdita || ''}
+                onChange={(e) => setKaizen(prev => ({
+                  ...prev,
+                  tipo_perdita: e.target.value,
+                }))}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              >
                 <option value="">Nessuna</option>
+
                 {(configs.categorie_perdita || []).map(p => (
-                  <option key={p._id} value={p.label}>{p.label}</option>
+                  <option key={p._id} value={p.label}>
+                    {p.label}
+                  </option>
                 ))}
               </select>
+            </div>
+
+            <div className="mt-6 pt-5 border-t">
+              <h4 className="font-bold text-sm text-gray-700 mb-4">
+                Pillar del progetto
+              </h4>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 uppercase mb-1">
+                    Pillar Owner
+                  </label>
+
+                  <select
+                    value={kaizen.pillar_id || ''}
+                    onChange={(e) => handlePillarOwnerChange(e.target.value)}
+                    disabled={loadingPillars}
+                    className="w-full border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100"
+                  >
+                    <option value="">
+                      {loadingPillars ? 'Caricamento...' : 'Seleziona Pillar Owner'}
+                    </option>
+
+                    {pillars.map(pillar => (
+                      <option key={pillar._id} value={pillar._id}>
+                        {pillar.sigla ? `${pillar.sigla} - ` : ''}
+                        {getPillarLabel(pillar)}
+                      </option>
+                    ))}
+                  </select>
+
+                  <p className="text-xs text-gray-500 mt-1">
+                    Pillar responsabile del coordinamento del progetto.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 uppercase mb-2">
+                    Pillar coinvolti
+                  </label>
+
+                  <div className="flex flex-wrap gap-2">
+                    {pillars.map(pillar => {
+                      const selected = (kaizen.pillar_ids || []).includes(pillar._id)
+                      const isOwner = kaizen.pillar_id === pillar._id
+
+                      return (
+                        <button
+                          key={pillar._id}
+                          type="button"
+                          onClick={() => togglePillarCoinvolto(pillar)}
+                          disabled={isOwner}
+                          className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                            selected || isOwner
+                              ? 'bg-primary text-white border-primary'
+                              : 'bg-white text-gray-600 border-gray-300 hover:border-primary hover:text-primary'
+                          } disabled:opacity-80`}
+                        >
+                          {pillar.sigla || getPillarLabel(pillar)}
+                          {isOwner ? ' · Owner' : ''}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <p className="text-xs text-gray-500 mt-2">
+                    Seleziona gli altri Pillar che contribuiscono al progetto.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
