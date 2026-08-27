@@ -12,6 +12,7 @@ import FiveWhysFlowChart from '../components/kaizen/FiveWhysFlowChart'
 import RiskPrioritizationChart from '../components/kaizen/RiskPrioritizationChart'
 import KaizenGantMasterPlan from '../components/kaizen/KaizenGantMasterPlan'
 import KaizenAzioniList from '../components/kaizen/KaizenAzioniList'
+import ConsolidatedActionPlans from '../components/kaizen/ConsolidatedActionPlans'
 import UserPicker from '../components/UserPicker'
 import ImageUpload from '../components/ImageUpload'
 import { useAllConfigurations } from '../hooks/useConfigurations'
@@ -1045,42 +1046,13 @@ export default function KaizenDetailPage() {
         />
       )}
 
-            {activeTab === 'actionplans' && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-xl shadow p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-bold text-gray-800">
-                  Action Plan consolidati
-                </h2>
-
-                <p className="text-sm text-gray-500 mt-1">
-                  Vista generale degli Action Plan del progetto e dei Quick Kaizen collegati.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow p-6 border-l-4 border-primary">
-            <h3 className="font-bold text-gray-800">
-              Action Plan generali del progetto
-            </h3>
-
-            <p className="text-sm text-gray-500 mt-1">
-              In questa sezione saranno visualizzate le azioni trasversali appartenenti direttamente allo Standard Kaizen.
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="font-bold text-gray-800">
-              Action Plan dei Quick Kaizen
-            </h3>
-
-            <p className="text-sm text-gray-500 mt-1">
-              Ogni Quick Kaizen collegato avrà una card con i propri Action Plan, stati, responsabili e scadenze.
-            </p>
-          </div>
-        </div>
+      {activeTab === 'actionplans' && (
+        <ConsolidatedActionPlans
+          kaizen={kaizen}
+          kaizenId={id}
+          kaizenNumero={kaizen.numero}
+          onUpdate={loadKaizen}
+        />
       )}
 
       {activeTab === 'stdelements' && isAdmin && (
