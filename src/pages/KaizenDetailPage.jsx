@@ -359,6 +359,30 @@ export default function KaizenDetailPage() {
   const costo = parseFloat(kaizen.risultati?.costo) || 0
   const risparmio = parseFloat(kaizen.risultati?.risparmio) || 0
 
+  const storicoOrdinato = [...(kaizen.feed || [])].sort((a, b) => {
+    const dataA = new Date(a.timestamp || 0).getTime()
+    const dataB = new Date(b.timestamp || 0).getTime()
+    return dataB - dataA
+  })
+
+  const formatStoricoDate = (value) => {
+    if (!value) return 'Data non disponibile'
+
+    const date = new Date(value)
+
+    if (Number.isNaN(date.getTime())) {
+      return value
+    }
+
+    return date.toLocaleString('it-IT', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
   return (
     <div>
       <div className="bg-primary text-white rounded-xl p-6 mb-6">
@@ -1131,16 +1155,76 @@ export default function KaizenDetailPage() {
 
       {activeTab === 'feed' && (
         <div className="bg-white rounded-xl shadow p-6">
-          <h3 className="font-bold mb-4">Cronologia Attività</h3>
-          {kaizen.feed?.map((entry, i) => (
-            <div key={i} className="flex gap-3 mb-3 pb-3 border-b last:border-0">
-              <div className="w-2 h-2 rounded-full bg-primary mt-2"></div>
-              <div>
-                <p className="text-sm"><strong>{entry.utente}</strong> — {entry.azione}</p>
-                <p className="text-xs text-gray-400">{entry.timestamp}</p>
-              </div>
+          <div className="flex items-center justify-between gap-4 mb-5">
+            <div>
+              <h3 className="font-bold text-lg text-gray-800">
+                Storico del Kaizen
+              </h3>
+
+              <p className="text-xs text-gray-500 mt-1">
+                Eventi e modifiche registrati durante il ciclo di vita del Kaizen.
+              </p>
             </div>
-          ))}
+
+            <span className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full">
+              {storicoOrdinato.length} eventi
+            </span>
+          </div>
+
+          {storicoOrdinato.length === 0 ? (
+            <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center">
+              <History size={24} className="mx-auto text-gray-300 mb-2" />
+
+              <p className="text-sm text-gray-400">
+                Nessun evento ancora registrato.
+              </p>
+            </div>
+          ) : (
+            <div>
+              {storicoOrdinato.map((entry, index) => (
+                <div
+                  key={`${entry.timestamp || 'evento'}_${index}`}
+                  className="relative flex gap-4 pb-5 last:pb-0"
+                >
+                  {index < storicoOrdinato.length - 1 && (
+                    <div className="absolute left-[5px] top-4 bottom-0 w-px bg-gray-200" />
+                  )}
+
+                  <div className="relative z-10 mt-1.5 w-3 h-3 rounded-full bg-primary border-2 border-white shadow flex-shrink-0" />
+
+                  <div className="flex-1 min-w-0 border-b border-gray-100 pb-4 last:border-0">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="text-sm text-gray-800">
+                          <strong>
+                            {entry.utente || 'Utente non disponibile'}
+                          </strong>
+
+                          <span className="text-gray-400 mx-2">
+                            ·
+                          </span>
+
+                          <span>
+                            {entry.azione || 'Attività registrata'}
+                          </span>
+                        </div>
+
+                        {entry.dettaglio && (
+                          <p className="text-xs text-gray-600 mt-1">
+                            {entry.dettaglio}
+                          </p>
+                        )}
+                      </div>
+
+                      <time className="text-xs text-gray-400 whitespace-nowrap">
+                        {formatStoricoDate(entry.timestamp)}
+                      </time>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
