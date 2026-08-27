@@ -2213,7 +2213,18 @@ function GembaObiettiviTab({ kaizen, setKaizen, updateField }) {
     <div className="space-y-6">
 
       <div className="bg-white rounded-xl shadow p-6">
-        <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">PLAN A GEMBA - VAI SUL POSTO REALE</h3>
+        <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">
+  GEMBA WALK
+</h3>
+
+<div className="mb-4 border-l-4 border-blue-500 bg-blue-50 rounded-r-lg px-4 py-3">
+  <h4 className="font-bold text-sm text-blue-900">
+    1. Preparazione
+  </h4>
+  <p className="text-xs text-blue-700 mt-1">
+    Definisci lo scopo, la data, il turno e i partecipanti al Gemba.
+  </p>
+</div>
 
         <div className="mb-4">
           <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Scopo del Gemba</label>
@@ -2239,8 +2250,19 @@ function GembaObiettiviTab({ kaizen, setKaizen, updateField }) {
           </div>
         </div>
 
-        <div className="pt-4 border-t">
-          <label className="block text-xs font-bold text-gray-600 uppercase mb-3">Checklist Gemba - Verifica del processo</label>
+        <div className="pt-5 border-t">
+          <div className="mb-4 border-l-4 border-orange-500 bg-orange-50 rounded-r-lg px-4 py-3">
+            <h4 className="font-bold text-sm text-orange-900">
+              2. Esecuzione
+            </h4>
+            <p className="text-xs text-orange-700 mt-1">
+              Verifica il processo sul campo e documenta le evidenze osservate.
+            </p>
+          </div>
+
+          <label className="block text-xs font-bold text-gray-600 uppercase mb-3">
+            Checklist Gemba - Verifica del processo
+          </label>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-3">
             {checklistItems.map(item => (
               <div key={item.key} className="pb-3 border-b">
@@ -2261,16 +2283,25 @@ function GembaObiettiviTab({ kaizen, setKaizen, updateField }) {
           </div>
         </div>
 
-        <div className="pt-4 border-t mt-4">
+        <div className="pt-5 border-t mt-5">
+          <div className="mb-4 border-l-4 border-green-500 bg-green-50 rounded-r-lg px-4 py-3">
+            <h4 className="font-bold text-sm text-green-900">
+              3. Conclusioni
+            </h4>
+            <p className="text-xs text-green-700 mt-1">
+              Riepiloga le osservazioni, le anomalie e le evidenze raccolte.
+            </p>
+          </div>
+
           <label className="block text-xs font-bold text-gray-600 uppercase mb-1">
-            Osservazioni Gemba (cosa è stato visto sul campo)
+            Osservazioni e conclusioni del Gemba
           </label>
 
           <textarea
             value={kaizen.gemba?.osservazioni || ''}
             onChange={(e) => updateField('gemba', 'osservazioni', e.target.value)}
             rows={3}
-            placeholder="Documenta cosa hai osservato direttamente su macchina, linea e processo"
+            placeholder="Riepiloga ciò che è stato osservato, le anomalie rilevate e le conclusioni del team"
             className="w-full border rounded-lg px-3 py-2 text-sm"
           />
         </div>
@@ -2302,7 +2333,9 @@ function GembaObiettiviTab({ kaizen, setKaizen, updateField }) {
       </div>
 
       <div className="bg-white rounded-xl shadow p-6">
-        <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">ESTABLISH OBJECTIVES - OBIETTIVO SMART</h3>
+        <h3 className="bg-primary text-white text-center py-2 rounded-lg font-bold mb-4">
+  OBIETTIVI DEL PROGETTO
+</h3>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
           <div>
