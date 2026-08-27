@@ -15,6 +15,7 @@ import KaizenAzioniList from '../components/kaizen/KaizenAzioniList'
 import ConsolidatedActionPlans from '../components/kaizen/ConsolidatedActionPlans'
 import UserPicker from '../components/UserPicker'
 import ImageUpload from '../components/ImageUpload'
+import DocumentUpload from '../components/DocumentUpload'
 import { useAllConfigurations } from '../hooks/useConfigurations'
 import { usePillars } from '../hooks/usePillars'
 import useUnsavedChangesGuard from '../hooks/useUnsavedChangesGuard'
@@ -1086,12 +1087,47 @@ export default function KaizenDetailPage() {
         <TeamAuditTab kaizen={kaizen} setKaizen={setKaizen} />
       )}
 
-      {activeTab === 'lavagna' && (
-        <div className="bg-white rounded-xl shadow p-6">
-          <textarea value={kaizen.lavagna || ''} onChange={(e) => setKaizen({ ...kaizen, lavagna: e.target.value })}
-            className="w-full border rounded-lg px-4 py-3 min-h-[400px]" placeholder="Scrivi qui le tue note..." />
-        </div>
-      )}
+{activeTab === 'lavagna' && (
+  <div className="space-y-6">
+    <div className="bg-white rounded-xl shadow p-6">
+      <h3 className="font-bold text-lg text-gray-800 mb-3">
+        Lavagna di progetto
+      </h3>
+
+      <textarea
+        value={kaizen.lavagna || ''}
+        onChange={(e) => setKaizen(prev => ({
+          ...prev,
+          lavagna: e.target.value,
+        }))}
+        className="w-full border rounded-lg px-4 py-3 min-h-[240px]"
+        placeholder="Note, decisioni, punti aperti e informazioni utili al progetto..."
+      />
+    </div>
+
+    <div className="bg-white rounded-xl shadow p-6">
+      <ImageUpload
+        images={kaizen.lavagna_immagini || []}
+        onChange={(lavagna_immagini) => setKaizen(prev => ({
+          ...prev,
+          lavagna_immagini,
+        }))}
+        label="Fotografie e immagini"
+        maxImages={20}
+      />
+    </div>
+
+    <div className="bg-white rounded-xl shadow p-6">
+      <DocumentUpload
+        documents={kaizen.lavagna_documenti || []}
+        onChange={(lavagna_documenti) => setKaizen(prev => ({
+          ...prev,
+          lavagna_documenti,
+        }))}
+      />
+    </div>
+  </div>
+)}
 
       {activeTab === 'feed' && (
         <div className="bg-white rounded-xl shadow p-6">
