@@ -17,7 +17,6 @@ function isLate(plan) {
 
 function formatDate(value) {
   if (!value) return 'Nessuna scadenza'
-
   return new Date(value).toLocaleDateString('it-IT')
 }
 
@@ -68,7 +67,7 @@ export default function ConsolidatedActionPlans({
   const toggleChild = childId => {
     setExpandedChildren(prev => ({
       ...prev,
-      !prev[childId],
+      [childId]: !prev[childId],
     }))
   }
 
@@ -205,4 +204,49 @@ export default function ConsolidatedActionPlans({
                                 </span>
 
                                 <span className="text-sm font-medium text-gray-800 truncate">
-                                  {plan
+                                  {plan.titolo || 'Senza titolo'}
+                                </span>
+                              </div>
+
+                              <div className="text-xs text-gray-500 mt-1">
+                                {plan.responsabile_nome || 'Responsabile non assegnato'}
+                                {' · '}
+                                {formatDate(plan.data_scadenza)}
+                              </div>
+                            </div>
+
+                            <span
+                              className={`text-xs px-2 py-1 rounded ${
+                                isLate(plan)
+                                  ? 'bg-red-100 text-red-700'
+                                  : isCompleted(plan)
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-gray-100 text-gray-700'
+                              }`}
+                            >
+                              {isLate(plan) ? 'In ritardo' : plan.stato || 'Da valutare'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="p-3 border-t bg-gray-50 flex justify-end">
+                      <Link
+                        to={`/kaizen/${child._id}`}
+                        className="text-xs font-medium text-blue-700 hover:text-blue-900 flex items-center gap-1"
+                      >
+                        <ExternalLink size={13} />
+                        Apri Quick Kaizen
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })
+        )}
+      </div>
+    </div>
+  )
+}
