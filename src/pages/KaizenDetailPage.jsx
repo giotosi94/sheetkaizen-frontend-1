@@ -1370,8 +1370,13 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
   const [figli, setFigli] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showLinkModal, setShowLinkModal] = useState(false)
   const [newTitolo, setNewTitolo] = useState('')
   const [creating, setCreating] = useState(false)
+  const [linking, setLinking] = useState(false)
+  const [quickDisponibili, setQuickDisponibili] = useState([])
+  const [loadingQuick, setLoadingQuick] = useState(false)
+  const [quickSearch, setQuickSearch] = useState('')
   const [apByChild, setApByChild] = useState({})
 
   useEffect(() => { loadFigli() }, [kaizenId])
@@ -1430,6 +1435,65 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
     setCreating(false)
   }
 
+  const loadQuickDisponibili = async () => {
+    setLoadingQuick(true)
+
+    try {
+      const res = await api.get('/kaizens/', {
+        params: {
+          livello: 'Quick',
+          parent_kaizen_id: 'null',
+        },
+      })
+
+      const currentChildIds = new Set(figli.map(child => child._id))
+
+      setQuickDisponibili(
+        (res.data || []).filter(quick => !currentChildIds.has(quick._id))
+      )
+    } catch (err) {
+      console.error('Errore caricamento Quick Kaizen disponibili:', err)
+      setQuickDisponibili([])
+      alert(
+        'Errore durante il caricamento dei Quick Kaizen: ' +
+        (err.response?.data?.detail || err.message)
+      )
+    } finally {
+      setLoadingQuick(false)
+    }
+  }
+
+  const openLinkModal = async () => {
+    setQuickSearch('')
+    setShowLinkModal(true)
+    await loadQuickDisponibili()
+  }
+
+  const collegaQuickEsistente = async quick => {
+    setLinking(true)
+
+    try {
+      await api.post(`/kaizens/${kaizenId}/link-child`, {
+        child_kaizen_id: quick._id,
+      })
+
+      setShowLinkModal(false)
+      setQuickSearch('')
+      await loadFigli()
+      onUpdate?.()
+
+      alert(`${quick.numero} collegato correttamente a ${kaizenNumero}.`)
+    } catch (err) {
+      console.error('Errore collegamento Quick Kaizen:', err)
+      alert(
+        'Errore durante il collegamento: ' +
+        (err.response?.data?.detail || err.message)
+      )
+    } finally {
+      setLinking(false)
+    }
+  }
+  
   const scollegaFiglio = async (childId, childNumero) => {
     if (!confirm(`Scollegare ${childNumero} da ${kaizenNumero}?\n\nIl Quick Kaizen rimane in vita ma non sarà più collegato a questo progetto.`)) return
     try {
@@ -1490,6 +1554,19 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
     window.location.href = `/kaizen/${childId}`
   }
 
+  const quickDisponibiliFiltrati = quickDisponibili.filter(quick => {
+    const searchValue = quickSearch.trim().toLowerCase()
+
+    if (!searchValue) return true
+
+    return (
+      (quick.numero || '').toLowerCase().includes(searchValue) ||
+      (quick.titolo || '').toLowerCase().includes(searchValue) ||
+      (quick.reparto || '').toLowerCase().includes(searchValue) ||
+      (quick.linea || '').toLowerCase().includes(searchValue)
+    )
+  })
+
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-xl shadow p-4">
@@ -1505,12 +1582,23 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
             </p>
           </div>
 
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-light text-sm font-medium whitespace-nowrap"
-          >
-            Crea Quick Kaizen
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={openLinkModal}
+              className="border border-primary text-primary px-4 py-2 rounded-lg hover:bg-blue-50 text-sm font-medium whitespace-nowrap"
+            >
+              Collega Quick esistente
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(true)}
+              className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-light text-sm font-medium whitespace-nowrap"
+            >
+              Crea Quick Kaizen
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1556,6 +1644,134 @@ function FigliTab({ kaizenId, kaizenNumero, kaizenLivello, kaizenReparto, kaizen
         </div>
       )}
 
+      {showLinkModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-3xl shadow-2xl overflow-hidden">
+            <div className="bg-primary text-white px-5 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold">
+                  Collega Quick Kaizen esistente
+                </h2>
+
+                <p className="text-xs text-white text-opacity-80 mt-1">
+                  Verranno mostrati soltanto i Quick Kaizen non collegati ad altri progetti.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowLinkModal(false)}
+                disabled={linking}
+                className="p-1 rounded hover:bg-white hover:bg-opacity-20 disabled:opacity-50"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-5">
+              <input
+                type="text"
+                value={quickSearch}
+                onChange={(e) => setQuickSearch(e.target.value)}
+                placeholder="Cerca per numero, titolo, reparto o linea..."
+                className="w-full border rounded-lg px-4 py-2.5 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-primary"
+                autoFocus
+              />
+
+              {loadingQuick ? (
+                <div className="py-12 text-center text-sm text-gray-400">
+                  Caricamento Quick Kaizen...
+                </div>
+              ) : quickDisponibiliFiltrati.length === 0 ? (
+                <div className="border-2 border-dashed border-gray-200 rounded-lg py-12 text-center">
+                  <Zap size={28} className="mx-auto text-gray-300 mb-2" />
+
+                  <div className="text-sm font-medium text-gray-600">
+                    Nessun Quick Kaizen disponibile
+                  </div>
+
+                  <div className="text-xs text-gray-400 mt-1">
+                    I Quick esistenti potrebbero essere già collegati oppure non corrispondere alla ricerca.
+                  </div>
+                </div>
+              ) : (
+                <div className="max-h-[55vh] overflow-y-auto divide-y border rounded-lg">
+                  {quickDisponibiliFiltrati.map(quick => {
+                    const scopeDiverso =
+                      (kaizenReparto &&
+                        quick.reparto &&
+                        kaizenReparto !== quick.reparto) ||
+                      (kaizenLinea &&
+                        quick.linea &&
+                        kaizenLinea !== quick.linea)
+
+                    return (
+                      <div
+                        key={quick._id}
+                        className="p-4 flex items-center gap-4 hover:bg-gray-50"
+                      >
+                        <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center flex-shrink-0">
+                          <Zap size={18} />
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-bold text-primary">
+                              {quick.numero}
+                            </span>
+
+                            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                              {quick.stato || 'Aperto'}
+                            </span>
+                          </div>
+
+                          <div className="font-semibold text-sm text-gray-800 mt-1">
+                            {quick.titolo || 'Senza titolo'}
+                          </div>
+
+                          <div className="text-xs text-gray-500 mt-1">
+                            {[quick.reparto, quick.linea, quick.macchina]
+                              .filter(Boolean)
+                              .join(' · ') || 'Ambito non specificato'}
+                          </div>
+
+                          {scopeDiverso && (
+                            <div className="text-xs text-orange-600 mt-1 flex items-center gap-1">
+                              <AlertTriangle size={12} />
+                              Reparto o linea differente dal progetto
+                            </div>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => collegaQuickEsistente(quick)}
+                          disabled={linking}
+                          className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-light disabled:opacity-50 whitespace-nowrap"
+                        >
+                          {linking ? 'Collegamento...' : 'Collega'}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-gray-50 border-t px-5 py-3 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowLinkModal(false)}
+                disabled={linking}
+                className="px-4 py-2 border rounded-lg text-sm hover:bg-white disabled:opacity-50"
+              >
+                Chiudi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {loading ? (
         <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">Caricamento...</div>
       ) : figli.length === 0 ? (
