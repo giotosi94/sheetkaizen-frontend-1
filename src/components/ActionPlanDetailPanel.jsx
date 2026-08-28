@@ -17,6 +17,8 @@ import {
 } from 'lucide-react'
 import api from '../services/api'
 import { useAllConfigurations } from '../hooks/useConfigurations'
+import { useAuth } from '../context/AuthContext'
+import MentionTextarea from './MentionTextarea'
 
 const PRIORITA_BG = {
   Lowest: 'bg-gray-100 text-gray-700',
@@ -103,6 +105,7 @@ export default function ActionPlanDetailPanel({
 }) {
   const [detail, setDetail] = useState(plan)
   const [nuovoCommento, setNuovoCommento] = useState('')
+  const [menzioniCommento, setMenzioniCommento] = useState([])
   const [nuovoChecklistItem, setNuovoChecklistItem] = useState('')
   const [uploadingAllegato, setUploadingAllegato] = useState(false)
   const [lightboxImg, setLightboxImg] = useState(null)
@@ -113,6 +116,7 @@ export default function ActionPlanDetailPanel({
   const streamRef = useRef(null)
 
   const { configs } = useAllConfigurations()
+  const { user } = useAuth()
   const statiConfig = configs.stato_ap || []
   const statoCorrente = statiConfig.find(stato => stato.label === detail.stato)
   const isLocked = Boolean(statoCorrente?.is_terminal)
@@ -156,20 +160,28 @@ export default function ActionPlanDetailPanel({
   }
 
   async function addCommento() {
-    if (!nuovoCommento.trim()) return
+  if (!nuovoCommento.trim()) return
 
-    try {
-      await api.post(`/action-plans/${plan._id}/commenti`, {
-        testo: nuovoCommento,
-        autore: 'Default User',
-      })
-      setNuovoCommento('')
-      await reload()
-    } catch (error) {
-      console.error(error)
-      alert('Errore durante l’aggiunta del commento: ' + (error.response?.data?.detail || error.message))
-    }
+  try {
+    await api.post(`/action-plans/${plan._id}/commenti`, {
+      testo: nuovoCommento,
+      autore_id: user?.id || null,
+      autore: user?.full_name || user?.username || 'Utente',
+      autore_email: user?.email || null,
+      mentions: menzioniCommento,
+    })
+
+    setNuovoCommento('')
+    setMenzioniCommento([])
+    await reload()
+  } catch (error) {
+    console.error(error)
+    alert(
+      'Errore durante l’aggiunta del commento: ' +
+      (error.response?.data?.detail || error.message)
+    )
   }
+}
 
   async function addChecklistItem() {
     if (!nuovoChecklistItem.trim()) return
@@ -675,21 +687,22 @@ export default function ActionPlanDetailPanel({
 
               {!isLocked && (
                 <div className="flex gap-2">
-                  <textarea
-                    value={nuovoCommento}
-                    onChange={event => setNuovoCommento(event.target.value)}
-                    placeholder="Scrivi un commento"
-                    rows={2}
-                    className="flex-1 border rounded-lg px-3 py-2 text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={addCommento}
-                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-light self-end"
-                  >
-                    <Send size={16} />
-                  </button>
-                </div>
+  <MentionTextarea
+    value={nuovoCommento}
+    onChange={setNuovoCommento}
+    mentions={menzioniCommento}
+    onMentionsChange={setMenzioniCommento}
+  />
+
+  <button
+    type="button"
+    onClick={addCommento}
+    disabled={!nuovoCommento.trim()}
+    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-light self-end disabled:opacity-50 disabled:cursor-not-allowed"
+  >
+    <Send size={16} />
+  </button>
+</div>
               )}
             </Section>
           </div>
