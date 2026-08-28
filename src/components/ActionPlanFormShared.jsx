@@ -14,27 +14,25 @@ const QUINTA_M = [
 ]
 
 export default function ActionPlanFormShared({ plan, onClose, onSaved, prefilledKaizen = null, prefilledParent = null }) {
-  const [form, setForm] = useState({
-    titolo: plan?.titolo || '',
-    descrizione: plan?.descrizione || '',
-    tipo: plan?.tipo || '',
-    priorita: plan?.priorita || '',
-    stato: plan?.stato || '',
-    categoria_perdita: plan?.categoria_perdita || plan?.tipo_perdita || '',
-    quinta_m: plan?.quinta_m || '',
-    responsabile: plan?.responsabile || '',
-    responsabile_id: plan?.responsabile_id || null,
-    reparto: plan?.reparto || '',
-    linea: plan?.linea || '',
-    macchina: plan?.macchina || '',
-    data_scadenza: plan?.data_scadenza ? plan.data_scadenza.slice(0, 10) : '',
-    tags: plan?.tags?.join(', ') || '',
-    parent_type: plan?.parent_type || prefilledParent?.parent_type || 'standalone',
-    parent_id: plan?.parent_id || prefilledParent?.parent_id || null,
-    parent_label: plan?.parent_label || prefilledParent?.parent_label || null,
-    pillar_id: plan?.pillar_id || prefilledParent?.pillar_id || null,
-    dashboard_id: plan?.dashboard_id || prefilledParent?.dashboard_id || null,
-  })
+const [form, setForm] = useState({
+  titolo: plan?.titolo || '',
+  tipo: plan?.tipo || '',
+  priorita: plan?.priorita || '',
+  stato: plan?.stato || '',
+  categoria_perdita: plan?.categoria_perdita || plan?.tipo_perdita || '',
+  quinta_m: plan?.quinta_m || '',
+  responsabile: plan?.responsabile || '',
+  responsabile_id: plan?.responsabile_id || null,
+  reparto: plan?.reparto || '',
+  linea: plan?.linea || '',
+  macchina: plan?.macchina || '',
+  data_scadenza: plan?.data_scadenza ? plan.data_scadenza.slice(0, 10) : '',
+  parent_type: plan?.parent_type || prefilledParent?.parent_type || 'standalone',
+  parent_id: plan?.parent_id || prefilledParent?.parent_id || null,
+  parent_label: plan?.parent_label || prefilledParent?.parent_label || null,
+  pillar_id: plan?.pillar_id || prefilledParent?.pillar_id || null,
+  dashboard_id: plan?.dashboard_id || prefilledParent?.dashboard_id || null,
+})
   const [saving, setSaving] = useState(false)
   const { configs } = useAllConfigurations()
 
@@ -82,22 +80,13 @@ export default function ActionPlanFormShared({ plan, onClose, onSaved, prefilled
     }
     setSaving(true)
     try {
-      const tagsArray = form.tags.split(',').map(t => t.trim()).filter(Boolean)
-
-      if (prefilledKaizen?.kaizen_numero) {
-        const kaizenTag = `kaizen-${prefilledKaizen.kaizen_numero}`
-        if (!tagsArray.includes(kaizenTag)) tagsArray.push(kaizenTag)
-      }
-
-      // Costruisco payload: NON escludo responsabile_id anche se null
-      // (così il backend riceve sempre il campo)
       const payload = {
         ...form,
-        tags: tagsArray,
-        data_scadenza: form.data_scadenza ? new Date(form.data_scadenza).toISOString() : null,
+        data_scadenza: form.data_scadenza
+          ? new Date(form.data_scadenza).toISOString()
+          : null,
       }
 
-      // Rimuovi solo i campi stringa vuota (non null)
       Object.keys(payload).forEach(k => {
         if (payload[k] === '') delete payload[k]
       })
@@ -174,19 +163,6 @@ export default function ActionPlanFormShared({ plan, onClose, onSaved, prefilled
               onChange={(e) => setForm({ ...form, titolo: e.target.value })}
               className="w-full border rounded-lg px-3 py-2"
             />
-          </Field>
-
-          <Field label="Descrizione">
-            <textarea
-              value={form.descrizione}
-              onChange={(e) => setForm({ ...form, descrizione: e.target.value })}
-              rows={4}
-              className="w-full border rounded-lg px-3 py-2 font-mono text-sm"
-            />
-            <div className="text-xs text-gray-500 mt-1">
-              Usa <code className="bg-gray-100 px-1">@nome</code> per taggare persone e{' '}
-              <code className="bg-gray-100 px-1">#argomento</code> per categorizzare
-            </div>
           </Field>
 
           {/* Tipo / Priorità / Stato */}
@@ -323,24 +299,15 @@ export default function ActionPlanFormShared({ plan, onClose, onSaved, prefilled
             </Field>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Scadenza *">
-              <input
-                required
-                type="date"
-                value={form.data_scadenza}
-                onChange={(e) => setForm({ ...form, data_scadenza: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2"
-              />
-            </Field>
-            <Field label="Tags (separati da virgola)">
-              <input
-                value={form.tags}
-                onChange={(e) => setForm({ ...form, tags: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2"
-              />
-            </Field>
-          </div>
+          <Field label="Scadenza *">
+            <input
+              required
+              type="date"
+              value={form.data_scadenza}
+              onChange={(e) => setForm({ ...form, data_scadenza: e.target.value })}
+              className="w-full border rounded-lg px-3 py-2"
+            />
+          </Field>
 
           <div className="flex justify-end gap-2 pt-3 border-t">
             <button type="button" onClick={onClose} className="px-4 py-2 border rounded-lg">
