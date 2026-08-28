@@ -3,6 +3,7 @@ import { Home, FileText, ClipboardList, LayoutDashboard, Settings, Menu, X, Book
 import { useState } from 'react'
 import { APP_NAME } from '../config/app'
 import { useAuth } from '../context/AuthContext'
+import NotificationBell from './NotificationBell'
 
 export default function Layout() {
   const location = useLocation()
@@ -76,6 +77,8 @@ export default function Layout() {
 
         {/* User card + logout */}
         <div className="border-t border-primary-light p-3 space-y-2">
+          <NotificationBell sidebarOpen={sidebarOpen} />
+
           {user && (
             <div className={`flex items-center gap-3 px-2 py-2 rounded-lg ${sidebarOpen ? 'bg-primary-light bg-opacity-50' : ''}`}>
               <div className={`${roleColor} text-white rounded-full w-9 h-9 flex items-center justify-center font-bold text-sm flex-shrink-0`}>
