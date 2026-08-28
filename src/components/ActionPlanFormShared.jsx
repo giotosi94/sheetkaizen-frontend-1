@@ -54,15 +54,28 @@ const [form, setForm] = useState({
   }, [form.linea, lineeDisponibili])
 
   useEffect(() => {
-    if (plan) return
-    const stati = configs.stato_ap || []
-    const priorita = configs.priorita_ap || []
-    setForm(f => ({
-      ...f,
-      stato: f.stato || stati[0]?.label || '',
-      priorita: f.priorita || priorita.find(p => p.label.toLowerCase().includes('medium'))?.label || priorita[0]?.label || '',
-    }))
-  }, [configs.stato_ap, configs.priorita_ap, plan])
+  if (plan) return
+
+  const stati = configs.stato_ap || []
+  const priorita = configs.priorita_ap || []
+
+  const statoAperto =
+    stati.find(s => s.label?.toLowerCase() === 'aperto')?.label ||
+    stati.find(s => s.label?.toLowerCase().includes('apert'))?.label ||
+    'Aperto'
+
+  const prioritaMedia =
+    priorita.find(p => p.label?.toLowerCase().includes('medium'))?.label ||
+    priorita.find(p => p.label?.toLowerCase().includes('media'))?.label ||
+    priorita[0]?.label ||
+    ''
+
+  setForm(f => ({
+    ...f,
+    stato: statoAperto,
+    priorita: f.priorita || prioritaMedia,
+  }))
+}, [configs.stato_ap, configs.priorita_ap, plan])
 
   function handleRepartoChange(nuovoReparto) {
     setForm(f => ({ ...f, reparto: nuovoReparto, linea: '', macchina: '' }))
@@ -165,8 +178,7 @@ const [form, setForm] = useState({
             />
           </Field>
 
-          {/* Tipo / Priorità / Stato */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className={`grid gap-3 ${plan ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <Field label="Tipo">
               <DynamicSelect
                 value={form.tipo}
@@ -176,6 +188,7 @@ const [form, setForm] = useState({
                 emptyHint="Settings → Tipo"
               />
             </Field>
+
             <Field label="Priorità">
               <DynamicSelect
                 value={form.priorita}
@@ -185,20 +198,23 @@ const [form, setForm] = useState({
                 emptyHint="Settings → Priorità"
               />
             </Field>
-            <Field label="Stato">
-              <DynamicSelect
-                value={form.stato}
-                onChange={(v) => setForm({ ...form, stato: v })}
-                options={statiConfig}
-                placeholder="Seleziona"
-                emptyHint="Settings → Stato"
-              />
-            </Field>
+
+            {plan && (
+              <Field label="Stato">
+                <DynamicSelect
+                  value={form.stato}
+                  onChange={(v) => setForm({ ...form, stato: v })}
+                  options={statiConfig}
+                  placeholder="Seleziona"
+                  emptyHint="Settings → Stato"
+                />
+              </Field>
+            )}
           </div>
 
           {/* Categoria Perdita + 5M */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Categoria Perdita (TPM)">
+            <Field label="Categoria">
               <DynamicSelect
                 value={form.categoria_perdita}
                 onChange={(v) => setForm({ ...form, categoria_perdita: v })}
