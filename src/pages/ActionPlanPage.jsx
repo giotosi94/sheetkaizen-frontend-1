@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import {
   Plus, Search, Filter, X, ChevronDown
@@ -10,6 +11,7 @@ import ActionPlanDetailPanel from '../components/ActionPlanDetailPanel'
 import ActionPlanViews from '../components/ActionPlanViews'
 
 export default function ActionPlanPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [plans, setPlans] = useState([])
   const [stats, setStats] = useState({})
   const [loading, setLoading] = useState(true)
@@ -37,7 +39,33 @@ export default function ActionPlanPage() {
   const prioritaConfig = configs.priorita_ap || []
   const tipiConfig = configs.tipi_action_plan || []
 
-  useEffect(() => { loadData() }, [filters])
+  useEffect(() => {
+    loadData()
+  }, [filters])
+
+  useEffect(() => {
+    const actionPlanId = searchParams.get('open')
+
+    if (!actionPlanId) return
+
+    const loadSelectedActionPlan = async () => {
+      try {
+        const response = await api.get(`/action-plans/${actionPlanId}`)
+        setSelectedPlan(response.data)
+      } catch (error) {
+        console.error('Errore apertura Action Plan da notifica:', error)
+
+        alert(
+          'Impossibile aprire l’Action Plan: ' +
+          (error.response?.data?.detail || error.message)
+        )
+
+        setSearchParams({}, { replace: true })
+      }
+    }
+
+    loadSelectedActionPlan()
+  }, [searchParams, setSearchParams])
 
   useEffect(() => {
     Promise.all([
@@ -335,8 +363,15 @@ export default function ActionPlanPage() {
         />
       )}
       {selectedPlan && (
-        <ActionPlanDetailPanel plan={selectedPlan}
-          onClose={() => setSelectedPlan(null)}
+        <ActionPlanDetailPanel
+  plan={selectedPlan}
+  onClose={() => {
+    setSelectedPlan(null)
+
+    if (searchParams.get('open')) {
+      setSearchParams({}, { replace: true })
+    }
+  }}
           onUpdated={() => loadData()}
           onEdit={(p) => { setSelectedPlan(null); setEditingPlan(p); setShowForm(true) }}
           onCancel={async (p) => { await handleCancel(p); setSelectedPlan(null) }}
