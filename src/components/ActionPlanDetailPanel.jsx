@@ -3,7 +3,6 @@ import {
   X,
   Edit2,
   Trash2,
-  AtSign,
   CheckSquare,
   Square,
   Send,
@@ -479,36 +478,6 @@ export default function ActionPlanDetailPanel({
           )}
 
           <div className="p-6 space-y-6">
-            <Section title="Descrizione">
-              {detail.descrizione ? (
-                <div className="bg-gray-50 p-3 rounded text-sm whitespace-pre-wrap">
-                  {renderWithMentionsTags(detail.descrizione)}
-                </div>
-              ) : (
-                <div className="text-sm text-gray-400 italic">Nessuna descrizione</div>
-              )}
-            </Section>
-
-            {(detail.tags?.length > 0 || detail.mentions?.length > 0) && (
-              <Section title="Tags & Mentions">
-                <div className="flex flex-wrap gap-2">
-                  {detail.tags?.map(tag => (
-                    <span key={tag} className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs">
-                      #{tag}
-                    </span>
-                  ))}
-                  {detail.mentions?.map(mention => (
-                    <span
-                      key={mention}
-                      className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs flex items-center gap-1"
-                    >
-                      <AtSign size={10} />
-                      {mention}
-                    </span>
-                  ))}
-                </div>
-              </Section>
-            )}
 
             <Section title={`Checklist ${checklistTotali ? `(${checklistCompletati}/${checklistTotali})` : ''}`}>
               {checklistTotali > 0 && (
