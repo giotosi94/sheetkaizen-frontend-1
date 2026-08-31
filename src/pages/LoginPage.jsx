@@ -8,6 +8,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
   const { login } = useAuth()
   const navigate = useNavigate()
 
@@ -31,12 +32,9 @@ export default function LoginPage() {
       <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md">
         <div className="text-center mb-8">
           <img
-            src=<img
-                  src={lpwSystemLogo}
-                  alt="LPW System"
-                  className="w-32 h-32 object
+            src={lpwSystemLogo}
             alt="LPW System"
-            className="w-32 h-32 object-contain mx-auto mb-3"
+            className="w-32 h-32 object-contain mx-auto mb-3 mix-blend-multiply"
           />
 
           <h1 className="text-3xl font-bold text-primary">
