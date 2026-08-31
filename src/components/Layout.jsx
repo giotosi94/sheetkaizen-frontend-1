@@ -1,117 +1,264 @@
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, FileText, ClipboardList, LayoutDashboard, Settings, Menu, X, BookOpen, Cog, Columns, Users, LogOut } from 'lucide-react'
-import { useState } from 'react'
-import { APP_NAME } from '../config/app'
-import { useAuth } from '../context/AuthContext'
-import NotificationBell from './NotificationBell'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import api from '../services/api'
+import { CheckCircle2, FileText, Eye, X } from 'lucide-react'
 
-export default function Layout() {
-  const location = useLocation()
-  const navigate = useNavigate()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const { user, logout, isAdmin } = useAuth()
+export default function OplReadPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [selected, setSelected] = useState(null)
 
-  const links = [
-    { to: '/', icon: Home, label: 'Home' },
-    { to: '/kaizen', icon: FileText, label: 'Kaizen' },
-    { to: '/action-plan', icon: ClipboardList, label: 'Action Plan' },
-    { to: '/dashboard', icon: LayoutDashboard, label: 'Meetings' },
-    { to: '/pillars', icon: Columns, label: 'Pillars' },
-    { to: '/documenti', icon: BookOpen, label: 'Documenti' },
-    { to: '/da-leggere', icon: FileText, label: 'Da leggere' },
-    // Utenti: solo admin
-    ...(isAdmin ? [{ to: '/users', icon: Users, label: 'Utenti' }] : []),
-    { to: '/settings', icon: Cog, label: 'Settings' },
-  ]
-
-  function handleLogout() {
-    if (confirm('Vuoi davvero uscire?')) {
-      logout()
-      navigate('/login')
+  const load = async () => {
+    setLoading(true)
+    try {
+      const res = await api.get('/opl-letture/da-leggere')
+      setItems(res.data?.items || [])
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const userInitials = user?.full_name
-    ? user.full_name.split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase()
-    : '?'
+  useEffect(() => {
+    load()
+  }, [])
 
-  const roleColors = {
-    admin: 'bg-red-500',
-    manager: 'bg-purple-500',
-    office: 'bg-blue-500',
-    operator: 'bg-green-500',
+  useEffect(() => {
+    const oplId = searchParams.get('opl')
+    if (!oplId) return
+
+    const openOpl = async () => {
+      try {
+        const res = await api.get(`/documenti/${oplId}`)
+        setSelected(res.data)
+      } catch (err) {
+        console.error(err)
+      }
+    }
+
+    openOpl()
+  }, [searchParams])
+
+  const closePanel = () => {
+    setSelected(null)
+    if (searchParams.get('opl')) {
+      setSearchParams({}, { replace: true })
+    }
   }
-  const roleColor = roleColors[user?.role] || 'bg-gray-500'
+
+  const openDocumento = async documentoId => {
+    try {
+      const res = await api.get(`/documenti/${documentoId}`)
+      setSelected(res.data)
+    } catch (err) {
+      alert('Errore apertura documento: ' + (err.response?.data?.detail || err.message))
+    }
+  }
 
   return (
-    <div className="flex h-screen bg-background text-warm-text">
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-16'} bg-primary text-white transition-all duration-300 flex flex-col shadow-warm-lg`}>
-        {/* Header sidebar */}
-        <div className="p-4 flex justify-between items-center border-b border-primary-light">
-          {sidebarOpen && <h1 className="text-lg font-bold">{APP_NAME}</h1>}
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-white hover:bg-primary-light p-1 rounded">
-            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+    <div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">
+          OPL da leggere
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Documenti assegnati che richiedono la tua conferma di lettura.
+        </p>
+      </div>
+
+      {loading ? (
+        <div className="bg-white rounded-xl shadow p-12 text-center text-gray-400">
+          Caricamento...
+        </div>
+      ) : items.length === 0 ? (
+        <div className="bg-white rounded-xl shadow p-12 text-center">
+          <CheckCircle2 size={40} className="mx-auto text-green-500 mb-3" />
+          <div className="text-lg font-semibold text-gray-700">
+            Nessuna OPL da leggere
+          </div>
+          <p className="text-sm text-gray-500 mt-1">
+            Hai confermato tutte le letture assegnate.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {items.map(item => (
+            <div
+              key={item._id}
+              className="bg-white rounded-xl shadow border-l-4 border-yellow-500 p-5"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <FileText size={18} className="text-yellow-600" />
+                <span className="font-mono text-xs font-bold text-primary">
+                  {item.document_number}
+                </span>
+                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                  v{item.version}
+                </span>
+              </div>
+
+              <h3 className="font-semibold text-gray-800 mb-3">
+                {item.document_title}
+              </h3>
+
+              {item.scadenza && (
+                <div className="text-xs text-gray-500 mb-3">
+                  Scadenza: {new Date(item.scadenza).toLocaleDateString('it-IT')}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => openDocumento(item.document_id)}
+                className="w-full bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-light flex items-center justify-center gap-2"
+              >
+                <Eye size={16} />
+                Apri e conferma
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {selected && (
+        <OplConfirmModal
+          documento={selected}
+          onClose={closePanel}
+          onConfirmed={() => {
+            closePanel()
+            load()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function OplConfirmModal({ documento, onClose, onConfirmed }) {
+  const [confirming, setConfirming] = useState(false)
+  const [blobUrl, setBlobUrl] = useState(null)
+
+  useEffect(() => {
+    let url = null
+    let cancelled = false
+
+    const loadFile = async () => {
+      if (!documento.file_id) return
+      try {
+        const res = await api.get(`/documenti/${documento._id}/file`, {
+          responseType: 'blob',
+        })
+        if (cancelled) return
+        url = URL.createObjectURL(res.data)
+        setBlobUrl(url)
+      } catch (err) {
+        console.error(err)
+      }
+    }
+
+    loadFile()
+
+    return () => {
+      cancelled = true
+      if (url) URL.revokeObjectURL(url)
+    }
+  }, [documento._id, documento.file_id])
+
+  const conferma = async () => {
+    setConfirming(true)
+    try {
+      await api.post(`/opl-letture/${documento._id}/conferma`, {
+        confirmation_text: 'Confermo di aver letto e compreso',
+      })
+      alert('Lettura confermata.')
+      onConfirmed()
+    } catch (err) {
+      alert('Errore conferma: ' + (err.response?.data?.detail || err.message))
+    } finally {
+      setConfirming(false)
+    }
+  }
+
+  const oplData = documento.opl_data || {}
+  const isImage = documento.file_content_type?.startsWith('image/')
+  const isPdf = documento.file_name?.toLowerCase().endsWith('.pdf')
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl w-full max-w-4xl h-[92vh] flex flex-col shadow-2xl">
+        <div className="bg-primary text-white px-6 py-3 rounded-t-xl flex justify-between items-center">
+          <div className="min-w-0">
+            <div className="font-semibold truncate">
+              {documento.numero} - {documento.titolo}
+            </div>
+            <div className="text-xs opacity-80">
+              Versione {documento.versione} · {documento.stato}
+            </div>
+          </div>
+          <button onClick={onClose} className="hover:bg-primary-light p-1.5 rounded">
+            <X size={20} />
           </button>
         </div>
 
-        {/* Nav links */}
-        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-          {links.map((link) => {
-            const Icon = link.icon
-            const isActive = location.pathname === link.to || (link.to !== '/' && location.pathname.startsWith(link.to))
-            return (
-              <Link
-                key={link.to}
-                to={link.to}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${
-  isActive
-    ? 'bg-gold-dark text-white shadow-warm-sm'
-    : 'hover:bg-chocolate-light'
-}`}
-              >
-                <Icon size={20} />
-                {sidebarOpen && <span className="text-sm">{link.label}</span>}
-              </Link>
-            )
-          })}
-        </nav>
+        <div className="flex-1 overflow-auto bg-gray-100 p-6">
+          {blobUrl && isPdf && (
+            {blobUrl}
+          )}
 
-        {/* User card + logout */}
-        <div className="border-t border-primary-light p-3 space-y-2">
-          <NotificationBell sidebarOpen={sidebarOpen} />
+          {blobUrl && isImage && (
+            <div className="flex items-center justify-center">
+              {blobUrl}
+            </div>
+          )}
 
-          {user && (
-            <div className={`flex items-center gap-3 px-2 py-2 rounded-lg ${sidebarOpen ? 'bg-primary-light bg-opacity-50' : ''}`}>
-              <div className={`${roleColor} text-white rounded-full w-9 h-9 flex items-center justify-center font-bold text-sm flex-shrink-0`}>
-                {userInitials}
-              </div>
-              {sidebarOpen && (
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{user.full_name}</div>
-                  <div className="text-xs text-gray-300 truncate capitalize">{user.role}</div>
+          {(oplData.problema || oplData.causa || oplData.miglioramento) && (
+            <div className="max-w-3xl mx-auto mt-4 space-y-3">
+              {oplData.problema && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="font-bold text-red-800 text-sm mb-1">Problema</div>
+                  <div className="text-sm text-red-900 whitespace-pre-wrap">{oplData.problema}</div>
+                </div>
+              )}
+              {oplData.causa && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <div className="font-bold text-orange-800 text-sm mb-1">Causa</div>
+                  <div className="text-sm text-orange-900 whitespace-pre-wrap">{oplData.causa}</div>
+                </div>
+              )}
+              {oplData.miglioramento && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="font-bold text-green-800 text-sm mb-1">Miglioramento</div>
+                  <div className="text-sm text-green-900 whitespace-pre-wrap">{oplData.miglioramento}</div>
                 </div>
               )}
             </div>
           )}
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-500 hover:bg-opacity-70 transition-colors text-sm"
-            title="Logout"
-          >
-            <LogOut size={18} />
-            {sidebarOpen && <span>Logout</span>}
-          </button>
-          {sidebarOpen && (
-            <div className="text-xs text-gray-300 text-center">
-              {`${APP_NAME} v1.0`}
+
+          {!blobUrl && !oplData.problema && !oplData.causa && !oplData.miglioramento && (
+            <div className="text-center text-gray-400 py-12">
+              Nessuna anteprima disponibile. Conferma la lettura dopo aver consultato il documento.
             </div>
           )}
         </div>
-      </aside>
 
-<main className="flex-1 overflow-y-auto p-6">
-  <Outlet />
-</main>
+        <div className="border-t bg-white px-6 py-4 flex items-center justify-between gap-4">
+          <div className="text-xs text-gray-500">
+            La conferma sarà registrata con utente, data, ora e versione.
+          </div>
+
+          <button
+            type="button"
+            onClick={conferma}
+            disabled={confirming}
+            className="bg-green-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+          >
+            <CheckCircle2 size={18} />
+            {confirming ? 'Registrazione...' : 'Confermo di aver letto e compreso'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
