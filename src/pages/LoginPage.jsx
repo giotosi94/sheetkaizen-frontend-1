@@ -32,9 +32,9 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <img
             src=<img
-  src={lpwSystemLogo}
-  alt="LPW System"
-  className="w-32 h-32 object
+                  src={lpwSystemLogo}
+                  alt="LPW System"
+                  className="w-32 h-32 object
             alt="LPW System"
             className="w-32 h-32 object-contain mx-auto mb-3"
           />
