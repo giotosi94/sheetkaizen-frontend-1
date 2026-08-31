@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { CheckCircle2, FileText, Eye, X } from 'lucide-react'
@@ -203,13 +203,19 @@ function OplConfirmModal({ documento, onClose, onConfirmed }) {
         </div>
 
         <div className="flex-1 overflow-auto bg-gray-100 p-6">
-          {blobUrl && isPdf && (
-            {blobUrl}
-          )}
+          {blobUrl && isPdf && React.createElement('iframe', {
+            src: blobUrl,
+            className: 'w-full h-full border-0 bg-white',
+            title: documento.titolo,
+          })}
 
           {blobUrl && isImage && (
             <div className="flex items-center justify-center">
-              {blobUrl}
+              {React.createElement('img', {
+                src: blobUrl,
+                alt: documento.titolo,
+                className: 'max-w-full max-h-[70vh] object-contain',
+              })}
             </div>
           )}
 
