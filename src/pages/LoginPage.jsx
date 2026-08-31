@@ -29,7 +29,9 @@ export default function LoginPage() {
     <div className="min-h-screen bg-primary flex items-center justify-center">
       <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md">
         <div className="text-center mb-8">
-  {lpwSystemLogo}
+  <img
+  src={lpwSystemLogo}
+  alt="LPW System
 
   <h1 className="text-3xl font-bold text-primary">
     LPW System
