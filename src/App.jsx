@@ -10,6 +10,7 @@ import ActionPlanPage from './pages/ActionPlanPage'
 import DashboardListPage from './pages/DashboardListPage'
 import DashboardDetailPage from './pages/DashboardDetailPage'
 import DocumentiPage from './pages/DocumentiPage'
+import OplReadPage from './pages/OplReadPage'
 import SettingsPage from './pages/SettingsPage'
 import PillarListPage from './pages/PillarListPage'
 import PillarDetailPage from './pages/PillarDetailPage'
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="dashboard" element={<DashboardListPage />} />
           <Route path="dashboard/:id" element={<DashboardDetailPage />} />
           <Route path="documenti" element={<DocumentiPage />} />
+          <Route path="da-leggere" element={<OplReadPage />} />
           <Route path="pillars" element={<PillarListPage />} />
           <Route path="pillars/:id" element={<PillarDetailPage />} />
           <Route path="settings" element={<SettingsPage />} />
