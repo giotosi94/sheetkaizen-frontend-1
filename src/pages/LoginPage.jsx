@@ -8,12 +8,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-
   const { login } = useAuth()
   const navigate = useNavigate()
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const handleSubmit = async event => {
+    event.preventDefault()
     setError('')
     setLoading(true)
 
@@ -31,7 +30,11 @@ export default function LoginPage() {
     <div className="min-h-screen bg-primary flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md">
         <div className="text-center mb-8">
-          {lpwSystemLogo}
+          <img
+            src={lpwSystemLogo}
+            alt="LPW System"
+            className="w-32 h-32 object-contain mx-auto mb-3"
+          />
 
           <h1 className="text-3xl font-bold text-primary">
             LPW System
@@ -57,7 +60,7 @@ export default function LoginPage() {
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={event => setEmail(event.target.value)}
               className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="nome@lindt.com"
               required
@@ -72,7 +75,7 @@ export default function LoginPage() {
             <input
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={event => setPassword(event.target.value)}
               className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="••••••••"
               required
