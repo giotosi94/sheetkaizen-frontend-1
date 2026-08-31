@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { CheckCircle2, FileText, Eye, X } from 'lucide-react'
@@ -45,6 +45,15 @@ export default function OplReadPage() {
     setSelected(null)
     if (searchParams.get('opl')) {
       setSearchParams({}, { replace: true })
+    }
+  }
+
+  const openDocumento = async documentoId => {
+    try {
+      const res = await api.get(`/documenti/${documentoId}`)
+      setSelected(res.data)
+    } catch (err) {
+      alert('Errore apertura documento: ' + (err.response?.data?.detail || err.message))
     }
   }
 
@@ -102,7 +111,7 @@ export default function OplReadPage() {
 
               <button
                 type="button"
-                onClick={() => openDocumento(item.document_id, setSelected)}
+                onClick={() => openDocumento(item.document_id)}
                 className="w-full bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-light flex items-center justify-center gap-2"
               >
                 <Eye size={16} />
@@ -125,15 +134,6 @@ export default function OplReadPage() {
       )}
     </div>
   )
-}
-
-async function openDocumento(documentoId, setSelected) {
-  try {
-    const res = await api.get(`/documenti/${documentoId}`)
-    setSelected(res.data)
-  } catch (err) {
-    alert('Errore apertura documento: ' + (err.response?.data?.detail || err.message))
-  }
 }
 
 function OplConfirmModal({ documento, onClose, onConfirmed }) {
@@ -203,13 +203,19 @@ function OplConfirmModal({ documento, onClose, onConfirmed }) {
         </div>
 
         <div className="flex-1 overflow-auto bg-gray-100 p-6">
-          {blobUrl && isPdf && (
-            {blobUrl}-0 bg-white" title={documento.titolo} />
-          )}
+          {blobUrl && isPdf && React.createElement('iframe', {
+            src: blobUrl,
+            className: 'w-full h-full border-0 bg-white',
+            title: documento.titolo,
+          })}
 
           {blobUrl && isImage && (
             <div className="flex items-center justify-center">
-              {blobUrl}-w-full max-h-[70vh] object-contain" />
+              {React.createElement('img', {
+                src: blobUrl,
+                alt: documento.titolo,
+                className: 'max-w-full max-h-[70vh] object-contain',
+              })}
             </div>
           )}
 
@@ -233,6 +239,12 @@ function OplConfirmModal({ documento, onClose, onConfirmed }) {
                   <div className="text-sm text-green-900 whitespace-pre-wrap">{oplData.miglioramento}</div>
                 </div>
               )}
+            </div>
+          )}
+
+          {!blobUrl && !oplData.problema && !oplData.causa && !oplData.miglioramento && (
+            <div className="text-center text-gray-400 py-12">
+              Nessuna anteprima disponibile. Conferma la lettura dopo aver consultato il documento.
             </div>
           )}
         </div>
