@@ -31,7 +31,10 @@ export default function LoginPage() {
       <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md">
         <div className="text-center mb-8">
           <img
-            src={lpwSystemLogo}
+            src=<img
+  src={lpwSystemLogo}
+  alt="LPW System"
+  className="w-32 h-32 object
             alt="LPW System"
             className="w-32 h-32 object-contain mx-auto mb-3"
           />
