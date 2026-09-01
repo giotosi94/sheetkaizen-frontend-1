@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
 import api from '../services/api'
-import { FileText, Upload, Download, Search, Trash2, Edit2, Eye, X, Plus, Pencil, Send, BarChart3 } from 'lucide-react'
+import { FileText, Upload, Download, Search, Trash2, Edit2, X, Plus, Pencil, Send } from 'lucide-react'
 import OplImageEditor from '../components/opl/OplImageEditor'
 import { OPL_SYMBOLS } from '../components/opl/oplSymbols'
 import OplPublishModal from '../components/opl/OplPublishModal'
-import OplReadReportModal from '../components/opl/OplReadReportModal'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -34,7 +33,6 @@ export default function DocumentiPage() {
   const [bulkOpen, setBulkOpen] = useState(false)
   const [oplNativaOpen, setOplNativaOpen] = useState(false)
   const [publishingDoc, setPublishingDoc] = useState(null)
-  const [reportDoc, setReportDoc] = useState(null)
 
   useEffect(() => { load() }, [filterTipo, filterCategoria, filterStato])
 
@@ -186,7 +184,16 @@ export default function DocumentiPage() {
                 }
                 return (
                   <tr key={doc._id} className="border-t hover:bg-gray-50">
-                    <td className="p-4 font-mono text-primary font-bold">{doc.numero}</td>
+                    <td className="p-4">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDoc(doc)}
+                        className="font-mono text-primary font-bold hover:underline hover:text-primary-light"
+                        title="Apri documento"
+                      >
+                        {doc.numero}
+                      </button>
+                    </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         <span>{getTipoIcon(doc.tipo)}</span>
@@ -222,19 +229,6 @@ export default function DocumentiPage() {
                             <Send size={16} />
                           </button>
                         )}
-                        {doc.tipo === 'OPL' && doc.pubblicata && (
-                          <button
-                            type="button"
-                            onClick={() => setReportDoc(doc)}
-                            className="text-indigo-600 hover:bg-indigo-50 p-1 rounded"
-                            title="Report letture"
-                          >
-                            <BarChart3 size={16} />
-                          </button>
-                        )}
-                        <button onClick={() => setPreviewDoc(doc)} className="text-blue-600 hover:bg-blue-50 p-1 rounded" title="Anteprima">
-                          <Eye size={16} />
-                        </button>
                         <button onClick={handleTableDownload} className="text-green-600 hover:bg-green-50 p-1 rounded" title="Scarica">
                           <Download size={16} />
                         </button>
@@ -264,12 +258,6 @@ export default function DocumentiPage() {
           documento={publishingDoc}
           onClose={() => setPublishingDoc(null)}
           onPublished={load}
-        />
-      )}
-      {reportDoc && (
-        <OplReadReportModal
-          documento={reportDoc}
-          onClose={() => setReportDoc(null)}
         />
       )}
     </div>
