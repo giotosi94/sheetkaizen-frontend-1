@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Send, X } from 'lucide-react'
-import api from '../services/api'
+import api from '../../services/api'
 
 export default function OplPublishModal({ documento, onClose, onPublished }) {
   const [reparti, setReparti] = useState([])
