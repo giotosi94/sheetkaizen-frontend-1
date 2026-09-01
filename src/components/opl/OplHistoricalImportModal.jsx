@@ -9,7 +9,6 @@ export default function OplHistoricalImportModal({ onClose }) {
   const [items, setItems] = useState([])
   const [analyzing, setAnalyzing] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
-  const [nextNumber, setNextNumber] = useState('')
   const fileRef = useRef(null)
 
   const selected = items[selectedIndex]
@@ -20,7 +19,6 @@ export default function OplHistoricalImportModal({ onClose }) {
     setFiles(selectedFiles)
     setItems([])
     setSelectedIndex(0)
-    setNextNumber('')
   }
 
   const analyze = async () => {
@@ -34,7 +32,6 @@ export default function OplHistoricalImportModal({ onClose }) {
         timeout: 300000,
       })
       setItems(response.data.items || [])
-      setNextNumber(response.data.next_number || '')
       setSelectedIndex(0)
     } catch (error) {
       alert('Errore analisi: ' + (error.response?.data?.detail || error.message))
@@ -133,10 +130,6 @@ export default function OplHistoricalImportModal({ onClose }) {
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${selected.confidence >= 85 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                         {selected.confidence}%
                       </span>
-                    </div>
-
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-                      Prossima codifica disponibile per una nuova OPL: <strong>{nextNumber || 'Calcolo non disponibile'}</strong>
                     </div>
 
                     <Field label="Numero OPL di sistema" value={selected.numero} onChange={value => updateSelected('numero', value)} />
