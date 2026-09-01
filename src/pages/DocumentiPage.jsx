@@ -6,7 +6,10 @@ import { OPL_SYMBOLS } from '../components/opl/oplSymbols'
 import OplPublishModal from '../components/opl/OplPublishModal'
 import OplReadReportModal from '../components/opl/OplReadReportModal'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API_BASE = (
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:8000/api'
+).replace(/\/api\/?$/, '')
 
 const CATEGORIE = ['Operativa', 'Sicurezza', 'Manutenzione', 'Qualità', 'Pulizia', 'Allergeni', 'Avvio/Spegnimento']
 const STATI = ['Bozza', 'In Revisione', 'Approvato', 'Obsoleto']
