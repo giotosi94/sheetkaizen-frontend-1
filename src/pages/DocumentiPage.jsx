@@ -40,6 +40,7 @@ export default function DocumentiPage() {
   const [publishingDoc, setPublishingDoc] = useState(null)
   const [reportDoc, setReportDoc] = useState(null)
   const [historicalOpen, setHistoricalOpen] = useState(false)
+  const [nextOplNumber, setNextOplNumber] = useState('')
   const savedUser = (() => {
     try {
       return JSON.parse(localStorage.getItem('user') || '{}')
@@ -63,6 +64,16 @@ export default function DocumentiPage() {
       setDocumenti(res.data)
       const statsRes = await api.get('/documenti/stats/summary')
       setStats(statsRes.data)
+
+      if (isAdmin) {
+        try {
+          const nextNumberRes = await api.get('/documenti/next-number/OPL')
+          setNextOplNumber(nextNumberRes.data.numero || '')
+        } catch (error) {
+          console.error('Errore prossima codifica OPL:', error)
+    setNextOplNumber('')
+  }
+}
     } catch (err) { console.error(err) }
   }
 
