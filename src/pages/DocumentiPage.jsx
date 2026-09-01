@@ -137,17 +137,36 @@ export default function DocumentiPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        {['OPL', 'SOP'].map(tipo => {
-          const total = Object.values(stats[tipo] || {}).reduce((s, n) => s + n, 0)
-          const approvati = (stats[tipo] || {})['Approvato'] || 0
-          return (
-            <div key={tipo} className="bg-white rounded-xl shadow p-5">
-              <div className="text-3xl mb-2">{getTipoIcon(tipo)}</div>
-              <p className="text-sm text-gray-500">{tipo === 'OPL' ? 'One Point Lessons' : 'Standard Operating Procedures'}</p>
-              <p className="text-2xl font-bold">{total} documenti</p>
-              <p className="text-xs text-green-600 mt-1">{approvati} approvati</p>
-            </div>
-          )
+  {['OPL', 'SOP'].map(tipo => {
+    const total = Object.values(stats[tipo] || {}).reduce((s, n) => s + n, 0)
+    const approvati = (stats[tipo] || {})['Approvato'] || 0
+
+    return (
+      <div key={tipo} className="bg-white rounded-xl shadow p-5">
+        <div className="text-3xl mb-2">{getTipoIcon(tipo)}</div>
+        <p className="text-sm text-gray-500">
+          {tipo === 'OPL' ? 'One Point Lessons' : 'Standard Operating Procedures'}
+        </p>
+        <p className="text-2xl font-bold">{total} documenti</p>
+        <p className="text-xs text-green-600 mt-1">{approvati} approvati</p>
+      </div>
+    )
+  })}
+
+  {isAdmin && (
+    <div className="bg-white rounded-xl shadow p-5 md:col-start-4 border-l-4 border-amber-600">
+      <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+        Prossima codifica OPL
+      </div>
+      <div className="text-3xl font-bold text-amber-700 mt-3">
+        {nextOplNumber || '...'}
+      </div>
+      <div className="text-xs text-gray-500 mt-2">
+        Assegnata automaticamente alla prossima OPL
+      </div>
+    </div>
+  )}
+</div>
         })}
       </div>
 
