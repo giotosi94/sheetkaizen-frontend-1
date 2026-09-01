@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react'
 import api from '../services/api'
-import { FileText, Upload, Download, Search, Trash2, Edit2, X, Plus, Pencil, Send, BarChart3 } from 'lucide-react'
+import { FileText, Upload, Download, Search, Trash2, Edit2, X, Plus, Pencil, Send, BarChart3, ArchiveRestore } from 'lucide-react'
 import OplImageEditor from '../components/opl/OplImageEditor'
 import { OPL_SYMBOLS } from '../components/opl/oplSymbols'
 import OplPublishModal from '../components/opl/OplPublishModal'
 import OplReadReportModal from '../components/opl/OplReadReportModal'
+import OplHistoricalImportModal from '../components/opl/OplHistoricalImportModal'
 
 const API_BASE = (
   import.meta.env.VITE_API_URL ||
@@ -38,6 +39,16 @@ export default function DocumentiPage() {
   const [oplNativaOpen, setOplNativaOpen] = useState(false)
   const [publishingDoc, setPublishingDoc] = useState(null)
   const [reportDoc, setReportDoc] = useState(null)
+  const [historicalOpen, setHistoricalOpen] = useState(false)
+  const savedUser = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('user') || '{}')
+    } catch {
+      return {}
+    }
+  })()
+  const userRole = String(savedUser.role || savedUser.ruolo || '').toLowerCase()
+  const isAdmin = ['admin', 'administrator', 'amministratore'].includes(userRole)
 
   useEffect(() => { load() }, [filterTipo, filterCategoria, filterStato])
 
@@ -84,6 +95,15 @@ export default function DocumentiPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Document Manager (OPL / SOP)</h1>
         <div className="flex gap-2">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setHistoricalOpen(true)}
+              className="bg-amber-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-amber-800 font-medium"
+            >
+              <ArchiveRestore size={18} /> Importa OPL Storiche
+            </button>
+          )}
           <button
             onClick={() => setOplNativaOpen(true)}
             className="bg-yellow-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-yellow-600 font-medium"
@@ -280,6 +300,9 @@ export default function DocumentiPage() {
           documento={reportDoc}
           onClose={() => setReportDoc(null)}
         />
+      )}
+      {historicalOpen && (
+        <OplHistoricalImportModal onClose={() => setHistoricalOpen(false)} />
       )}
     </div>
   )
