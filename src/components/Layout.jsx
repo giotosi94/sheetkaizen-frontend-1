@@ -30,7 +30,6 @@ export default function Layout() {
     { to: '/dashboard', icon: LayoutDashboard, label: 'Meetings' },
     { to: '/pillars', icon: Columns, label: 'Pillars' },
     { to: '/documenti', icon: BookOpen, label: 'Documenti' },
-    { to: '/da-leggere', icon: FileText, label: 'Da leggere' },
     ...(isAdmin ? [{ to: '/users', icon: Users, label: 'Utenti' }] : []),
     { to: '/settings', icon: Cog, label: 'Settings' },
   ]
