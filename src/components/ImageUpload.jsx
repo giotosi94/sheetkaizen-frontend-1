@@ -286,10 +286,12 @@ export default function ImageUpload({
               className="block w-full"
               title="Apri immagine"
             >
-              {resolveImageUrl(url)}                alt={`Evidenza ${index + 1}`}
-                className="w-full h-28 object-cover"
-                loading="lazy"
-              />
+              {React.createElement('img', {
+                src: resolveImageUrl(url),
+                alt: `Evidenza ${index + 1}`,
+                className: 'w-full h-28 object-cover',
+                loading: 'lazy',
+              })}
             </button>
 
             <div className="absolute left-1.5 bottom-1.5 px-1.5 py-0.5 rounded bg-black bg-opacity-60 text-white text-[10px]">
@@ -439,10 +441,12 @@ export default function ImageUpload({
             <X size={22} />
           </button>
 
-          {resolveImageUrl(previewUrl)}            alt="Anteprima evidenza"
-            className="max-w-full max-h-[90vh] object-contain rounded-lg"
-            onClick={event => event.stopPropagation()}
-          />
+          {React.createElement('img', {
+            src: resolveImageUrl(previewUrl),
+            alt: 'Anteprima evidenza',
+            className: 'max-w-full max-h-[90vh] object-contain rounded-lg',
+            onClick: event => event.stopPropagation(),
+          })}
         </div>
       )}
     </div>
