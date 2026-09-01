@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
 import api from '../services/api'
-import { FileText, Upload, Download, Search, Trash2, Edit2, Eye, X, Plus, Pencil } from 'lucide-react'
+import { FileText, Upload, Download, Search, Trash2, Edit2, Eye, X, Plus, Pencil, Send } from 'lucide-react'
 import OplImageEditor from '../components/opl/OplImageEditor'
 import { OPL_SYMBOLS } from '../components/opl/oplSymbols'
+import OplPublishModal from '../components/opl/OplPublishModal'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -31,6 +32,7 @@ export default function DocumentiPage() {
   const [previewDoc, setPreviewDoc] = useState(null)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [oplNativaOpen, setOplNativaOpen] = useState(false)
+  const [publishingDoc, setPublishingDoc] = useState(null)
 
   useEffect(() => { load() }, [filterTipo, filterCategoria, filterStato])
 
@@ -208,6 +210,16 @@ export default function DocumentiPage() {
                     </td>
                     <td className="p-4">
                       <div className="flex gap-2">
+                        {doc.tipo === 'OPL' && !doc.pubblicata && (
+                          <button
+                            type="button"
+                            onClick={() => setPublishingDoc(doc)}
+                            className="text-purple-600 hover:bg-purple-50 p-1 rounded"
+                            title="Pubblica e assegna"
+                          >
+                            <Send size={16} />
+                          </button>
+                        )}
                         <button onClick={() => setPreviewDoc(doc)} className="text-blue-600 hover:bg-blue-50 p-1 rounded" title="Anteprima">
                           <Eye size={16} />
                         </button>
@@ -235,6 +247,13 @@ export default function DocumentiPage() {
       {previewDoc && <PreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
       {bulkOpen && <BulkUploadModal onClose={() => setBulkOpen(false)} onSaved={load} />}
       {oplNativaOpen && <OplNativaModal onClose={() => setOplNativaOpen(false)} onSaved={load} />}
+      {publishingDoc && (
+        <OplPublishModal
+          documento={publishingDoc}
+          onClose={() => setPublishingDoc(null)}
+          onPublished={load}
+        />
+      )}
     </div>
   )
 }
@@ -372,13 +391,11 @@ function PreviewModal({ doc, onClose }) {
       return (
         <div className="w-full h-full flex items-center justify-center p-4 overflow-auto">
           {React.createElement('img', {
-        ref: imgRef,
-        src: imageUrl,
-        alt: 'OPL',
-        onLoad: onImgLoad,
-        className: 'max-w-full object-contain block',
-        style: { maxHeight: '70vh' },
-      })}
+            src: blobUrl,
+            alt: doc.titolo,
+            className: 'max-w-full object-contain block',
+            style: { maxHeight: '70vh' },
+          })}
 
         </div>
       )
@@ -478,55 +495,94 @@ function PreviewModal({ doc, onClose }) {
 
 function UploadModal({ onClose, onSaved }) {
   const [form, setForm] = useState({
-    titolo: '', tipo: 'OPL', categoria: '', reparto: '', linea: '', macchina: '',
-    autore: '', descrizione: '', tag: '',
+    titolo: '',
+    tipo: 'OPL',
+    categoria: '',
+    reparto: '',
+    linea: '',
+    macchina: '',
+    autore: '',
+    descrizione: '',
+    tag: '',
   })
+  const [reparti, setReparti] = useState([])
   const [file, setFile] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [compress, setCompress] = useState(true)
   const fileRef = useRef(null)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  useEffect(() => {
+    api
+      .get('/reparti/')
+      .then(response => setReparti((response.data || []).filter(reparto => reparto.attivo !== false)))
+      .catch(error => console.error('Errore reparti:', error))
+
+    try {
+      const savedUser = localStorage.getItem('user')
+      if (savedUser) {
+        const user = JSON.parse(savedUser)
+        setForm(current => ({
+          ...current,
+          autore: user.full_name || user.email || '',
+          reparto: user.reparto || '',
+        }))
+      }
+    } catch (error) {
+      console.error('Errore utente salvato:', error)
+    }
+  }, [])
+
+  const lineeAvailable = reparti.find(reparto => reparto.nome === form.reparto)?.linee || []
+  const macchineAvailable = lineeAvailable.find(linea => linea.nome === form.linea)?.macchine || []
+
+  const handleSubmit = async event => {
+    event.preventDefault()
     if (!file) return alert('Seleziona un file')
     setUploading(true)
+
     try {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('compress', compress ? 'true' : 'false')
-      Object.entries(form).forEach(([k, v]) => v && formData.append(k, v))
-      const res = await api.post('/documenti/upload', formData, {
+      Object.entries(form).forEach(([key, value]) => value && formData.append(key, value))
+
+      const response = await api.post('/documenti/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
-      const c = res.data.compressione
-      let msg = `Documento ${res.data.numero} creato!`
-      if (c && c.compressed) {
-        const origMB = (c.original_size / 1024 / 1024).toFixed(2)
-        const finalMB = (c.final_size / 1024 / 1024).toFixed(2)
-        msg += `\n\nCompressione: ${origMB} MB → ${finalMB} MB (-${c.saved_pct}%)`
+
+      const compression = response.data.compressione
+      let message = `Documento ${response.data.numero} creato!`
+
+      if (compression?.compressed) {
+        const originalMb = (compression.original_size / 1024 / 1024).toFixed(2)
+        const finalMb = (compression.final_size / 1024 / 1024).toFixed(2)
+        message += `\n\nCompressione: ${originalMb} MB → ${finalMb} MB (-${compression.saved_pct}%)`
       }
-      alert(msg)
+
+      alert(message)
       onSaved()
       onClose()
-    } catch (err) {
-      console.error(err)
-      alert('Errore upload: ' + (err.response?.data?.detail || err.message))
+    } catch (error) {
+      console.error(error)
+      alert('Errore upload: ' + (error.response?.data?.detail || error.message))
+    } finally {
+      setUploading(false)
     }
-    setUploading(false)
   }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="bg-primary text-white p-4 rounded-t-xl flex justify-between items-center sticky top-0">
+        <div className="bg-primary text-white p-4 rounded-t-xl flex justify-between items-center sticky top-0 z-10">
           <h2 className="text-lg font-bold">Carica Documento</h2>
-          <button onClick={onClose}><X size={20} /></button>
+          <button type="button" onClick={onClose}><X size={20} /></button>
         </div>
+
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">File <span className="text-red-500">*</span></label>
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-primary" onClick={() => fileRef.current?.click()}>
-              <input ref={fileRef} type="file" onChange={(e) => setFile(e.target.files[0])} className="hidden" />
+              <input ref={fileRef} type="file" onChange={event => setFile(event.target.files?.[0] || null)} className="hidden" />
               {file ? (
                 <div>
                   <FileText className="mx-auto text-green-600 mb-2" size={32} />
@@ -546,15 +602,12 @@ function UploadModal({ onClose, onSaved }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium mb-1">Titolo <span className="text-red-500">*</span></label>
-              <input required value={form.titolo} onChange={(e) => setForm({...form, titolo: e.target.value})} className="w-full border rounded-lg px-3 py-2" />
+              <input required value={form.titolo} onChange={event => setForm({ ...form, titolo: event.target.value })} className="w-full border rounded-lg px-3 py-2" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Tipo <span className="text-red-500">*</span></label>
-              <select value={form.tipo} onChange={(e) => setForm({...form, tipo: e.target.value})} className="w-full border rounded-lg px-3 py-2">
-                <option>OPL</option>
-                <option>SOP</option>
-                <option>Procedura</option>
-                <option>Istruzione</option>
+              <select value={form.tipo} onChange={event => setForm({ ...form, tipo: event.target.value })} className="w-full border rounded-lg px-3 py-2">
+                <option>OPL</option><option>SOP</option><option>Procedura</option><option>Istruzione</option>
               </select>
             </div>
           </div>
@@ -562,48 +615,55 @@ function UploadModal({ onClose, onSaved }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium mb-1">Categoria</label>
-              <select value={form.categoria} onChange={(e) => setForm({...form, categoria: e.target.value})} className="w-full border rounded-lg px-3 py-2">
+              <select value={form.categoria} onChange={event => setForm({ ...form, categoria: event.target.value })} className="w-full border rounded-lg px-3 py-2">
                 <option value="">-- Seleziona --</option>
-                {CATEGORIE.map(c => <option key={c}>{c}</option>)}
+                {CATEGORIE.map(categoria => <option key={categoria}>{categoria}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Autore</label>
-              <input value={form.autore} onChange={(e) => setForm({...form, autore: e.target.value})} className="w-full border rounded-lg px-3 py-2" />
+              <input value={form.autore} onChange={event => setForm({ ...form, autore: event.target.value })} className="w-full border rounded-lg px-3 py-2 bg-gray-50" />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium mb-1">Reparto</label>
-              <input value={form.reparto} onChange={(e) => setForm({...form, reparto: e.target.value})} className="w-full border rounded-lg px-3 py-2" />
+              <select value={form.reparto} onChange={event => setForm({ ...form, reparto: event.target.value, linea: '', macchina: '' })} className="w-full border rounded-lg px-3 py-2">
+                <option value="">-- Seleziona --</option>
+                {reparti.map(reparto => <option key={reparto._id || reparto.nome} value={reparto.nome}>{reparto.nome}</option>)}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Linea</label>
-              <input value={form.linea} onChange={(e) => setForm({...form, linea: e.target.value})} className="w-full border rounded-lg px-3 py-2" />
+              <select value={form.linea} onChange={event => setForm({ ...form, linea: event.target.value, macchina: '' })} disabled={!form.reparto} className="w-full border rounded-lg px-3 py-2 disabled:bg-gray-100">
+                <option value="">-- Seleziona --</option>
+                {lineeAvailable.filter(linea => linea.attivo !== false).map(linea => <option key={linea.id || linea.nome} value={linea.nome}>{linea.nome}</option>)}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Macchina</label>
-              <input value={form.macchina} onChange={(e) => setForm({...form, macchina: e.target.value})} className="w-full border rounded-lg px-3 py-2" />
+              <select value={form.macchina} onChange={event => setForm({ ...form, macchina: event.target.value })} disabled={!form.linea} className="w-full border rounded-lg px-3 py-2 disabled:bg-gray-100">
+                <option value="">-- Seleziona --</option>
+                {macchineAvailable.filter(macchina => macchina.attivo !== false).map(macchina => <option key={macchina.id || macchina.nome} value={macchina.nome}>{macchina.nome}</option>)}
+              </select>
             </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-1">Descrizione</label>
-            <textarea value={form.descrizione} onChange={(e) => setForm({...form, descrizione: e.target.value})} rows={2} className="w-full border rounded-lg px-3 py-2" />
+            <textarea value={form.descrizione} onChange={event => setForm({ ...form, descrizione: event.target.value })} rows={2} className="w-full border rounded-lg px-3 py-2" />
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-1">Tag (separati da virgola)</label>
-            <input value={form.tag} onChange={(e) => setForm({...form, tag: e.target.value})} className="w-full border rounded-lg px-3 py-2" />
+            <input value={form.tag} onChange={event => setForm({ ...form, tag: event.target.value })} className="w-full border rounded-lg px-3 py-2" />
           </div>
 
-          <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <input type="checkbox" id="compress" checked={compress} onChange={(e) => setCompress(e.target.checked)} className="w-4 h-4" />
-            <label htmlFor="compress" className="text-sm cursor-pointer flex-1">
-              <strong>Comprimi automaticamente</strong> — Riduce dimensioni di immagini, PDF e file Office
-            </label>
-          </div>
+          <label className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200 cursor-pointer">
+            <input type="checkbox" checked={compress} onChange={event => setCompress(event.target.checked)} className="w-4 h-4" />
+            <span className="text-sm"><strong>Comprimi automaticamente</strong> — Riduce dimensioni di immagini, PDF e file Office</span>
+          </label>
 
           <div className="flex justify-end gap-2 pt-4 border-t">
             <button type="button" onClick={onClose} className="px-4 py-2 border rounded-lg">Annulla</button>
