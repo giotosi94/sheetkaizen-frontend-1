@@ -2,11 +2,14 @@ import { useMemo, useRef, useState } from 'react'
 import { AlertTriangle, CheckCircle2, FileSpreadsheet, Upload, X } from 'lucide-react'
 import api from '../../services/api'
 
+const formatMb = bytes => `${((bytes || 0) / 1024 / 1024).toFixed(2)} MB`
+
 export default function OplHistoricalImportModal({ onClose }) {
   const [files, setFiles] = useState([])
   const [items, setItems] = useState([])
   const [analyzing, setAnalyzing] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [nextNumber, setNextNumber] = useState('')
   const fileRef = useRef(null)
 
   const selected = items[selectedIndex]
@@ -17,6 +20,7 @@ export default function OplHistoricalImportModal({ onClose }) {
     setFiles(selectedFiles)
     setItems([])
     setSelectedIndex(0)
+    setNextNumber('')
   }
 
   const analyze = async () => {
@@ -30,6 +34,7 @@ export default function OplHistoricalImportModal({ onClose }) {
         timeout: 300000,
       })
       setItems(response.data.items || [])
+      setNextNumber(response.data.next_number || '')
       setSelectedIndex(0)
     } catch (error) {
       alert('Errore analisi: ' + (error.response?.data?.detail || error.message))
@@ -48,7 +53,7 @@ export default function OplHistoricalImportModal({ onClose }) {
         <div className="bg-amber-700 text-white px-6 py-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold">Importa OPL Storiche</h2>
-            <p className="text-xs text-amber-100 mt-1">POC amministratore · analisi senza salvataggio</p>
+            <p className="text-xs text-amber-100 mt-1">Analisi amministratore senza salvataggio</p>
           </div>
           <button type="button" onClick={onClose} className="p-1.5 rounded hover:bg-amber-600">
             <X size={20} />
@@ -64,7 +69,7 @@ export default function OplHistoricalImportModal({ onClose }) {
               <input ref={fileRef} type="file" accept=".xlsx,.xlsm" multiple onChange={chooseFiles} className="hidden" />
               <Upload className="mx-auto text-gray-400 mb-3" size={44} />
               <p className="font-semibold">Seleziona fino a 5 OPL Excel</p>
-              <p className="text-sm text-gray-500 mt-1">Il sistema individua il foglio OPL, estrae i dati e genera l'anteprima</p>
+              <p className="text-sm text-gray-500 mt-1">Compressione automatica, riconoscimento dati e controllo codifica</p>
             </div>
 
             {files.length > 0 && (
@@ -73,7 +78,7 @@ export default function OplHistoricalImportModal({ onClose }) {
                   <div key={`${file.name}-${file.size}`} className="px-4 py-3 border-b last:border-b-0 flex items-center gap-3">
                     <FileSpreadsheet size={18} className="text-green-600" />
                     <span className="flex-1 text-sm truncate">{file.name}</span>
-                    <span className="text-xs text-gray-400">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                    <span className="text-xs text-gray-400">{formatMb(file.size)}</span>
                   </div>
                 ))}
               </div>
@@ -85,7 +90,7 @@ export default function OplHistoricalImportModal({ onClose }) {
               disabled={!files.length || analyzing}
               className="mt-5 px-6 py-2.5 bg-amber-700 text-white rounded-lg disabled:opacity-50"
             >
-              {analyzing ? 'Analisi in corso...' : `Analizza ${files.length || ''} file`}
+              {analyzing ? 'Compressione e analisi in corso...' : `Analizza ${files.length || ''} file`}
             </button>
           </div>
         ) : (
@@ -102,7 +107,7 @@ export default function OplHistoricalImportModal({ onClose }) {
                   className={`w-full text-left p-4 border-b ${selectedIndex === index ? 'bg-amber-50 border-l-4 border-l-amber-600' : 'hover:bg-white'}`}
                 >
                   <div className="flex gap-2 items-start">
-                    {item.error ? <AlertTriangle size={17} className="text-red-500 mt-0.5" /> : <CheckCircle2 size={17} className="text-green-600 mt-0.5" />}
+                    {item.error || item.duplicate ? <AlertTriangle size={17} className="text-amber-600 mt-0.5" /> : <CheckCircle2 size={17} className="text-green-600 mt-0.5" />}
                     <div className="min-w-0">
                       <div className="text-sm font-medium truncate">{item.numero || item.filename}</div>
                       <div className="text-xs text-gray-500 truncate mt-1">{item.titolo || item.error}</div>
@@ -119,33 +124,46 @@ export default function OplHistoricalImportModal({ onClose }) {
               ) : selected ? (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
                         <h3 className="font-bold text-gray-800">Dati riconosciuti</h3>
                         <p className="text-xs text-gray-500">Foglio: {selected.sheet}</p>
+                        <p className="text-xs text-gray-500 mt-1">Codice storico: {selected.numero_originale || 'Non rilevato'}</p>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${selected.confidence >= 90 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${selected.confidence >= 85 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                         {selected.confidence}%
                       </span>
                     </div>
 
-                    <Field label="Numero OPL" value={selected.numero} onChange={value => updateSelected('numero', value)} />
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                      Prossima codifica disponibile per una nuova OPL: <strong>{nextNumber || 'Calcolo non disponibile'}</strong>
+                    </div>
+
+                    <Field label="Numero OPL di sistema" value={selected.numero} onChange={value => updateSelected('numero', value)} />
                     <Field label="Titolo" value={selected.titolo} onChange={value => updateSelected('titolo', value)} />
                     <div className="grid grid-cols-2 gap-3">
                       <Field label="Reparto" value={selected.reparto} onChange={value => updateSelected('reparto', value)} />
                       <Field label="Linea" value={selected.linea} onChange={value => updateSelected('linea', value)} />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Autore" value={selected.autore} onChange={value => updateSelected('autore', value)} />
-                      <Field label="Data" type="date" value={selected.data_documento} onChange={value => updateSelected('data_documento', value)} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-3 gap-3">
                       <Field label="Area OPL" value={selected.area_opl} onChange={value => updateSelected('area_opl', value)} />
                       <Field label="Tipo OPL" value={selected.tipo_opl} onChange={value => updateSelected('tipo_opl', value)} />
+                      <Field label="Data" type="date" value={selected.data_documento} onChange={value => updateSelected('data_documento', value)} />
                     </div>
-                    <Field label="Problema" value={selected.problema} onChange={value => updateSelected('problema', value)} multiline />
-                    <Field label="Causa" value={selected.causa} onChange={value => updateSelected('causa', value)} multiline />
-                    <Field label="Miglioramento" value={selected.miglioramento} onChange={value => updateSelected('miglioramento', value)} multiline />
+
+                    <div className="bg-gray-50 border rounded-lg p-3 text-sm">
+                      <div className="font-medium text-gray-700">Compressione</div>
+                      <div className="text-gray-600 mt-1">
+                        {formatMb(selected.original_size)} → {formatMb(selected.final_size)}
+                        {selected.compression_applied ? ` · riduzione ${selected.saved_pct}%` : ' · nessuna riduzione'}
+                      </div>
+                    </div>
+
+                    {selected.duplicate && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                        La codifica <strong>{selected.numero}</strong> è già presente. Questo elemento non dovrà essere importato come nuovo documento.
+                      </div>
+                    )}
 
                     {selected.warnings?.length > 0 && (
                       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
@@ -160,7 +178,7 @@ export default function OplHistoricalImportModal({ onClose }) {
                       {selected.preview ? (
                         <img src={selected.preview} alt={selected.titolo || selected.filename} className="max-w-full h-auto shadow bg-white" />
                       ) : (
-                        <div className="text-gray-400 text-sm">Anteprima non disponibile</div>
+                        <div className="text-gray-400 text-sm">Anteprima non disponibile sul server corrente</div>
                       )}
                     </div>
                   </div>
@@ -172,24 +190,18 @@ export default function OplHistoricalImportModal({ onClose }) {
 
         <div className="border-t bg-gray-50 px-6 py-3 flex justify-between items-center">
           <button type="button" onClick={onClose} className="px-4 py-2 border rounded-lg">Chiudi</button>
-          {items.length > 0 && (
-            <div className="text-xs text-gray-500">In questa prima fase i dati non vengono ancora salvati.</div>
-          )}
+          {items.length > 0 && <div className="text-xs text-gray-500">I dati non vengono ancora salvati.</div>}
         </div>
       </div>
     </div>
   )
 }
 
-function Field({ label, value, onChange, multiline = false, type = 'text' }) {
+function Field({ label, value, onChange, type = 'text' }) {
   return (
     <label className="block">
       <span className="block text-xs font-medium text-gray-600 mb-1">{label}</span>
-      {multiline ? (
-        <textarea value={value || ''} onChange={event => onChange(event.target.value)} rows={3} className="w-full border rounded-lg px-3 py-2 text-sm" />
-      ) : (
-        <input type={type} value={value || ''} onChange={event => onChange(event.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
-      )}
+      <input type={type} value={value || ''} onChange={event => onChange(event.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
     </label>
   )
 }
