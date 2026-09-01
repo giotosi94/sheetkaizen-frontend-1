@@ -15,6 +15,7 @@ export default function HomePage() {
   const [kaizens, setKaizens] = useState([])
   const [pillars, setPillars] = useState([])
   const [dashboards, setDashboards] = useState([])
+  const [oplDaLeggere, setOplDaLeggere] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedAP, setSelectedAP] = useState(null)
 
@@ -24,16 +25,27 @@ export default function HomePage() {
     if (!user) return
     setLoading(true)
     try {
-      const [apsRes, kaizensRes, pillarsRes, dashboardsRes] = await Promise.all([
-        api.get('/action-plans/').catch(() => ({ data: [] })),
-        api.get('/kaizens/').catch(() => ({ data: [] })),
-        api.get('/pillars/').catch(() => ({ data: [] })),
-        api.get('/dashboards/').catch(() => ({ data: [] })),
-      ])
-      setActionPlans(apsRes.data || [])
-      setKaizens(kaizensRes.data || [])
-      setPillars(pillarsRes.data || [])
-      setDashboards(dashboardsRes.data || [])
+      const [
+  apsRes,
+  kaizensRes,
+  pillarsRes,
+  dashboardsRes,
+  oplRes,
+] = await Promise.all([
+  api.get('/action-plans/').catch(() => ({ data: [] })),
+  api.get('/kaizens/').catch(() => ({ data: [] })),
+  api.get('/pillars/').catch(() => ({ data: [] })),
+  api.get('/dashboards/').catch(() => ({ data: [] })),
+  api.get('/opl-letture/da-leggere').catch(() => ({
+    data: { items: [] },
+  })),
+])
+
+setActionPlans(apsRes.data || [])
+setKaizens(kaizensRes.data || [])
+setPillars(pillarsRes.data || [])
+setDashboards(dashboardsRes.data || [])
+setOplDaLeggere(oplRes.data?.items || [])
     } catch (err) {
       console.error(err)
     } finally {
@@ -171,6 +183,90 @@ export default function HomePage() {
         <StatCard icon={Clock} label="Oggi" value={apToday.length} color="orange" link="/action-plan" />
         <StatCard icon={Calendar} label="Settimana" value={apWeek.length} color="yellow" link="/action-plan" />
         <StatCard icon={CheckCircle2} label="AP totali" value={targetActionPlans.length} color="green" link="/action-plan" />
+      </div>
+
+            <div className="bg-white rounded-xl shadow overflow-hidden">
+        <div className="bg-yellow-50 border-l-4 border-yellow-500 px-6 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <FileText size={20} className="text-yellow-600" />
+                OPL da prendere visione
+
+                {oplDaLeggere.length > 0 && (
+                  <span className="bg-red-500 text-white min-w-6 h-6 px-1.5 rounded-full text-xs flex items-center justify-center">
+                    {oplDaLeggere.length}
+                  </span>
+                )}
+              </h2>
+
+              <p className="text-xs text-gray-500 mt-1">
+                OPL assegnate che richiedono la conferma di lettura e comprensione.
+              </p>
+            </div>
+
+            {oplDaLeggere.length > 0 && (
+              <Link
+                to="/da-leggere"
+                className="text-primary text-sm font-medium hover:underline flex items-center gap-1"
+              >
+                Vedi tutte
+                <ChevronRight size={14} />
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {oplDaLeggere.length === 0 ? (
+          <div className="px-6 py-5 flex items-center gap-3 text-sm text-gray-500">
+            <CheckCircle2 size={22} className="text-green-500 flex-shrink-0" />
+
+            <span>
+              Nessuna OPL in attesa di conferma.
+            </span>
+          </div>
+        ) : (
+          <div className="divide-y">
+            {oplDaLeggere.slice(0, 4).map(opl => (
+              <Link
+                key={opl._id}
+                to={`/da-leggere?opl=${opl.document_id}`}
+                className="flex items-center gap-4 px-6 py-4 hover:bg-yellow-50 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-lg bg-yellow-100 text-yellow-700 flex items-center justify-center flex-shrink-0">
+                  <FileText size={19} />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold text-primary">
+                      {opl.document_number}
+                    </span>
+
+                    <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs">
+                      v{opl.version}
+                    </span>
+                  </div>
+
+                  <div className="text-sm font-medium text-gray-800 truncate mt-1">
+                    {opl.document_title}
+                  </div>
+
+                  {opl.scadenza && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      Da confermare entro il{' '}
+                      {new Date(opl.scadenza).toLocaleDateString('it-IT')}
+                    </div>
+                  )}
+                </div>
+
+                <span className="text-xs font-medium bg-primary text-white px-3 py-1.5 rounded-lg">
+                  Apri
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* LE MIE ACTION PLAN */}
