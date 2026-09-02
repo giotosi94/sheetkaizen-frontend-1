@@ -204,7 +204,8 @@ export default function DocumentiPage() {
               <th className="p-4">Titolo</th>
               <th className="p-4">Tipo</th>
               <th className="p-4">Categoria</th>
-              <th className="p-4">Reparto/Linea</th>
+              <th className="p-4">Reparto</th>
+              <th className="p-4">Linea</th>
               <th className="p-4">Versione</th>
               <th className="p-4">Stato</th>
               <th className="p-4">Azioni</th>
@@ -212,7 +213,7 @@ export default function DocumentiPage() {
           </thead>
           <tbody>
             {documenti.length === 0 ? (
-              <tr><td colSpan="8" className="text-center text-gray-400 py-8">Nessun documento. Caricane uno!</td></tr>
+              <tr><td colSpan="9" className="text-center text-gray-400 py-8">Nessun documento. Caricane uno!</td></tr>
             ) : (
               documenti.map(doc => {
                 const handleTableDownload = async () => {
@@ -253,10 +254,8 @@ export default function DocumentiPage() {
                     </td>
                     <td className="p-4">{doc.tipo}</td>
                     <td className="p-4">{doc.categoria || '-'}</td>
-                    <td className="p-4 text-xs">
-                      {doc.reparto && <div>{doc.reparto}</div>}
-                      {doc.linea && <div>{doc.linea}</div>}
-                    </td>
+                    <td className="p-4 text-xs">{doc.reparto || '-'}</td>
+                    <td className="p-4 text-xs">{doc.linea || '-'}</td>
                     <td className="p-4">
                       <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">v{doc.versione || 1}</span>
                     </td>
