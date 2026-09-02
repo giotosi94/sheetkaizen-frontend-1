@@ -8,7 +8,7 @@ import { OPL_SYMBOLS, CATEGORIES } from './oplSymbols'
 // EDITOR PRINCIPALE
 // ─────────────────────────────────────────────────────────────
 
-export default function OplImageEditor({ documento, imageBlobUrl, onClose, onSaved }) {
+export default function OplImageEditor({ documento, imageBlobUrl, onClose, onSaved, onSaveAnnotations }) {
   const [image, setImage] = useState(null)
   const [imageSize, setImageSize] = useState({ width: 800, height: 600 })
   const [annotations, setAnnotations] = useState([])
@@ -150,9 +150,13 @@ export default function OplImageEditor({ documento, imageBlobUrl, onClose, onSav
   async function handleSave() {
     setSaving(true)
     try {
-      await api.patch(`/documenti/${documento._id}/opl-annotations`, {
-        annotations,
-      })
+      if (onSaveAnnotations) {
+        await onSaveAnnotations(annotations)
+      } else {
+        await api.patch(`/documenti/${documento._id}/opl-annotations`, {
+          annotations,
+        })
+      }
       onSaved?.()
       onClose?.()
     } catch (err) {
