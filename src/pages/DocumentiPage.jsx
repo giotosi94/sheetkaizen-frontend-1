@@ -5,7 +5,7 @@ import OplImageEditor from '../components/opl/OplImageEditor'
 import { OPL_SYMBOLS } from '../components/opl/oplSymbols'
 import OplPublishModal from '../components/opl/OplPublishModal'
 import OplReadReportModal from '../components/opl/OplReadReportModal'
-import OplHistoricalImportModal from '../components/opl/OplHistoricalImportModal'
+import OplImportModal from '../components/opl/OplImportModal'
 
 const API_BASE = (
   import.meta.env.VITE_API_URL ||
@@ -113,7 +113,7 @@ export default function DocumentiPage() {
               onClick={() => setHistoricalOpen(true)}
               className="bg-amber-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-amber-800 font-medium"
             >
-              <ArchiveRestore size={18} /> Importa OPL Storiche
+              <ArchiveRestore size={18} /> Importa OPL
             </button>
           )}
           <button
@@ -121,12 +121,6 @@ export default function DocumentiPage() {
             className="bg-yellow-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-yellow-600 font-medium"
           >
             <Plus size={18} /> Nuova OPL Nativa
-          </button>
-          <button
-            onClick={() => setBulkOpen(true)}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700"
-          >
-            Bulk Upload
           </button>
           <button
             onClick={() => setUploadOpen(true)}
@@ -315,7 +309,6 @@ export default function DocumentiPage() {
       {uploadOpen && <UploadModal onClose={() => setUploadOpen(false)} onSaved={load} />}
       {editingDoc && <EditModal doc={editingDoc} onClose={() => setEditingDoc(null)} onSaved={load} />}
       {previewDoc && <PreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
-      {bulkOpen && <BulkUploadModal onClose={() => setBulkOpen(false)} onSaved={load} />}
       {oplNativaOpen && <OplNativaModal onClose={() => setOplNativaOpen(false)} onSaved={load} />}
       {publishingDoc && (
         <OplPublishModal
@@ -331,7 +324,10 @@ export default function DocumentiPage() {
         />
       )}
       {historicalOpen && (
-        <OplHistoricalImportModal onClose={() => setHistoricalOpen(false)} />
+        <OplImportModal
+          onClose={() => setHistoricalOpen(false)}
+          onImported={load}
+        />
       )}
     </div>
   )
