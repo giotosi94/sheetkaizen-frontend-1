@@ -27,8 +27,8 @@ const CINQUE_W_UNA_H = {
     titolo: 'CHE COSA?',
     domanda: 'Che cosa non funziona esattamente?',
     guida: [
-      'Qual e l\'oggetto del problema: componente, macchina, materiale, prodotto?',
-      'Che cosa e successo di anomalo: rottura, difetto, fermo, deviazione?',
+      'Qual' è l\'oggetto del problema: componente, macchina, materiale, prodotto?',
+      'Che cosa è successo di anomalo: rottura, difetto, fermo, deviazione?',
       'Quali sono le caratteristiche del componente coinvolto (tipo, funzione, stato)?',
       'Descrivi il fenomeno con i fatti, senza indicare la causa.',
     ],
@@ -40,7 +40,7 @@ const CINQUE_W_UNA_H = {
       'In quale reparto, linea, macchina, posizione precisa?',
       'In quale punto del componente compare il difetto?',
       'Riguarda un prodotto, un formato, un cliente o un fornitore specifico?',
-      'Il problema e localizzato o diffuso su piu punti?',
+      'Il problema è localizzato o diffuso su più punti?',
     ],
   },
   quando: {
@@ -50,7 +50,7 @@ const CINQUE_W_UNA_H = {
       'Sempre, a intermittenza, in modo stagionale?',
       'All\'avvio, a regime, dopo la pulizia, al cambio formato, dopo la manutenzione?',
       'Con quale frequenza: ogni turno, ogni lotto, ogni giorno?',
-      'Da quando e comparso: e nuovo o storico?',
+      'Da quando è comparso: è nuovo o storico?',
     ],
   },
   chi: {
@@ -60,15 +60,14 @@ const CINQUE_W_UNA_H = {
       'Il problema cambia in base alla persona, al turno o alla squadra?',
       'Riguarda una specifica competenza o livello di formazione?',
       'Chi lo rileva e chi ne subisce l\'impatto (operatore, cliente, manutenzione)?',
-      'Individua un tema di competenza o metodo, non una colpa personale.',
     ],
   },
   quale: {
     titolo: 'QUALE?',
     domanda: 'Quale tendenza o ricorrenza si osserva?',
     guida: [
-      'Quale prodotto, formato o processo e piu colpito?',
-      'Il problema aumenta in certe condizioni (velocita, temperatura, materiale)?',
+      'Quale prodotto, formato o processo e più colpito?',
+      'Il problema aumenta in certe condizioni (velocità, temperature, materiali, etc.)?',
       'Esiste una relazione ricorrente o un pattern nel tempo?',
       'Quali dati confermano questa tendenza?',
     ],
@@ -78,9 +77,9 @@ const CINQUE_W_UNA_H = {
     domanda: 'Come si presenta la deviazione rispetto allo standard?',
     guida: [
       'In cosa differisce dalla condizione ideale o dallo standard definito?',
-      'Quanto e grande lo scostamento?',
-      'Misuralo con un dato concreto: KPI, quantita, tempo, percentuale, pezzi.',
-      'Questo valore e la baseline: ti servira per confrontare prima e dopo il miglioramento.',
+      'Quanto è grande lo scostamento?',
+      'Misuralo con un dato concreto: KPI, quantità, tempo, percentuale, pezzi.',
+      'Questo valore è la baseline: ti servirà per confrontare prima e dopo il miglioramento.',
     ],
   },
 }
