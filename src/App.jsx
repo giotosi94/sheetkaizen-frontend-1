@@ -16,6 +16,7 @@ import PillarListPage from './pages/PillarListPage'
 import PillarDetailPage from './pages/PillarDetailPage'
 import AdminPage from './pages/AdminPage'
 import UsersPage from './pages/UsersPage'
+import SegnalazioniPage from './pages/SegnalazioniPage'
 
 
 export default function App() {
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="pillars" element={<PillarListPage />} />
           <Route path="pillars/:id" element={<PillarDetailPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="/segnalazioni" element={<SegnalazioniPage />} />
 
           {/* Gestione Utenti: solo admin */}
           <Route
