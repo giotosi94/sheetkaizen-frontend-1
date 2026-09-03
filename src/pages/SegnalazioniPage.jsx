@@ -142,9 +142,20 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
   const [showApForm, setShowApForm] = useState(false)
   const [editingAp, setEditingAp] = useState(null)
 
+  const [categorieOptions, setCategorieOptions] = useState([])
+
   useEffect(() => {
     api.get('/reparti/').then(res => setReparti(res.data || [])).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    const tipoConfig = form.tipo === 'Ambiente'
+      ? 'categoria_segnalazione_ambiente'
+      : 'categoria_segnalazione_sicurezza'
+    api.get(`/configurazioni/?tipo=${tipoConfig}&attivo=true`)
+      .then(res => setCategorieOptions(res.data || []))
+      .catch(() => setCategorieOptions([]))
+  }, [form.tipo])
 
   const loadActionPlans = async () => {
     try {
@@ -391,7 +402,15 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
             <Section title="GESTIONE (ADMIN)">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Field label="Categoria">
-                  <input value={form.categoria || ''} onChange={e => classifica('categoria', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Es: Rischio meccanico" />
+                  <select value={form.categoria || ''} onChange={e => classifica('categoria', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
+                    <option value="">— Seleziona —</option>
+                    {categorieOptions.map(c => (
+                      <option key={c._id} value={c.label}>{c.icon ? `${c.icon} ` : ''}{c.label}</option>
+                    ))}
+                    {form.categoria && !categorieOptions.some(c => c.label === form.categoria) && (
+                      <option value={form.categoria}>{form.categoria}</option>
+                    )}
+                  </select>
                 </Field>
                 <Field label="Gravita">
                   <select value={form.gravita || ''} onChange={e => classifica('gravita', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
