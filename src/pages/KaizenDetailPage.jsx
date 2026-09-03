@@ -32,7 +32,6 @@ const CINQUE_W_UNA_H = {
       'Quali sono le caratteristiche del componente coinvolto (tipo, funzione, stato)?',
       'Descrivi il fenomeno con i fatti, senza indicare la causa.',
     ],
-    esempio: 'La coclea di dosaggio si blocca lasciando residuo di prodotto sul fondo tramoggia.',
   },
   dove: {
     titolo: 'DOVE?',
@@ -43,7 +42,6 @@ const CINQUE_W_UNA_H = {
       'Riguarda un prodotto, un formato, un cliente o un fornitore specifico?',
       'Il problema e localizzato o diffuso su piu punti?',
     ],
-    esempio: 'Sul lato destro della colatrice Bindler 16, in uscita dallo stampo.',
   },
   quando: {
     titolo: 'QUANDO?',
@@ -54,7 +52,6 @@ const CINQUE_W_UNA_H = {
       'Con quale frequenza: ogni turno, ogni lotto, ogni giorno?',
       'Da quando e comparso: e nuovo o storico?',
     ],
-    esempio: 'Ogni cambio formato, nei primi 20 minuti di riavvio impianto.',
   },
   chi: {
     titolo: 'CHI?',
@@ -65,7 +62,6 @@ const CINQUE_W_UNA_H = {
       'Chi lo rileva e chi ne subisce l\'impatto (operatore, cliente, manutenzione)?',
       'Individua un tema di competenza o metodo, non una colpa personale.',
     ],
-    esempio: 'Si verifica di piu nel turno di notte, dove manca l\'addestramento sul cambio formato.',
   },
   quale: {
     titolo: 'QUALE?',
@@ -76,7 +72,6 @@ const CINQUE_W_UNA_H = {
       'Esiste una relazione ricorrente o un pattern nel tempo?',
       'Quali dati confermano questa tendenza?',
     ],
-    esempio: 'Solo sui formati piccoli e solo con cioccolato al latte, non con il fondente.',
   },
   come: {
     titolo: 'COME?',
@@ -87,7 +82,6 @@ const CINQUE_W_UNA_H = {
       'Misuralo con un dato concreto: KPI, quantita, tempo, percentuale, pezzi.',
       'Questo valore e la baseline: ti servira per confrontare prima e dopo il miglioramento.',
     ],
-    esempio: 'Scarti al cambio formato pari al 4,2%, contro lo standard dell\'1,5%.',
   },
 }
 
