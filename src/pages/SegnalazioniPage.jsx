@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import api from '../services/api'
-import { AlertTriangle, Leaf, Plus, Eye, X, Send, Trash2, Save } from 'lucide-react'
+import { AlertTriangle, Leaf, Plus, Eye, X, Send, Trash2, Save, CheckCircle2, Lock } from 'lucide-react'
+import ActionPlanFormShared from '../components/ActionPlanFormShared'
 
 const TIPI = [
-  { id: 'Sicurezza', label: 'SICUREZZA', Icon: AlertTriangle, color: 'text-red-600' },
-  { id: 'Ambiente', label: 'AMBIENTE', Icon: Leaf, color: 'text-green-600' },
+  { id: 'Sicurezza', label: 'SICUREZZA', Icon: AlertTriangle },
+  { id: 'Ambiente', label: 'AMBIENTE', Icon: Leaf },
 ]
 
 const STATO_BADGE = {
@@ -13,6 +14,8 @@ const STATO_BADGE = {
   'In gestione': 'bg-yellow-100 text-yellow-700',
   Chiuso: 'bg-green-100 text-green-700',
 }
+
+const STATI_CHIUSI = ['Chiuso', 'Done', 'Completato']
 
 export default function SegnalazioniPage() {
   const [items, setItems] = useState([])
@@ -133,10 +136,29 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
   const [form, setForm] = useState(segnalazione)
   const [reparti, setReparti] = useState([])
   const [saving, setSaving] = useState(false)
+  const [chiusuraOpen, setChiusuraOpen] = useState(false)
+  const [apList, setApList] = useState([])
+  const [apOpen, setApOpen] = useState(0)
+  const [showApForm, setShowApForm] = useState(false)
 
   useEffect(() => {
     api.get('/reparti/').then(res => setReparti(res.data || [])).catch(() => {})
   }, [])
+
+  const loadActionPlans = async () => {
+    try {
+      const res = await api.get(`/segnalazioni/${form._id}/action-plans`)
+      setApList(res.data.items || [])
+      setApOpen(res.data.aperti || 0)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  useEffect(() => {
+    if (isAdmin && form.stato !== 'Bozza') loadActionPlans()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form._id, form.stato])
 
   const isChiuso = form.stato === 'Chiuso'
   const canEdit = !isChiuso || isAdmin
@@ -165,7 +187,7 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
       const res = await api.put(`/segnalazioni/${form._id}`, payload)
       setForm(res.data)
       onSaved()
-      alert('Bozza salvata')
+      alert('Salvato')
     } catch (err) {
       alert('Errore: ' + (err.response?.data?.detail || err.message))
     } finally {
@@ -182,7 +204,6 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
       const res = await api.post(`/segnalazioni/${form._id}/termina`)
       setForm(res.data)
       onSaved()
-      alert('Segnalazione inviata')
     } catch (err) {
       alert('Errore: ' + (err.response?.data?.detail || err.message))
     }
@@ -204,9 +225,19 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
     }
   }
 
-  const cambiaStato = async stato => {
+  const setInGestione = async () => {
     try {
-      const res = await api.patch(`/segnalazioni/${form._id}/stato`, { stato })
+      const res = await api.patch(`/segnalazioni/${form._id}/in-gestione`)
+      setForm(res.data)
+      onSaved()
+    } catch (err) {
+      alert('Errore: ' + (err.response?.data?.detail || err.message))
+    }
+  }
+
+  const riapri = async () => {
+    try {
+      const res = await api.patch(`/segnalazioni/${form._id}/riapri`)
       setForm(res.data)
       onSaved()
     } catch (err) {
@@ -254,6 +285,21 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {isChiuso && (
+            <div className="bg-green-50 border-l-4 border-green-500 rounded-r-lg p-3 flex items-center gap-3">
+              <Lock size={20} className="text-green-600" />
+              <div className="flex-1 text-sm">
+                <div className="font-bold text-green-900">Segnalazione chiusa</div>
+                {form.nota_verifica_efficacia && (
+                  <div className="text-green-800 mt-0.5">Verifica efficacia: {form.nota_verifica_efficacia}</div>
+                )}
+              </div>
+              {isAdmin && (
+                <button onClick={riapri} className="text-sm border border-green-600 text-green-700 px-3 py-1.5 rounded-lg hover:bg-green-100">Riapri</button>
+              )}
+            </div>
+          )}
+
           <Section title="DATI RIEPILOGATIVI">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <ReadField label="Codice" value={form.codice} />
@@ -339,24 +385,75 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
               <Field label="Note di gestione">
                 <textarea value={form.note_gestione || ''} onChange={e => classifica('note_gestione', e.target.value)} rows={2} className="w-full border rounded-lg px-3 py-2 text-sm" />
               </Field>
-
-              <div className="flex flex-wrap items-center gap-2 pt-2">
-                <span className="text-xs font-bold text-gray-500 uppercase mr-2">Stato:</span>
-                {['Aperto', 'In gestione', 'Chiuso'].map(s => (
-                  <button key={s} type="button" onClick={() => cambiaStato(s)} className={`px-3 py-1.5 rounded-lg text-sm border ${form.stato === s ? 'bg-primary text-white border-primary' : 'bg-white text-gray-600 hover:border-primary'}`}>
-                    {s}
-                  </button>
-                ))}
-              </div>
-
-              <div className="bg-gray-50 border rounded-lg p-4 mt-2">
-                <div className="text-xs font-bold text-gray-500 uppercase mb-2">Collegamenti</div>
-                <div className="text-sm text-gray-600">
-                  Action Plan: {form.action_plan_numero || 'Nessuno'} · Kaizen: {form.kaizen_numero || 'Nessuno'}
-                </div>
-                <p className="text-xs text-gray-400 mt-2">Il collegamento a Action Plan e Kaizen verra abilitato nel prossimo step.</p>
-              </div>
             </Section>
+          )}
+
+          {/* ACTION PLAN COLLEGATI */}
+          {isAdmin && form.stato !== 'Bozza' && (
+            <Section title="ACTION PLAN COLLEGATI">
+              {apList.length === 0 ? (
+                <div className="text-sm text-gray-400">Nessun Action Plan collegato a questa segnalazione.</div>
+              ) : (
+                <div className="space-y-2">
+                  {apList.map(ap => {
+                    const chiuso = STATI_CHIUSI.includes(ap.stato) || ap.is_cancelled
+                    return (
+                      <div key={ap._id} className="border rounded-lg p-3 flex items-center gap-3">
+                        <span className="font-mono text-xs font-bold text-primary bg-gray-100 px-2 py-1 rounded">{ap.numero}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{ap.titolo}</div>
+                          <div className="text-xs text-gray-500 mt-0.5 flex gap-3 flex-wrap">
+                            {ap.tipo && <span>Tipo: {ap.tipo}</span>}
+                            {ap.responsabile && <span>Resp: {ap.responsabile}</span>}
+                            {ap.data_scadenza && <span>Scad: {String(ap.data_scadenza).slice(0, 10)}</span>}
+                          </div>
+                        </div>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${chiuso ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {ap.is_cancelled ? 'Annullato' : ap.stato}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowApForm(true)}
+                className="mt-1 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-light flex items-center gap-2"
+              >
+                <Plus size={16} /> Crea Action Plan
+              </button>
+              <p className="text-xs text-gray-400 mt-2">
+                Le azioni sono gestite come Action Plan (Tipo {form.tipo}, collegati a questa segnalazione). Le trovi anche nella pagina Action Plan.
+              </p>
+            </Section>
+          )}
+
+          {/* CHIUSURA */}
+          {isAdmin && !isChiuso && form.stato !== 'Bozza' && (
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50 border rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                {form.stato !== 'In gestione' && (
+                  <button onClick={setInGestione} className="px-3 py-1.5 border rounded-lg text-sm hover:bg-white">Metti in gestione</button>
+                )}
+                <div className="text-sm text-gray-600">
+                  {apOpen > 0
+                    ? `${apOpen} Action Plan ancora apert${apOpen === 1 ? 'o' : 'i'}`
+                    : apList.length > 0
+                      ? 'Tutti gli Action Plan sono chiusi'
+                      : 'Nessun Action Plan collegato'}
+                </div>
+              </div>
+              <button
+                onClick={() => setChiusuraOpen(true)}
+                disabled={apOpen > 0}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                title={apOpen > 0 ? 'Chiudi prima tutti gli Action Plan collegati' : ''}
+              >
+                <Lock size={15} /> Chiudi segnalazione
+              </button>
+            </div>
           )}
 
           {canEdit && (
@@ -366,6 +463,77 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
               </button>
             </div>
           )}
+        </div>
+      </div>
+
+      {showApForm && (
+        <ActionPlanFormShared
+          prefilledParent={{
+            parent_type: 'segnalazione',
+            parent_id: form._id,
+            parent_label: form.codice,
+            tipo: form.tipo,
+          }}
+          onClose={() => setShowApForm(false)}
+          onSaved={() => {
+            setShowApForm(false)
+            loadActionPlans()
+          }}
+        />
+      )}
+
+      {chiusuraOpen && (
+        <ChiusuraModal
+          segnalazioneId={form._id}
+          onClose={() => setChiusuraOpen(false)}
+          onClosed={updated => { setForm(updated); onSaved(); setChiusuraOpen(false) }}
+        />
+      )}
+    </div>
+  )
+}
+
+function ChiusuraModal({ segnalazioneId, onClose, onClosed }) {
+  const [nota, setNota] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const chiudi = async () => {
+    if (!nota.trim()) {
+      alert('La nota di verifica efficacia e obbligatoria')
+      return
+    }
+    setBusy(true)
+    try {
+      const res = await api.patch(`/segnalazioni/${segnalazioneId}/chiudi`, { nota_verifica_efficacia: nota })
+      onClosed(res.data)
+    } catch (err) {
+      alert('Errore: ' + (err.response?.data?.detail || err.message))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+        <div className="bg-green-600 text-white px-5 py-4 flex items-center gap-2">
+          <CheckCircle2 size={20} />
+          <h3 className="font-bold">Chiudi segnalazione</h3>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
+            La verifica di efficacia conferma che il rischio e stato realmente eliminato, non solo che le azioni sono completate.
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Nota di verifica efficacia <span className="text-red-500">*</span></label>
+            <textarea value={nota} onChange={e => setNota(e.target.value)} rows={4} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Descrivi come e stata verificata l'efficacia delle azioni e l'eliminazione del rischio." autoFocus />
+          </div>
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <button onClick={onClose} className="px-4 py-2 border rounded-lg text-sm">Annulla</button>
+            <button onClick={chiudi} disabled={busy || !nota.trim()} className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">
+              {busy ? 'Chiusura...' : 'Conferma chiusura'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
