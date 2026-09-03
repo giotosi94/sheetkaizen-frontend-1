@@ -140,6 +140,7 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
   const [apList, setApList] = useState([])
   const [apOpen, setApOpen] = useState(0)
   const [showApForm, setShowApForm] = useState(false)
+  const [editingAp, setEditingAp] = useState(null)
 
   useEffect(() => {
     api.get('/reparti/').then(res => setReparti(res.data || [])).catch(() => {})
@@ -152,6 +153,15 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
       setApOpen(res.data.aperti || 0)
     } catch (err) {
       console.error(err)
+    }
+  }
+
+  const openAp = async apId => {
+    try {
+      const res = await api.get(`/action-plans/${apId}`)
+      setEditingAp(res.data)
+    } catch (err) {
+      alert('Errore apertura Action Plan: ' + (err.response?.data?.detail || err.message))
     }
   }
 
@@ -398,7 +408,12 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
                   {apList.map(ap => {
                     const chiuso = STATI_CHIUSI.includes(ap.stato) || ap.is_cancelled
                     return (
-                      <div key={ap._id} className="border rounded-lg p-3 flex items-center gap-3">
+                      <button
+                        type="button"
+                        key={ap._id}
+                        onClick={() => openAp(ap._id)}
+                        className="w-full text-left border rounded-lg p-3 flex items-center gap-3 hover:border-primary hover:bg-gray-50 transition-colors"
+                      >
                         <span className="font-mono text-xs font-bold text-primary bg-gray-100 px-2 py-1 rounded">{ap.numero}</span>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium truncate">{ap.titolo}</div>
@@ -411,7 +426,7 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${chiuso ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
                           {ap.is_cancelled ? 'Annullato' : ap.stato}
                         </span>
-                      </div>
+                      </button>
                     )
                   })}
                 </div>
@@ -477,6 +492,17 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
           onClose={() => setShowApForm(false)}
           onSaved={() => {
             setShowApForm(false)
+            loadActionPlans()
+          }}
+        />
+      )}
+
+      {editingAp && (
+        <ActionPlanFormShared
+          plan={editingAp}
+          onClose={() => setEditingAp(null)}
+          onSaved={() => {
+            setEditingAp(null)
             loadActionPlans()
           }}
         />
