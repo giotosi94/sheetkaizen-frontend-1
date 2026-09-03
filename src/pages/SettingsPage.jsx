@@ -125,6 +125,27 @@ const SECTIONS = [
       },
     ],
   },
+  {
+    id: 'segnalazioni',
+    label: 'Segnalazioni',
+    color: 'red',
+    tabs: [
+      {
+        id: 'categoria_segnalazione_sicurezza',
+        label: 'Categorie Sicurezza',
+        color: 'red',
+        description: 'Categorie configurabili per le segnalazioni di sicurezza (es. Rischio meccanico, Caduta, Elettrico, DPI)',
+        usedIn: ['Form Segnalazione Sicurezza (campo "Categoria")'],
+      },
+      {
+        id: 'categoria_segnalazione_ambiente',
+        label: 'Categorie Ambiente',
+        color: 'green',
+        description: 'Categorie configurabili per le segnalazioni di ambiente (es. Sversamento, Rifiuti, Emissioni, Rumore)',
+        usedIn: ['Form Segnalazione Ambiente (campo "Categoria")'],
+      },
+    ],
+  },
 ]
 
 const TAB_ACTIVE = 'bg-primary bg-opacity-10 text-primary border-primary'
