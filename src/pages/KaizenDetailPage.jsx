@@ -27,7 +27,7 @@ const CINQUE_W_UNA_H = {
     titolo: 'CHE COSA?',
     domanda: 'Che cosa non funziona esattamente?',
     guida: [
-      'Qual' è l\'oggetto del problema: componente, macchina, materiale, prodotto?',
+      'Qual è l\'oggetto del problema: componente, macchina, materiale, prodotto?',
       'Che cosa è successo di anomalo: rottura, difetto, fermo, deviazione?',
       'Quali sono le caratteristiche del componente coinvolto (tipo, funzione, stato)?',
       'Descrivi il fenomeno con i fatti, senza indicare la causa.',
