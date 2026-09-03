@@ -1,17 +1,4 @@
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import {
-  Home,
-  FileText,
-  ClipboardList,
-  LayoutDashboard,
-  Menu,
-  X,
-  BookOpen,
-  Cog,
-  Columns,
-  Users,
-  LogOut,
-} from 'lucide-react'
+import { Home, FileText, ClipboardList, LayoutDashboard, Menu, X, BookOpen, Cog, Columns, Users, LogOut, AlertTriangle, } from 'lucide-react'
 import { useState } from 'react'
 import { APP_NAME } from '../config/app'
 import { useAuth } from '../context/AuthContext'
@@ -30,6 +17,7 @@ export default function Layout() {
     { to: '/dashboard', icon: LayoutDashboard, label: 'Meetings' },
     { to: '/pillars', icon: Columns, label: 'Pillars' },
     { to: '/documenti', icon: BookOpen, label: 'Documenti' },
+    { to: '/segnalazioni', icon: AlertTriangle, label: 'Segnalazioni' },
     ...(isAdmin ? [{ to: '/users', icon: Users, label: 'Utenti' }] : []),
     { to: '/settings', icon: Cog, label: 'Settings' },
   ]
