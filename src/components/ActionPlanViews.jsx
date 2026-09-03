@@ -83,8 +83,9 @@ function CollegatoBadge({ ap }) {
     pillar: 'bg-indigo-100 text-indigo-700',
     kaizen: 'bg-emerald-100 text-emerald-700',
     dashboard: 'bg-purple-100 text-purple-700',
+    segnalazione: 'bg-red-100 text-red-700',
   }
-  const labels = { pillar: 'Pillar', kaizen: 'Kaizen', dashboard: 'Meeting' }
+  const labels = { pillar: 'Pillar', kaizen: 'Kaizen', dashboard: 'Meeting', segnalazione: 'Segnalazione' }
   return (
     <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${styles[ap.parent_type] || 'bg-gray-100 text-gray-700'}`}>
       {labels[ap.parent_type] || ap.parent_type}
