@@ -4,7 +4,7 @@ import api from '../services/api'
 import {
   Save, ChevronDown, X, History, RefreshCw, Lock, RotateCcw,
   Zap, BarChart3, Trophy, FileText, Activity, User, Target,
-  Factory, MapPin, Cog, Building2, CalendarDays, Check, AlertTriangle,
+  Factory, MapPin, Cog, Building2, CalendarDays, Check, AlertTriangle, Info,
 } from 'lucide-react'
 import ActionPlanFormShared from '../components/ActionPlanFormShared'
 import IshikawaDiagram from '../components/kaizen/IshikawaDiagram'
@@ -21,6 +21,116 @@ import { usePillars } from '../hooks/usePillars'
 import useUnsavedChangesGuard from '../hooks/useUnsavedChangesGuard'
 import { useAuth } from '../context/AuthContext'
 import ParetoChart from '../components/pillar/ParetoChart'
+
+const CINQUE_W_UNA_H = {
+  che_cosa: {
+    titolo: 'CHE COSA?',
+    domanda: 'Che cosa non funziona esattamente?',
+    guida: [
+      'Qual e l\'oggetto del problema: componente, macchina, materiale, prodotto?',
+      'Che cosa e successo di anomalo: rottura, difetto, fermo, deviazione?',
+      'Quali sono le caratteristiche del componente coinvolto (tipo, funzione, stato)?',
+      'Descrivi il fenomeno con i fatti, senza indicare la causa.',
+    ],
+    esempio: 'La coclea di dosaggio si blocca lasciando residuo di prodotto sul fondo tramoggia.',
+  },
+  dove: {
+    titolo: 'DOVE?',
+    domanda: 'Dove si manifesta il problema?',
+    guida: [
+      'In quale reparto, linea, macchina, posizione precisa?',
+      'In quale punto del componente compare il difetto?',
+      'Riguarda un prodotto, un formato, un cliente o un fornitore specifico?',
+      'Il problema e localizzato o diffuso su piu punti?',
+    ],
+    esempio: 'Sul lato destro della colatrice Bindler 16, in uscita dallo stampo.',
+  },
+  quando: {
+    titolo: 'QUANDO?',
+    domanda: 'Quando si verifica il problema?',
+    guida: [
+      'Sempre, a intermittenza, in modo stagionale?',
+      'All\'avvio, a regime, dopo la pulizia, al cambio formato, dopo la manutenzione?',
+      'Con quale frequenza: ogni turno, ogni lotto, ogni giorno?',
+      'Da quando e comparso: e nuovo o storico?',
+    ],
+    esempio: 'Ogni cambio formato, nei primi 20 minuti di riavvio impianto.',
+  },
+  chi: {
+    titolo: 'CHI?',
+    domanda: 'Chi e coinvolto nel problema?',
+    guida: [
+      'Il problema cambia in base alla persona, al turno o alla squadra?',
+      'Riguarda una specifica competenza o livello di formazione?',
+      'Chi lo rileva e chi ne subisce l\'impatto (operatore, cliente, manutenzione)?',
+      'Individua un tema di competenza o metodo, non una colpa personale.',
+    ],
+    esempio: 'Si verifica di piu nel turno di notte, dove manca l\'addestramento sul cambio formato.',
+  },
+  quale: {
+    titolo: 'QUALE?',
+    domanda: 'Quale tendenza o ricorrenza si osserva?',
+    guida: [
+      'Quale prodotto, formato o processo e piu colpito?',
+      'Il problema aumenta in certe condizioni (velocita, temperatura, materiale)?',
+      'Esiste una relazione ricorrente o un pattern nel tempo?',
+      'Quali dati confermano questa tendenza?',
+    ],
+    esempio: 'Solo sui formati piccoli e solo con cioccolato al latte, non con il fondente.',
+  },
+  come: {
+    titolo: 'COME?',
+    domanda: 'Come si presenta la deviazione rispetto allo standard?',
+    guida: [
+      'In cosa differisce dalla condizione ideale o dallo standard definito?',
+      'Quanto e grande lo scostamento?',
+      'Misuralo con un dato concreto: KPI, quantita, tempo, percentuale, pezzi.',
+      'Questo valore e la baseline: ti servira per confrontare prima e dopo il miglioramento.',
+    ],
+    esempio: 'Scarti al cambio formato pari al 4,2%, contro lo standard dell\'1,5%.',
+  },
+}
+
+function InfoPopover({ info }) {
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    const onClick = (e) => {
+      if (!e.target.closest('.info-popover-wrap')) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [open])
+
+  if (!info) return null
+
+  return (
+    <span className="relative info-popover-wrap inline-flex">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="text-gray-400 hover:text-primary transition-colors"
+        title="Come si compila"
+      >
+        <Info size={15} />
+      </button>
+      {open && (
+        <div className="absolute z-50 left-5 top-0 w-72 bg-white border border-gray-200 rounded-lg shadow-xl p-3 text-left normal-case">
+          <div className="font-bold text-sm text-gray-800">{info.domanda}</div>
+          <ul className="mt-2 space-y-1 list-disc list-inside text-xs text-gray-600">
+            {info.guida.map((g, i) => <li key={i}>{g}</li>)}
+          </ul>
+          {info.esempio && (
+            <div className="mt-2 pt-2 border-t text-xs text-gray-500 italic">
+              Esempio: {info.esempio}
+            </div>
+          )}
+        </div>
+      )}
+    </span>
+  )
+}
 
 const LIVELLI = ['Quick', 'Standard', 'Major']
 
@@ -923,7 +1033,10 @@ export default function KaizenDetailPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-3">
               {['che_cosa', 'dove', 'quando', 'chi', 'quale', 'come'].map(field => (
                 <div key={field}>
-                  <label className="block text-sm font-bold text-gray-600 uppercase mb-1">{field.replace('_', ' ')}?</label>
+                  <label className="flex items-center gap-1.5 text-sm font-bold text-gray-600 uppercase mb-1">
+                    {field.replace('_', ' ')}?
+                    <InfoPopover info={CINQUE_W_UNA_H[field]} />
+                  </label>
                   <textarea value={kaizen.passo1_definizione?.[field] || ''}
                     onChange={(e) => updateField('passo1_definizione', field, e.target.value)}
                     className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} />
