@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { AlertTriangle, Leaf, Plus, Eye, X, Send, Trash2, Save, CheckCircle2, Lock } from 'lucide-react'
 import ActionPlanFormShared from '../components/ActionPlanFormShared'
@@ -21,6 +22,7 @@ export default function SegnalazioniPage() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [detail, setDetail] = useState(null)
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const savedUser = (() => {
     try { return JSON.parse(localStorage.getItem('user') || '{}') } catch { return {} }
@@ -41,6 +43,15 @@ export default function SegnalazioniPage() {
   }
 
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    const openId = searchParams.get('open')
+    if (!openId) return
+    api.get(`/segnalazioni/${openId}`)
+      .then(res => setDetail(res.data))
+      .catch(err => console.error('Errore apertura segnalazione da notifica:', err))
+      .finally(() => setSearchParams({}, { replace: true }))
+  }, [searchParams, setSearchParams])
 
   const createNew = async tipo => {
     try {
