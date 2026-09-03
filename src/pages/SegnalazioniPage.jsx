@@ -521,6 +521,9 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
             parent_id: form._id,
             parent_label: form.codice,
             tipo: form.tipo,
+            reparto: form.reparto || '',
+            linea: form.linea || '',
+            macchina: form.macchina || '',
           }}
           onClose={() => setShowApForm(false)}
           onSaved={() => {
@@ -529,6 +532,7 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
           }}
         />
       )}
+
 
       {editingAp && (
         <ActionPlanFormShared
