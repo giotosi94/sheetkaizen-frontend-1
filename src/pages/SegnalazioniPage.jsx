@@ -211,9 +211,23 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
       return
     }
     try {
+      await api.put(`/segnalazioni/${form._id}`, {
+        tipo: form.tipo,
+        data_evento: form.data_evento,
+        ora_evento: form.ora_evento,
+        reparto: form.reparto,
+        linea: form.linea,
+        macchina: form.macchina,
+        descrizione: form.descrizione,
+        persona_coinvolta: form.persona_coinvolta,
+        persone_presenti: form.persone_presenti,
+        azioni_immediate: form.azioni_immediate,
+        azioni_suggerite: form.azioni_suggerite,
+      })
       const res = await api.post(`/segnalazioni/${form._id}/termina`)
       setForm(res.data)
       onSaved()
+      alert('Segnalazione inviata')
     } catch (err) {
       alert('Errore: ' + (err.response?.data?.detail || err.message))
     }
