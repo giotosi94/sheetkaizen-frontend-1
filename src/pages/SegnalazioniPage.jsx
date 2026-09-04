@@ -53,13 +53,15 @@ export default function SegnalazioniPage() {
       .finally(() => setSearchParams({}, { replace: true }))
   }, [searchParams, setSearchParams])
 
-  const createNew = async tipo => {
-    try {
-      const res = await api.post('/segnalazioni/', { tipo })
-      setDetail(res.data)
-    } catch (err) {
-      alert('Errore: ' + (err.response?.data?.detail || err.message))
-    }
+  const createNew = tipo => {
+    setDetail({
+      _id: null,
+      tipo,
+      stato: 'Bozza',
+      codice: '',
+      segnalatore_nome: '',
+      descrizione: '',
+    })
   }
 
   const byTipo = useMemo(() => {
@@ -216,7 +218,12 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
         azioni_immediate: form.azioni_immediate,
         azioni_suggerite: form.azioni_suggerite,
       }
-      const res = await api.put(`/segnalazioni/${form._id}`, payload)
+      let id = form._id
+      if (!id) {
+        const created = await api.post('/segnalazioni/', { tipo: form.tipo })
+        id = created.data._id
+      }
+      const res = await api.put(`/segnalazioni/${id}`, payload)
       setForm(res.data)
       onSaved()
       alert('Salvato')
@@ -233,7 +240,12 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
       return
     }
     try {
-      await api.put(`/segnalazioni/${form._id}`, {
+      let id = form._id
+      if (!id) {
+        const created = await api.post('/segnalazioni/', { tipo: form.tipo })
+        id = created.data._id
+      }
+      await api.put(`/segnalazioni/${id}`, {
         tipo: form.tipo,
         data_evento: form.data_evento,
         ora_evento: form.ora_evento,
@@ -246,7 +258,7 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
         azioni_immediate: form.azioni_immediate,
         azioni_suggerite: form.azioni_suggerite,
       })
-      const res = await api.post(`/segnalazioni/${form._id}/termina`)
+      const res = await api.post(`/segnalazioni/${id}/termina`)
       setForm(res.data)
       onSaved()
       alert('Segnalazione inviata')
@@ -308,7 +320,7 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
         <div className="bg-gray-700 text-white px-6 py-4 flex items-center justify-between">
           <div>
             <div className="text-xs text-gray-300">Segnalazione di {form.tipo}</div>
-            <h2 className="text-lg font-bold">Codice {form.codice}</h2>
+            <h2 className="text-lg font-bold">{form.codice ? `Codice ${form.codice}` : 'Nuova segnalazione'}</h2>
           </div>
           <div className="flex items-center gap-2">
             {canEdit && form.stato === 'Bozza' && (
