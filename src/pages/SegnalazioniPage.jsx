@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { AlertTriangle, Leaf, Plus, Eye, X, Send, Trash2, Save, CheckCircle2, Lock } from 'lucide-react'
 import ActionPlanFormShared from '../components/ActionPlanFormShared'
+import ImageUpload from '../components/ImageUpload'
+import DocumentUpload from '../components/DocumentUpload'
 
 const TIPI = [
   { id: 'Sicurezza', label: 'SICUREZZA', Icon: AlertTriangle },
@@ -225,6 +227,8 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
     persone_presenti: form.persone_presenti,
     azioni_immediate: form.azioni_immediate,
     azioni_suggerite: form.azioni_suggerite,
+    immagini: form.immagini || [],
+    allegati: form.allegati || [],
   })
 
   const save = async () => {
@@ -433,6 +437,51 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
                 <textarea disabled={!canEdit} value={form.azioni_suggerite || ''} onChange={e => set('azioni_suggerite', e.target.value)} rows={2} className="w-full border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100" />
               </Field>
             </div>
+          </Section>
+
+          <Section title="FOTO E ALLEGATI">
+            {canEdit ? (
+              <>
+                <ImageUpload
+                  images={form.immagini || []}
+                  onChange={immagini => set('immagini', immagini)}
+                  label="Foto ed evidenze"
+                  maxImages={10}
+                />
+                <div className="pt-4 border-t">
+                  <DocumentUpload
+                    documents={form.allegati || []}
+                    onChange={allegati => set('allegati', allegati)}
+                  />
+                </div>
+                <p className="text-xs text-gray-400">
+                  Dopo aver caricato foto o documenti, premi Salva per confermarli sulla segnalazione.
+                </p>
+              </>
+            ) : (
+              <div className="space-y-3">
+                {(form.immagini || []).length === 0 && (form.allegati || []).length === 0 ? (
+                  <div className="text-sm text-gray-400">Nessuna foto o allegato.</div>
+                ) : (
+                  <>
+                    {(form.immagini || []).length > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {(form.immagini || []).map((url, i) => (
+                          <a key={i} href={url} target="_blank" rel="noreferrer" className="block rounded-lg border overflow-hidden">
+                            <img src={url} alt={`Foto ${i + 1}`} className="w-full h-28 object-cover" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                    {(form.allegati || []).map((doc, i) => (
+                      <a key={i} href={doc.url} target="_blank" rel="noreferrer" className="block text-sm text-blue-600 hover:underline">
+                        {doc.filename || `Documento ${i + 1}`}
+                      </a>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
           </Section>
 
           {isAdmin && form._id && (
