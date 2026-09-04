@@ -64,6 +64,18 @@ export default function SegnalazioniPage() {
     })
   }
 
+  const handleClose = async current => {
+    if (current && current._id && current.stato === 'Bozza' && !current.descrizione?.trim()) {
+      try {
+        await api.delete(`/segnalazioni/${current._id}`)
+      } catch (err) {
+        console.error('Bozza vuota non eliminata:', err)
+      }
+    }
+    setDetail(null)
+    load()
+  }
+
   const byTipo = useMemo(() => {
     const map = { Sicurezza: [], Ambiente: [] }
     items.forEach(item => {
@@ -137,7 +149,7 @@ export default function SegnalazioniPage() {
         <SegnalazioneDetail
           segnalazione={detail}
           isAdmin={isAdmin}
-          onClose={() => setDetail(null)}
+          onClose={handleClose}
           onSaved={() => { load() }}
         />
       )}
@@ -154,7 +166,6 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
   const [apOpen, setApOpen] = useState(0)
   const [showApForm, setShowApForm] = useState(false)
   const [editingAp, setEditingAp] = useState(null)
-
   const [categorieOptions, setCategorieOptions] = useState([])
 
   useEffect(() => {
@@ -190,7 +201,7 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
   }
 
   useEffect(() => {
-    if (isAdmin && form.stato !== 'Bozza') loadActionPlans()
+    if (isAdmin && form._id && form.stato !== 'Bozza') loadActionPlans()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form._id, form.stato])
 
@@ -202,28 +213,34 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
 
   const set = (field, value) => setForm(f => ({ ...f, [field]: value }))
 
+  const buildPayload = () => ({
+    tipo: form.tipo,
+    data_evento: form.data_evento,
+    ora_evento: form.ora_evento,
+    reparto: form.reparto,
+    linea: form.linea,
+    macchina: form.macchina,
+    descrizione: form.descrizione,
+    persona_coinvolta: form.persona_coinvolta,
+    persone_presenti: form.persone_presenti,
+    azioni_immediate: form.azioni_immediate,
+    azioni_suggerite: form.azioni_suggerite,
+  })
+
   const save = async () => {
+    if (saving) return
+    if (!form._id && !form.descrizione?.trim()) {
+      alert('Inserisci almeno la descrizione dell evento prima di salvare')
+      return
+    }
     setSaving(true)
     try {
-      const payload = {
-        tipo: form.tipo,
-        data_evento: form.data_evento,
-        ora_evento: form.ora_evento,
-        reparto: form.reparto,
-        linea: form.linea,
-        macchina: form.macchina,
-        descrizione: form.descrizione,
-        persona_coinvolta: form.persona_coinvolta,
-        persone_presenti: form.persone_presenti,
-        azioni_immediate: form.azioni_immediate,
-        azioni_suggerite: form.azioni_suggerite,
-      }
       let id = form._id
       if (!id) {
         const created = await api.post('/segnalazioni/', { tipo: form.tipo })
         id = created.data._id
       }
-      const res = await api.put(`/segnalazioni/${id}`, payload)
+      const res = await api.put(`/segnalazioni/${id}`, buildPayload())
       setForm(res.data)
       onSaved()
       alert('Salvato')
@@ -235,41 +252,34 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
   }
 
   const termina = async () => {
+    if (saving) return
     if (!form.descrizione?.trim()) {
       alert('La descrizione dell evento e obbligatoria')
       return
     }
+    setSaving(true)
     try {
       let id = form._id
       if (!id) {
         const created = await api.post('/segnalazioni/', { tipo: form.tipo })
         id = created.data._id
       }
-      await api.put(`/segnalazioni/${id}`, {
-        tipo: form.tipo,
-        data_evento: form.data_evento,
-        ora_evento: form.ora_evento,
-        reparto: form.reparto,
-        linea: form.linea,
-        macchina: form.macchina,
-        descrizione: form.descrizione,
-        persona_coinvolta: form.persona_coinvolta,
-        persone_presenti: form.persone_presenti,
-        azioni_immediate: form.azioni_immediate,
-        azioni_suggerite: form.azioni_suggerite,
-      })
+      await api.put(`/segnalazioni/${id}`, buildPayload())
       const res = await api.post(`/segnalazioni/${id}/termina`)
       setForm(res.data)
       onSaved()
       alert('Segnalazione inviata')
     } catch (err) {
       alert('Errore: ' + (err.response?.data?.detail || err.message))
+    } finally {
+      setSaving(false)
     }
   }
 
   const classifica = async (field, value) => {
     const next = { ...form, [field]: value }
     setForm(next)
+    if (!form._id) return
     try {
       await api.patch(`/segnalazioni/${form._id}/classificazione`, {
         categoria: next.categoria,
@@ -304,11 +314,15 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
   }
 
   const elimina = async () => {
+    if (!form._id) {
+      onClose(null)
+      return
+    }
     if (!confirm('Eliminare questa segnalazione?')) return
     try {
       await api.delete(`/segnalazioni/${form._id}`)
       onSaved()
-      onClose()
+      onClose(null)
     } catch (err) {
       alert('Errore: ' + (err.response?.data?.detail || err.message))
     }
@@ -325,20 +339,20 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
           <div className="flex items-center gap-2">
             {canEdit && form.stato === 'Bozza' && (
               <>
-                <button onClick={save} disabled={saving} className="bg-white text-gray-800 px-3 py-1.5 rounded text-sm flex items-center gap-1 hover:bg-gray-100">
+                <button onClick={save} disabled={saving} className="bg-white text-gray-800 px-3 py-1.5 rounded text-sm flex items-center gap-1 hover:bg-gray-100 disabled:opacity-50">
                   <Save size={15} /> Salva bozza
                 </button>
-                <button onClick={termina} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1 hover:bg-blue-700">
+                <button onClick={termina} disabled={saving} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1 hover:bg-blue-700 disabled:opacity-50">
                   <Send size={15} /> Termina inserimento
                 </button>
               </>
             )}
             {canEdit && form.stato !== 'Bozza' && (
-              <button onClick={save} disabled={saving} className="bg-white text-gray-800 px-3 py-1.5 rounded text-sm flex items-center gap-1 hover:bg-gray-100">
+              <button onClick={save} disabled={saving} className="bg-white text-gray-800 px-3 py-1.5 rounded text-sm flex items-center gap-1 hover:bg-gray-100 disabled:opacity-50">
                 <Save size={15} /> Salva
               </button>
             )}
-            <button onClick={onClose} className="p-1.5 rounded hover:bg-gray-600"><X size={20} /></button>
+            <button onClick={() => onClose(form)} className="p-1.5 rounded hover:bg-gray-600"><X size={20} /></button>
           </div>
         </div>
 
@@ -421,7 +435,7 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
             </div>
           </Section>
 
-          {isAdmin && (
+          {isAdmin && form._id && (
             <Section title="GESTIONE (ADMIN)">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Field label="Categoria">
@@ -454,8 +468,7 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
             </Section>
           )}
 
-          {/* ACTION PLAN COLLEGATI */}
-          {isAdmin && form.stato !== 'Bozza' && (
+          {isAdmin && form._id && form.stato !== 'Bozza' && (
             <Section title="ACTION PLAN COLLEGATI">
               {apList.length === 0 ? (
                 <div className="text-sm text-gray-400">Nessun Action Plan collegato a questa segnalazione.</div>
@@ -501,8 +514,7 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
             </Section>
           )}
 
-          {/* CHIUSURA */}
-          {isAdmin && !isChiuso && form.stato !== 'Bozza' && (
+          {isAdmin && !isChiuso && form._id && form.stato !== 'Bozza' && (
             <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50 border rounded-lg p-4">
               <div className="flex items-center gap-3">
                 {form.stato !== 'In gestione' && (
@@ -527,7 +539,7 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
             </div>
           )}
 
-          {canEdit && (
+          {canEdit && form._id && (
             <div className="flex justify-end">
               <button onClick={elimina} className="text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
                 <Trash2 size={15} /> Elimina segnalazione
@@ -555,7 +567,6 @@ function SegnalazioneDetail({ segnalazione, isAdmin, onClose, onSaved }) {
           }}
         />
       )}
-
 
       {editingAp && (
         <ActionPlanFormShared
