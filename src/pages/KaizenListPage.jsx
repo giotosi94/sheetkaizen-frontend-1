@@ -32,14 +32,14 @@ const INITIAL_KAIZEN = {
 
 const INITIAL_FILTERS = {
   search: '',
-  tipo: '',
-  stato: '',
-  pillar_id: '',
-  categoria_perdita: '',
-  reparto: '',
-  linea: '',
-  macchina: '',
-  dashboard_id: '',
+  tipo: [],
+  stato: [],
+  pillar_id: [],
+  categoria_perdita: [],
+  reparto: [],
+  linea: [],
+  macchina: [],
+  dashboard_id: [],
   creatore_id: null,
   creatore_nome: '',
   team_leader_id: null,
@@ -99,6 +99,49 @@ function FilterChip({ active, onClick, label }) {
   )
 }
 
+function toggleMultiValue(values, value) {
+  return values.includes(value) ? values.filter(item => item !== value) : [...values, value]
+}
+
+function SearchableMultiSelect({ title, field, options, filters, setFilters, disabled = false, disabledText = '' }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const selected = filters[field] || []
+  const filteredOptions = query.trim()
+    ? options.filter(option => option.label.toLowerCase().includes(query.trim().toLowerCase()))
+    : options
+  const selectedLabels = options.filter(option => selected.includes(option.value)).map(option => option.label)
+
+  function clearSelection(event) {
+    event.stopPropagation()
+    setFilters({ ...filters, [field]: [] })
+  }
+
+  return (
+    <div className="relative">
+      <div className="text-xs font-semibold text-gray-600 uppercase mb-1.5">{title}</div>
+      <button type="button" disabled={disabled} onClick={() => setOpen(value => !value)} className="w-full min-h-10 px-3 py-2 border rounded-lg bg-white text-left text-sm flex items-center justify-between gap-2 disabled:bg-gray-100 disabled:text-gray-400">
+        <span className="truncate">{disabled ? disabledText : selectedLabels.length === 0 ? `Tutti: ${title}` : selectedLabels.length <= 2 ? selectedLabels.join(', ') : `${selectedLabels.length} selezionati`}</span>
+        <span className="flex items-center gap-1 flex-shrink-0">
+          {selected.length > 0 && <span role="button" tabIndex={0} onClick={clearSelection} className="text-gray-400 hover:text-gray-700 px-1" title="Azzera selezione">×</span>}
+          <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+        </span>
+      </button>
+      {open && !disabled && (
+        <div className="absolute z-40 mt-1 w-full min-w-64 bg-white border rounded-lg shadow-xl overflow-hidden">
+          <div className="p-2 border-b relative"><Search size={14} className="absolute left-4 top-4 text-gray-400" /><input type="text" value={query} onChange={event => setQuery(event.target.value)} placeholder={`Cerca ${title.toLowerCase()}...`} className="w-full pl-8 pr-3 py-2 border rounded-md text-sm" autoFocus /></div>
+          <div className="max-h-56 overflow-y-auto p-1">
+            {filteredOptions.length === 0 ? <div className="px-3 py-3 text-sm text-gray-400">Nessun risultato</div> : filteredOptions.map(option => (
+              <label key={option.value} className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-50 cursor-pointer text-sm"><input type="checkbox" checked={selected.includes(option.value)} onChange={() => setFilters({ ...filters, [field]: toggleMultiValue(selected, option.value) })} className="rounded border-gray-300 text-primary focus:ring-primary" /><span className="truncate">{option.label}</span></label>
+            ))}
+          </div>
+          {selected.length > 0 && <div className="border-t p-2 flex justify-between items-center text-xs"><span className="text-gray-500">{selected.length} selezionati</span><button type="button" onClick={clearSelection} className="text-primary hover:underline">Azzera</button></div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function KaizenListPage() {
   const navigate = useNavigate()
   const [kaizens, setKaizens] = useState([])
@@ -134,17 +177,18 @@ export default function KaizenListPage() {
     return linea?.macchine?.filter(m => m.attivo !== false) || []
   }, [newKaizen.linea, lineeFormDisponibili])
 
-  // Linee/Macchine per FILTRI (in base al reparto del filtro)
+  const repartiFilterDisponibili = useMemo(() => reparti.filter(r => r.attivo !== false), [reparti])
   const lineeFilterDisponibili = useMemo(() => {
-    if (!filters.reparto) return []
-    const rep = reparti.find(r => r.nome === filters.reparto)
-    return rep?.linee?.filter(l => l.attivo !== false) || []
-  }, [filters.reparto, reparti])
-
+    return repartiFilterDisponibili
+      .filter(r => filters.reparto.length === 0 || filters.reparto.includes(r.nome))
+      .flatMap(r => r.linee || [])
+      .filter((linea, index, array) => linea.attivo !== false && array.findIndex(item => item.nome === linea.nome) === index)
+  }, [filters.reparto, repartiFilterDisponibili])
   const macchineFilterDisponibili = useMemo(() => {
-    if (!filters.linea) return []
-    const linea = lineeFilterDisponibili.find(l => l.nome === filters.linea)
-    return linea?.macchine?.filter(m => m.attivo !== false) || []
+    return lineeFilterDisponibili
+      .filter(l => filters.linea.length === 0 || filters.linea.includes(l.nome))
+      .flatMap(l => l.macchine || [])
+      .filter((macchina, index, array) => macchina.attivo !== false && array.findIndex(item => item.nome === macchina.nome) === index)
   }, [filters.linea, lineeFilterDisponibili])
 
   function handleRepartoChange(nuovoReparto) {
@@ -280,6 +324,7 @@ export default function KaizenListPage() {
     return Object.entries(filters).filter(([k, v]) => {
       if (k === 'search') return false
       if (k === 'view') return v !== 'all'
+      if (Array.isArray(v)) return v.length > 0
       if (typeof v === 'boolean') return v === true
       return v !== '' && v !== null && v !== undefined
     }).length
@@ -299,26 +344,26 @@ export default function KaizenListPage() {
 
       // Tipo
       const tipoNormalizzato = k.livello || (k.tipo?.includes('Major') ? 'Major' : k.tipo?.includes('Standard') ? 'Standard' : 'Quick')
-      const matchTipo = !filters.tipo || tipoNormalizzato === filters.tipo
+      const matchTipo = filters.tipo.length === 0 || filters.tipo.includes(tipoNormalizzato)
 
       // Stato
-      const matchStato = !filters.stato || k.stato === filters.stato
+      const matchStato = filters.stato.length === 0 || filters.stato.includes(k.stato)
 
       // Pillar
-      const matchPillar = !filters.pillar_id || k.pillar_id === filters.pillar_id
+      const matchPillar = filters.pillar_id.length === 0 || filters.pillar_id.includes(k.pillar_id)
 
       // Categoria perdita
-      const matchCategoria = !filters.categoria_perdita ||
-        k.tipo_perdita === filters.categoria_perdita ||
-        k.categoria === filters.categoria_perdita
+      const matchCategoria = filters.categoria_perdita.length === 0 ||
+        filters.categoria_perdita.includes(k.tipo_perdita) ||
+        filters.categoria_perdita.includes(k.categoria)
 
       // Reparto / Linea / Macchina
-      const matchReparto = !filters.reparto || k.reparto === filters.reparto
-      const matchLinea = !filters.linea || k.linea === filters.linea
-      const matchMacchina = !filters.macchina || k.macchina === filters.macchina
+      const matchReparto = filters.reparto.length === 0 || filters.reparto.includes(k.reparto)
+      const matchLinea = filters.linea.length === 0 || filters.linea.includes(k.linea)
+      const matchMacchina = filters.macchina.length === 0 || filters.macchina.includes(k.macchina)
 
       // Dashboard (Meeting)
-      const matchDashboard = !filters.dashboard_id || k.dashboard_id === filters.dashboard_id
+      const matchDashboard = filters.dashboard_id.length === 0 || filters.dashboard_id.includes(k.dashboard_id)
 
       // Creatore
       const matchCreatore = !filters.creatore_id || k.creatore_id === filters.creatore_id
@@ -437,128 +482,26 @@ export default function KaizenListPage() {
               </div>
             </div>
 
-            {/* Classificazione */}
-            <div>
-              <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Classificazione</label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <select value={filters.tipo} onChange={(e) => setFilters({ ...filters, tipo: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
-                  <option value="">Tutte le tipologie</option>
-                  {TIPOLOGIE_KAIZEN.map(t => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-                <select value={filters.stato} onChange={(e) => setFilters({ ...filters, stato: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
-                  <option value="">Tutti gli stati</option>
-                  <option value="Aperto">Aperto</option>
-                  <option value="In Corso">In Corso</option>
-                  <option value="Chiuso">Chiuso</option>
-                </select>
-                <select value={filters.pillar_id} onChange={(e) => setFilters({ ...filters, pillar_id: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
-                  <option value="">Tutti i pillar</option>
-                  {pillars.map(p => (
-                    <option key={p._id} value={p._id}>{p.sigla} — {p.label}</option>
-                  ))}
-                </select>
-                <select value={filters.categoria_perdita} onChange={(e) => setFilters({ ...filters, categoria_perdita: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
-                  <option value="">Tutte categorie perdita</option>
-                  {(configs.categorie_perdita || []).map(c => (
-                    <option key={c._id} value={c.label}>{c.label}</option>
-                  ))}
-                </select>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+              <SearchableMultiSelect title="Tipologia" field="tipo" options={TIPOLOGIE_KAIZEN.map(item => ({ value: item.value, label: item.label }))} filters={filters} setFilters={setFilters} />
+              <SearchableMultiSelect title="Stato" field="stato" options={[{ value: 'Aperto', label: 'Aperto' }, { value: 'In Corso', label: 'In Corso' }, { value: 'Chiuso', label: 'Chiuso' }]} filters={filters} setFilters={setFilters} />
+              <SearchableMultiSelect title="Pillar" field="pillar_id" options={pillars.map(item => ({ value: item._id, label: `${item.sigla} - ${item.label}` }))} filters={filters} setFilters={setFilters} />
+              <SearchableMultiSelect title="Categoria perdita" field="categoria_perdita" options={(configs.categorie_perdita || []).map(item => ({ value: item.label, label: item.label }))} filters={filters} setFilters={setFilters} />
             </div>
-
-            {/* Struttura aziendale */}
             <div>
               <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Struttura aziendale</label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                <select
-                  value={filters.reparto}
-                  onChange={(e) => setFilters({ ...filters, reparto: e.target.value, linea: '', macchina: '' })}
-                  className="border rounded-lg px-3 py-2 text-sm"
-                >
-                  <option value="">Tutti i reparti</option>
-                  {reparti.filter(r => r.attivo !== false).map(r => (
-                    <option key={r._id} value={r.nome}>{r.nome}{r.codice ? ` [${r.codice}]` : ''}</option>
-                  ))}
-                </select>
-                <select
-                  value={filters.linea}
-                  onChange={(e) => setFilters({ ...filters, linea: e.target.value, macchina: '' })}
-                  disabled={!filters.reparto}
-                  className="border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100"
-                >
-                  <option value="">{filters.reparto ? 'Tutte le linee' : '— prima il reparto —'}</option>
-                  {lineeFilterDisponibili.map(l => (
-                    <option key={l.id} value={l.nome}>{l.nome}{l.codice ? ` [${l.codice}]` : ''}</option>
-                  ))}
-                </select>
-                <select
-                  value={filters.macchina}
-                  onChange={(e) => setFilters({ ...filters, macchina: e.target.value })}
-                  disabled={!filters.linea}
-                  className="border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100"
-                >
-                  <option value="">{filters.linea ? 'Tutte le macchine' : '— prima la linea —'}</option>
-                  {macchineFilterDisponibili.map(m => (
-                    <option key={m.id} value={m.nome}>{m.nome}{m.codice ? ` [${m.codice}]` : ''}</option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <SearchableMultiSelect title="Reparto" field="reparto" options={repartiFilterDisponibili.map(item => ({ value: item.nome, label: item.nome }))} filters={filters} setFilters={setFilters} />
+                <SearchableMultiSelect title="Linea" field="linea" options={lineeFilterDisponibili.map(item => ({ value: item.nome, label: item.nome }))} filters={filters} setFilters={setFilters} disabled={filters.reparto.length === 0} disabledText="Seleziona prima un reparto" />
+                <SearchableMultiSelect title="Macchina" field="macchina" options={macchineFilterDisponibili.map(item => ({ value: item.nome, label: item.nome }))} filters={filters} setFilters={setFilters} disabled={filters.linea.length === 0} disabledText="Seleziona prima una linea" />
               </div>
             </div>
-
-            {/* Contesto */}
             <div>
               <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Contesto</label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                <select
-                  value={filters.dashboard_id}
-                  onChange={(e) => setFilters({ ...filters, dashboard_id: e.target.value })}
-                  className="border rounded-lg px-3 py-2 text-sm"
-                >
-                  <option value="">Tutti i meeting</option>
-                  {dashboards.map(d => (
-                    <option key={d._id} value={d._id}>
-                      {d.nome || d.label || d.titolo || 'Meeting'}
-                    </option>
-                  ))}
-                </select>
-                <div>
-                  <UserPicker
-                    value={
-                      filters.creatore_id
-                        ? { id: filters.creatore_id, name: filters.creatore_nome }
-                        : null
-                    }
-                    onChange={(selected) => {
-                      if (selected) {
-                        setFilters({ ...filters, creatore_id: selected.id, creatore_nome: selected.name })
-                      } else {
-                        setFilters({ ...filters, creatore_id: null, creatore_nome: '' })
-                      }
-                    }}
-                    mode="single"
-                    placeholder="Cerca creatore..."
-                  />
-                </div>
-                <div>
-                  <UserPicker
-                    value={
-                      filters.team_leader_id
-                        ? { id: filters.team_leader_id, name: filters.team_leader_nome }
-                        : null
-                    }
-                    onChange={(selected) => {
-                      if (selected) {
-                        setFilters({ ...filters, team_leader_id: selected.id, team_leader_nome: selected.name })
-                      } else {
-                        setFilters({ ...filters, team_leader_id: null, team_leader_nome: '' })
-                      }
-                    }}
-                    mode="single"
-                    placeholder="Cerca team leader..."
-                  />
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <SearchableMultiSelect title="Meeting" field="dashboard_id" options={dashboards.map(item => ({ value: item._id, label: item.nome || item.label || item.titolo || 'Meeting' }))} filters={filters} setFilters={setFilters} />
+                <div><div className="text-xs font-semibold text-gray-600 uppercase mb-1.5">Creatore</div><UserPicker value={filters.creatore_id ? { id: filters.creatore_id, name: filters.creatore_nome } : null} onChange={(selected) => selected ? setFilters({ ...filters, creatore_id: selected.id, creatore_nome: selected.name }) : setFilters({ ...filters, creatore_id: null, creatore_nome: '' })} mode="single" placeholder="Cerca creatore..." /></div>
+                <div><div className="text-xs font-semibold text-gray-600 uppercase mb-1.5">Team leader</div><UserPicker value={filters.team_leader_id ? { id: filters.team_leader_id, name: filters.team_leader_nome } : null} onChange={(selected) => selected ? setFilters({ ...filters, team_leader_id: selected.id, team_leader_nome: selected.name }) : setFilters({ ...filters, team_leader_id: null, team_leader_nome: '' })} mode="single" placeholder="Cerca team leader..." /></div>
               </div>
             </div>
           </div>
