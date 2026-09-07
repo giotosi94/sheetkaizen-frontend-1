@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
-import { AlertTriangle, Leaf, Plus, Eye, X, Send, Trash2, Save, CheckCircle2, Lock, Filter, ListChecks } from 'lucide-react'
+import { AlertTriangle, Leaf, Plus, Eye, X, Send, Trash2, Save, CheckCircle2, Lock, Download } from 'lucide-react'
 import ActionPlanFormShared from '../components/ActionPlanFormShared'
 import ImageUpload from '../components/ImageUpload'
 import DocumentUpload from '../components/DocumentUpload'
@@ -20,11 +20,64 @@ const STATO_BADGE = {
 
 const STATI_CHIUSI = ['Chiuso', 'Done', 'Completato']
 
+const EXPORT_COLUMNS = [
+  { key: 'codice', label: 'Codice' },
+  { key: 'tipo', label: 'Tipo' },
+  { key: 'stato', label: 'Stato' },
+  { key: 'categoria', label: 'Categoria' },
+  { key: 'gravita', label: 'Gravita' },
+  { key: 'priorita', label: 'Priorita' },
+  { key: 'reparto', label: 'Reparto' },
+  { key: 'linea', label: 'Linea' },
+  { key: 'macchina', label: 'Macchina' },
+  { key: 'descrizione', label: 'Descrizione' },
+  { key: 'segnalatore_nome', label: 'Segnalatore' },
+  { key: 'responsabile_nome', label: 'Responsabile' },
+  { key: 'data_evento', label: 'Data evento' },
+  { key: 'ora_evento', label: 'Ora evento' },
+  { key: 'created_at', label: 'Data creazione' },
+  { key: 'data_chiusura', label: 'Data chiusura' },
+  { key: 'note_gestione', label: 'Note gestione' },
+  { key: 'nota_verifica_efficacia', label: 'Verifica efficacia' },
+]
+
+const formatCell = (value, key) => {
+  if (value === null || value === undefined) return ''
+  if ((key === 'created_at' || key === 'data_chiusura') && value) {
+    const d = new Date(value)
+    if (!isNaN(d.getTime())) return d.toLocaleString('it-IT')
+  }
+  return String(value)
+}
+
+const escapeCsv = value => {
+  const v = formatCell(value.raw, value.key).replace(/\r?\n/g, ' ')
+  if (/[";]/.test(v)) return `"${v.replace(/"/g, '""')}"`
+  return v
+}
+
+const exportSegnalazioniCsv = rows => {
+  const header = EXPORT_COLUMNS.map(c => c.label).join(';')
+  const body = rows.map(item =>
+    EXPORT_COLUMNS.map(c => escapeCsv({ raw: item[c.key], key: c.key })).join(';')
+  )
+  const csv = '\uFEFF' + [header, ...body].join('\r\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  const today = new Date().toISOString().slice(0, 10)
+  link.href = url
+  link.download = `segnalazioni_${today}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
 export default function SegnalazioniPage() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [detail, setDetail] = useState(null)
-  const [filtroStato, setFiltroStato] = useState(null)
   const [searchParams, setSearchParams] = useSearchParams()
 
   const savedUser = (() => {
@@ -79,51 +132,14 @@ export default function SegnalazioniPage() {
     load()
   }
 
-  const stats = useMemo(() => {
-    const s = {
-      totale: items.length,
-      aperte: 0,
-      inGestione: 0,
-      chiuse: 0,
-      critiche: 0,
-      sicurezza: 0,
-      ambiente: 0,
-    }
-    items.forEach(it => {
-      if (it.stato === 'Aperto') s.aperte += 1
-      else if (it.stato === 'In gestione') s.inGestione += 1
-      else if (it.stato === 'Chiuso') s.chiuse += 1
-      if (it.gravita === 'Critica' && it.stato !== 'Chiuso') s.critiche += 1
-      if (it.tipo === 'Sicurezza') s.sicurezza += 1
-      else if (it.tipo === 'Ambiente') s.ambiente += 1
-    })
-    s.percentualeChiusura = s.totale > 0 ? Math.round((s.chiuse / s.totale) * 100) : 0
-    return s
-  }, [items])
-
-  const matchFiltro = item => {
-    if (!filtroStato) return true
-    if (filtroStato === 'Critiche') return item.gravita === 'Critica' && item.stato !== 'Chiuso'
-    return item.stato === filtroStato
-  }
-
-  const toggleFiltro = key => setFiltroStato(prev => (prev === key ? null : key))
-
   const byTipo = useMemo(() => {
     const map = { Sicurezza: [], Ambiente: [] }
     items.forEach(item => {
-      if (filtroStato) {
-        if (filtroStato === 'Critiche') {
-          if (!(item.gravita === 'Critica' && item.stato !== 'Chiuso')) return
-        } else if (item.stato !== filtroStato) {
-          return
-        }
-      }
       if (!map[item.tipo]) map[item.tipo] = []
       map[item.tipo].push(item)
     })
     return map
-  }, [items, filtroStato])
+  }, [items])
 
   return (
     <div>
@@ -132,95 +148,15 @@ export default function SegnalazioniPage() {
           <h1 className="text-2xl font-bold text-gray-800">Segnalazioni</h1>
           <p className="text-sm text-gray-500">Segnalazioni di sicurezza e ambiente</p>
         </div>
-        {filtroStato && (
-          <button
-            type="button"
-            onClick={() => setFiltroStato(null)}
-            className="flex items-center gap-2 text-sm border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100"
-          >
-            <X size={15} /> Rimuovi filtro
-          </button>
-        )}
-      </div>
-
-      <div className="bg-white rounded-xl shadow p-4 mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2 text-sm font-bold text-gray-700">
-            <ListChecks size={16} /> Dashboard segnalazioni
-          </div>
-          {filtroStato && (
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <Filter size={13} /> Filtro attivo: <span className="font-semibold text-gray-700">{filtroStato}</span>
-            </div>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <KpiCard
-            label="Totale"
-            value={stats.totale}
-            active={!filtroStato}
-            onClick={() => setFiltroStato(null)}
-            tone="slate"
-          />
-          <KpiCard
-            label="Aperte"
-            value={stats.aperte}
-            active={filtroStato === 'Aperto'}
-            onClick={() => toggleFiltro('Aperto')}
-            tone="blue"
-          />
-          <KpiCard
-            label="In gestione"
-            value={stats.inGestione}
-            active={filtroStato === 'In gestione'}
-            onClick={() => toggleFiltro('In gestione')}
-            tone="amber"
-          />
-          <KpiCard
-            label="Chiuse"
-            value={stats.chiuse}
-            active={filtroStato === 'Chiuso'}
-            onClick={() => toggleFiltro('Chiuso')}
-            tone="green"
-          />
-          <KpiCard
-            label="Critiche aperte"
-            value={stats.critiche}
-            active={filtroStato === 'Critiche'}
-            onClick={() => toggleFiltro('Critiche')}
-            tone="red"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
-          <div className="border rounded-lg p-3 flex items-center gap-3">
-            <AlertTriangle size={18} className="text-red-500" />
-            <div>
-              <div className="text-xs text-gray-500">Sicurezza</div>
-              <div className="text-lg font-bold text-gray-800">{stats.sicurezza}</div>
-            </div>
-          </div>
-          <div className="border rounded-lg p-3 flex items-center gap-3">
-            <Leaf size={18} className="text-green-600" />
-            <div>
-              <div className="text-xs text-gray-500">Ambiente</div>
-              <div className="text-lg font-bold text-gray-800">{stats.ambiente}</div>
-            </div>
-          </div>
-          <div className="border rounded-lg p-3 flex items-center gap-3">
-            <CheckCircle2 size={18} className="text-emerald-600" />
-            <div className="flex-1">
-              <div className="text-xs text-gray-500">Percentuale di chiusura</div>
-              <div className="flex items-center gap-2">
-                <div className="text-lg font-bold text-gray-800">{stats.percentualeChiusura}%</div>
-                <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500" style={{ width: `${stats.percentualeChiusura}%` }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => exportSegnalazioniCsv(items)}
+          disabled={loading || items.length === 0}
+          className="flex items-center gap-2 text-sm bg-gray-700 text-white px-3 py-2 rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50"
+          title="Scarica le segnalazioni in un file per Excel"
+        >
+          <Download size={16} /> Scarica Excel
+        </button>
       </div>
 
       <div className="space-y-4">
@@ -246,9 +182,7 @@ export default function SegnalazioniPage() {
                 {loading ? (
                   <div className="p-6 text-center text-gray-400 text-sm">Caricamento...</div>
                 ) : list.length === 0 ? (
-                  <div className="p-6 text-center text-gray-400 text-sm">
-                    {filtroStato ? 'Nessuna segnalazione con questo filtro' : 'Nessuna segnalazione'}
-                  </div>
+                  <div className="p-6 text-center text-gray-400 text-sm">Nessuna segnalazione</div>
                 ) : (
                   list.map(item => (
                     <div key={item._id} className="px-5 py-3 flex items-center gap-4 hover:bg-gray-50">
@@ -812,28 +746,6 @@ function ChiusuraModal({ segnalazioneId, onClose, onClosed }) {
         </div>
       </div>
     </div>
-  )
-}
-
-const KPI_TONES = {
-  slate: { base: 'border-gray-200 bg-gray-50', active: 'border-gray-700 bg-gray-700 text-white', value: 'text-gray-800' },
-  blue: { base: 'border-blue-200 bg-blue-50', active: 'border-blue-600 bg-blue-600 text-white', value: 'text-blue-700' },
-  amber: { base: 'border-yellow-200 bg-yellow-50', active: 'border-yellow-500 bg-yellow-500 text-white', value: 'text-yellow-700' },
-  green: { base: 'border-green-200 bg-green-50', active: 'border-green-600 bg-green-600 text-white', value: 'text-green-700' },
-  red: { base: 'border-red-200 bg-red-50', active: 'border-red-600 bg-red-600 text-white', value: 'text-red-700' },
-}
-
-function KpiCard({ label, value, active, onClick, tone }) {
-  const t = KPI_TONES[tone] || KPI_TONES.slate
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`text-left rounded-lg border p-3 transition-colors hover:shadow-sm ${active ? t.active : t.base}`}
-    >
-      <div className={`text-xs font-medium ${active ? 'text-white/90' : 'text-gray-500'}`}>{label}</div>
-      <div className={`text-2xl font-bold mt-1 ${active ? 'text-white' : t.value}`}>{value}</div>
-    </button>
   )
 }
 
