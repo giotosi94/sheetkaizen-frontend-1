@@ -33,6 +33,8 @@ export default function DashboardDetailPage() {
   const [saving, setSaving] = useState(false)
   const [showAddWidget, setShowAddWidget] = useState(false)
   const [editingWidget, setEditingWidget] = useState(null)
+  const [editingTitolo, setEditingTitolo] = useState(false)
+  const [titoloDraft, setTitoloDraft] = useState('')
 
   useEffect(() => { loadDashboard() }, [id])
 
@@ -41,6 +43,22 @@ export default function DashboardDetailPage() {
       const res = await api.get(`/dashboards/${id}`)
       setDashboard(res.data)
     } catch (err) { console.error(err) }
+  }
+
+  const saveTitolo = async () => {
+    const nuovoTitolo = titoloDraft.trim()
+    if (!nuovoTitolo) {
+      setEditingTitolo(false)
+      return
+    }
+    try {
+      await api.put(`/dashboards/${id}`, { titolo_pagina: nuovoTitolo })
+      setDashboard({ ...dashboard, titolo_pagina: nuovoTitolo })
+      setEditingTitolo(false)
+    } catch (err) {
+      console.error(err)
+      alert('Errore salvataggio titolo')
+    }
   }
 
   const saveDashboard = async () => {
@@ -157,7 +175,28 @@ export default function DashboardDetailPage() {
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="text-xl font-bold">{dashboard.nome}</h1>
+          <div>
+            {editingTitolo ? (
+              <input
+                value={titoloDraft}
+                onChange={(e) => setTitoloDraft(e.target.value)}
+                onBlur={saveTitolo}
+                onKeyDown={(e) => { if (e.key === 'Enter') saveTitolo() }}
+                className="text-xl font-bold text-gray-800 rounded px-2 py-1"
+                autoFocus
+              />
+            ) : (
+              <h1
+                className="text-xl font-bold cursor-pointer hover:opacity-80"
+                title="Clicca per modificare il titolo"
+                onClick={() => {
+                  setTitoloDraft(dashboard.titolo_pagina || dashboard.nome)
+                  setEditingTitolo(true)
+                }}
+              >
+                {dashboard.titolo_pagina || dashboard.nome}
+              </h1>
+            )}
             <p className="text-xs text-gray-300">{dashboard.tipo} · {dashboard.visibilita}</p>
           </div>
         </div>
