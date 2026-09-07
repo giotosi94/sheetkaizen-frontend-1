@@ -4,6 +4,7 @@ import GridLayout from 'react-grid-layout'
 import api from '../services/api'
 import { Save, ArrowLeft, Plus, Trash2, Settings, Edit2, X } from 'lucide-react'
 import ActionPlanWidget from '../components/widgets/ActionPlanWidget'
+import KaizenWidget from '../components/widgets/KaizenWidget'
 import KPICard from '../components/widgets/KPICard'
 import TextBlock from '../components/widgets/TextBlock'
 import BIEmbed from '../components/widgets/BIEmbed'
@@ -15,14 +16,15 @@ import TableEditor from '../components/TableEditor'
 import 'react-grid-layout/css/styles.css'
 
 const WIDGET_TYPES = [
-  { id: 'action_plan', label: '📋 Action Plan', icon: '📋', defaultSize: { w: 6, h: 6 } },
-  { id: 'presenze', label: '✓ Presenze', icon: '✓', defaultSize: { w: 8, h: 6 } },
-  { id: 'kpi_card', label: '🎯 KPI Card', icon: '🎯', defaultSize: { w: 3, h: 3 } },
-  { id: 'text_block', label: '📝 Blocco Testo', icon: '📝', defaultSize: { w: 4, h: 4 } },
-  { id: 'bi_embed', label: '📊 Embed BI', icon: '📊', defaultSize: { w: 6, h: 6 } },
-  { id: 'table', label: '📑 Tabella', icon: '📑', defaultSize: { w: 6, h: 5 } },
-  { id: 'excel_link', label: '🔗 Link Excel', icon: '🔗', defaultSize: { w: 4, h: 4 } },
-  { id: 'gantt', label: '📅 Gantt', icon: '📅', defaultSize: { w: 12, h: 8 } },
+  { id: 'action_plan', label: 'Action Plan', icon: 'AP', defaultSize: { w: 6, h: 6 } },
+  { id: 'kaizen', label: 'Kaizen collegati', icon: 'KZ', defaultSize: { w: 6, h: 6 } },
+  { id: 'presenze', label: 'Presenze', icon: 'PR', defaultSize: { w: 8, h: 6 } },
+  { id: 'kpi_card', label: 'KPI Card', icon: 'KPI', defaultSize: { w: 3, h: 3 } },
+  { id: 'text_block', label: 'Blocco Testo', icon: 'TXT', defaultSize: { w: 4, h: 4 } },
+  { id: 'bi_embed', label: 'Embed BI', icon: 'BI', defaultSize: { w: 6, h: 6 } },
+  { id: 'table', label: 'Tabella', icon: 'TAB', defaultSize: { w: 6, h: 5 } },
+  { id: 'excel_link', label: 'Link Excel', icon: 'XLS', defaultSize: { w: 4, h: 4 } },
+  { id: 'gantt', label: 'Gantt', icon: 'GNT', defaultSize: { w: 12, h: 8 } },
 ]
 
 export default function DashboardDetailPage() {
@@ -119,6 +121,8 @@ export default function DashboardDetailPage() {
     switch (widget.tipo) {
       case 'action_plan':
         return <ActionPlanWidget filterReparto={widget.config.filterReparto} filterStato={widget.config.filterStato} dashboardId={id} dashboardName={dashboard.nome} title={widget.config.titolo || 'Action Plan'} />
+      case 'kaizen':
+        return <KaizenWidget dashboardId={id} title={widget.config.titolo || 'Kaizen collegati'} />
       case 'kpi_card':
         return <KPICard config={widget.config} />
       case 'text_block':
@@ -126,16 +130,16 @@ export default function DashboardDetailPage() {
       case 'bi_embed':
         return <BIEmbed config={widget.config} />
       case 'table':
-  return (
-    <TableWidget
-      config={widget.config}
-      editMode={editMode}
-      onChange={(newConfig) => updateWidgetConfig(widget.widget_id, newConfig)}
-    />
-  )
+        return (
+          <TableWidget
+            config={widget.config}
+            editMode={editMode}
+            onChange={(newConfig) => updateWidgetConfig(widget.widget_id, newConfig)}
+          />
+        )
       case 'excel_link':
         return <ExcelLink config={widget.config} />
-     case 'presenze':
+      case 'presenze':
         return (
           <PresenzeWidget
             config={widget.config}
@@ -175,7 +179,6 @@ export default function DashboardDetailPage() {
             <ArrowLeft size={20} />
           </button>
           <div>
-          <div>
             {editingTitolo ? (
               <input
                 value={titoloDraft}
@@ -197,7 +200,7 @@ export default function DashboardDetailPage() {
                 {dashboard.titolo_pagina || dashboard.nome}
               </h1>
             )}
-            <p className="text-xs text-gray-300">{dashboard.tipo} · {dashboard.visibilita}</p>
+            <p className="text-xs text-gray-300">{dashboard.tipo} &middot; {dashboard.visibilita}</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -223,7 +226,7 @@ export default function DashboardDetailPage() {
         <div className="bg-white rounded-xl shadow p-12 text-center">
           <p className="text-gray-400 mb-4">Nessun widget. Aggiungine uno per iniziare!</p>
           <button onClick={() => { setEditMode(true); setShowAddWidget(true) }} className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-light">
-            ➕ Aggiungi primo widget
+            Aggiungi primo widget
           </button>
         </div>
       ) : (
@@ -273,7 +276,7 @@ export default function DashboardDetailPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl w-full max-w-md p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold">➕ Aggiungi Widget</h2>
+              <h2 className="text-lg font-bold">Aggiungi Widget</h2>
               <button onClick={() => setShowAddWidget(false)}><X size={20} /></button>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -283,7 +286,7 @@ export default function DashboardDetailPage() {
                   onClick={() => addWidget(w.id)}
                   className="border-2 border-gray-200 hover:border-primary rounded-lg p-4 text-center transition-colors"
                 >
-                  <div className="text-3xl mb-2">{w.icon}</div>
+                  <div className="text-lg font-bold mb-2">{w.icon}</div>
                   <div className="text-sm font-medium">{w.label}</div>
                 </button>
               ))}
@@ -297,7 +300,7 @@ export default function DashboardDetailPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
             <div className="flex justify-between items-center mb-4 sticky top-0 bg-white">
-              <h2 className="text-lg font-bold">⚙️ Configura Widget</h2>
+              <h2 className="text-lg font-bold">Configura Widget</h2>
               <button onClick={() => setEditingWidget(null)}><X size={20} /></button>
             </div>
             <div className="space-y-3">
@@ -312,7 +315,6 @@ export default function DashboardDetailPage() {
                   className="w-full border rounded-lg px-3 py-2"
                 />
               </div>
-
               {editingWidget.tipo === 'kpi_card' && (
                 <>
                   <div className="grid grid-cols-2 gap-3">
@@ -328,7 +330,7 @@ export default function DashboardDetailPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Unità</label>
+                      <label className="block text-sm font-medium mb-1">Unita</label>
                       <input
                         value={editingWidget.config.unita || ''}
                         onChange={(e) => {
@@ -336,7 +338,7 @@ export default function DashboardDetailPage() {
                           setEditingWidget({ ...editingWidget, config: { ...editingWidget.config, unita: e.target.value } })
                         }}
                         className="w-full border rounded-lg px-3 py-2"
-                        placeholder="%, €, ..."
+                        placeholder="%, EUR, ..."
                       />
                     </div>
                   </div>
@@ -353,7 +355,6 @@ export default function DashboardDetailPage() {
                   </div>
                 </>
               )}
-
               {editingWidget.tipo === 'text_block' && (
                 <div>
                   <label className="block text-sm font-medium mb-1">Contenuto</label>
@@ -368,7 +369,6 @@ export default function DashboardDetailPage() {
                   />
                 </div>
               )}
-
               {editingWidget.tipo === 'bi_embed' && (
                 <div>
                   <label className="block text-sm font-medium mb-1">URL Embed (Power BI / link)</label>
@@ -382,11 +382,10 @@ export default function DashboardDetailPage() {
                     placeholder="https://app.powerbi.com/view?r=..."
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    💡 Da Power BI: File → Embed report → copia URL
+                    Da Power BI: File &rarr; Embed report &rarr; copia URL
                   </p>
                 </div>
               )}
-
               {editingWidget.tipo === 'action_plan' && (
                 <>
                   <div>
@@ -419,7 +418,6 @@ export default function DashboardDetailPage() {
                   </div>
                 </>
               )}
-
               {editingWidget.tipo === 'table' && (
                 <TableEditor
                   config={editingWidget.config}
@@ -429,7 +427,6 @@ export default function DashboardDetailPage() {
                   }}
                 />
               )}
-
               {editingWidget.tipo === 'excel_link' && (
                 <div>
                   <label className="block text-sm font-medium mb-1">Link (uno per riga: etichetta | URL)</label>
@@ -449,7 +446,6 @@ export default function DashboardDetailPage() {
                   />
                 </div>
               )}
-
               <button
                 onClick={() => setEditingWidget(null)}
                 className="w-full bg-primary text-white py-2 rounded-lg mt-4"
