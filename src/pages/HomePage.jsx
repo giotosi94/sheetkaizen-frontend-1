@@ -18,6 +18,7 @@ export default function HomePage() {
   const [oplDaLeggere, setOplDaLeggere] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedAP, setSelectedAP] = useState(null)
+  const [origineFilter, setOrigineFilter] = useState('tutte')
 
   useEffect(() => { loadData() }, [user])
 
@@ -116,7 +117,11 @@ setOplDaLeggere(oplRes.data?.items || [])
     return 'future'
   }
 
-  const targetActionPlans = isOperator ? myAreaActionPlans : myActionPlans
+  const baseActionPlans = isOperator ? myAreaActionPlans : myActionPlans
+
+  const targetActionPlans = origineFilter === 'tutte'
+    ? baseActionPlans
+    : baseActionPlans.filter(ap => getOrigine(ap) === origineFilter)
 
   const apOverdue = targetActionPlans.filter(ap => classifyByDeadline(ap) === 'overdue')
   const apToday = targetActionPlans.filter(ap => classifyByDeadline(ap) === 'today')
@@ -288,6 +293,12 @@ setOplDaLeggere(oplRes.data?.items || [])
             Vedi tutte <ChevronRight size={14} />
           </Link>
         </div>
+
+        <OrigineFilterBar
+          plans={baseActionPlans}
+          value={origineFilter}
+          onChange={setOrigineFilter}
+        />
 
         {targetActionPlans.length === 0 ? (
           <div className="text-center py-8 text-gray-400">
@@ -516,6 +527,7 @@ function APGroup({ title, color, icon: Icon, aps, onClick }) {
           >
             <span className="font-mono text-xs text-primary font-bold flex-shrink-0">{ap.numero}</span>
             <span className="text-sm flex-1 truncate">{ap.titolo}</span>
+            <OriginePill ap={ap} />
             {ap.data_scadenza && (
               <span className="text-xs text-gray-500 flex-shrink-0">
                 {new Date(ap.data_scadenza).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })}
@@ -527,3 +539,114 @@ function APGroup({ title, color, icon: Icon, aps, onClick }) {
     </div>
   )
 }
+
+function getOrigine(ap) {
+  if (!ap.parent_type || ap.parent_type === 'standalone') {
+    return 'manuale'
+  }
+
+  return ap.parent_type
+}
+
+function getOrigineLabel(origine) {
+  if (origine === 'segnalazione') return 'Segnalazione'
+  if (origine === 'kaizen') return 'Kaizen'
+  if (origine === 'dashboard') return 'Meeting'
+  if (origine === 'pillar') return 'Pillar'
+  return 'Manuale'
+}
+
+function getOrigineColor(origine) {
+  if (origine === 'segnalazione') return 'bg-red-100 text-red-700'
+  if (origine === 'kaizen') return 'bg-emerald-100 text-emerald-700'
+  if (origine === 'dashboard') return 'bg-purple-100 text-purple-700'
+  if (origine === 'pillar') return 'bg-indigo-100 text-indigo-700'
+  return 'bg-gray-100 text-gray-600'
+}
+
+function getOrigineRoute(ap) {
+  if (!ap.parent_id) return null
+
+  if (ap.parent_type === 'segnalazione') {
+    return `/segnalazioni?open=${ap.parent_id}`
+  }
+
+  if (ap.parent_type === 'kaizen') {
+    return `/kaizen/${ap.parent_id}`
+  }
+
+  if (ap.parent_type === 'dashboard') {
+    return `/dashboard/${ap.parent_id}`
+  }
+
+  if (ap.parent_type === 'pillar') {
+    return `/pillars/${ap.parent_id}`
+  }
+
+  return null
+}
+
+function OriginePill({ ap }) {
+  const origine = getOrigine(ap)
+  const label = getOrigineLabel(origine)
+  const color = getOrigineColor(origine)
+  const route = getOrigineRoute(ap)
+
+  const pill = (
+    <span
+      className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${color}`}
+    >
+      {label}
+      {ap.parent_label ? ` · ${ap.parent_label}` : ''}
+    </span>
+  )
+
+  if (!route) {
+    return <span className="flex-shrink-0">{pill}</span>
+  }
+
+  return (
+    <Link
+      to={route}
+      onClick={event => event.stopPropagation()}
+      className="flex-shrink-0 hover:opacity-80"
+      title={`Apri ${label}`}
+    >
+      {pill}
+    </Link>
+  )
+}
+
+const ORIGINE_CHIPS = [
+  { id: 'tutte', label: 'Tutte' },
+  { id: 'segnalazione', label: 'Segnalazioni' },
+  { id: 'dashboard', label: 'Meeting' },
+  { id: 'kaizen', label: 'Kaizen' },
+  { id: 'pillar', label: 'Pillar' },
+  { id: 'manuale', label: 'Manuale' },
+]
+
+function OrigineFilterBar({ plans, value, onChange }) {
+  function getCount(origine) {
+    if (origine === 'tutte') {
+      return plans.length
+    }
+
+    return plans.filter(ap => getOrigine(ap) === origine).length
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2 mb-4">
+      {ORIGINE_CHIPS.map(chip => {
+        const active = value === chip.id
+        const count = getCount(chip.id)
+
+        return (
+          <button
+            key={chip.id}
+            type="button"
+            onClick={() => onChange(chip.id)}
+            className={
+              active
+                ? 'px-3 py-1.5 rounded-full text-xs font-medium border bg-primary text-white border-primary'
+                : 'px-3 py-1.5 rounded-full text-xs font-medium border bg-white text
