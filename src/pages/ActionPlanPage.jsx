@@ -1,9 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
-import {
-  Plus, Search, Filter, X, ChevronDown
-} from 'lucide-react'
+import { Plus, Search, X } from 'lucide-react'
 import api from '../services/api'
 import { useAllConfigurations } from '../hooks/useConfigurations'
 import ActionPlanFormShared from '../components/ActionPlanFormShared'
@@ -13,13 +10,11 @@ import ActionPlanViews from '../components/ActionPlanViews'
 export default function ActionPlanPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [plans, setPlans] = useState([])
-  const [stats, setStats] = useState({})
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingPlan, setEditingPlan] = useState(null)
   const [selectedPlan, setSelectedPlan] = useState(null)
-  const [viewMode, setViewMode] = useState('list')
-  const [calendarDays, setCalendarDays] = useState(30)  // giorni "prossime settimane"
+  const [viewMode] = useState('list')
   const [filters, setFilters] = useState({
     search: '', stato: [], tipo: [], priorita: [], parent_type: [],
     categoria_perdita: '', quinta_m: '',
@@ -120,25 +115,21 @@ export default function ActionPlanPage() {
           params.append(key, value)
         }
       })
-      const [plansRes, statsRes] = await Promise.all([
-        api.get(`/action-plans/?${params.toString()}`),
-        api.get('/action-plans/stats/summary'),
-      ])
-      setPlans(plansRes.data)
-      setStats(statsRes.data)
+      const plansRes = await api.get(`/action-plans/?${params.toString()}`)
+      setPlans(Array.isArray(plansRes.data) ? plansRes.data : [])
     } catch (err) { console.error(err) }
     finally { setLoading(false) }
   }
 
   async function handleDelete(id) {
-    if (!confirm('🗑️ Eliminare definitivamente questo Action Plan?\n\n(Sparisce dalla UI ma resta in DB per audit)')) return
+    if (!confirm('Eliminare definitivamente questo Action Plan?\n\n(Sparisce dalla UI ma resta in DB per audit)')) return
     await api.delete(`/action-plans/${id}`)
     loadData()
   }
 
   async function handleCancel(plan) {
     const reason = prompt(
-      `🚫 Annullare l'Action Plan "${plan.numero} - ${plan.titolo}"?\n\n` +
+      `Annullare l'Action Plan "${plan.numero} - ${plan.titolo}"?\n\n` +
       `Inserisci il motivo (obbligatorio):`
     )
     if (!reason || !reason.trim()) return
@@ -154,7 +145,7 @@ export default function ActionPlanPage() {
   }
 
   async function handleRestore(plan) {
-    if (!confirm(`♻️ Ripristinare l'Action Plan "${plan.numero}"?\n\nTornerà tra gli attivi.`)) return
+    if (!confirm(`Ripristinare l'Action Plan "${plan.numero}"?\n\nTornerà tra gli attivi.`)) return
     try {
       await api.post(`/action-plans/${plan._id}/restore`)
       loadData()
@@ -316,10 +307,9 @@ export default function ActionPlanPage() {
       </div>
       {/* LISTA/KANBAN */}
       {loading ? (
-        <div className="bg-white rounded-lg shadow-sm p-12 text-center text-gray-400">⏳ Caricamento...</div>
+        <div className="bg-white rounded-lg shadow-sm p-12 text-center text-gray-400">Caricamento...</div>
       ) : plans.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm p-12 text-center text-gray-400">
-          <div className="text-5xl mb-2">📋</div>
           <p>Nessun Action Plan trovato</p>
           <button onClick={() => setShowForm(true)} className="text-primary hover:underline mt-2">Creane uno nuovo →</button>
         </div>
@@ -371,6 +361,65 @@ export default function ActionPlanPage() {
 // ──────────────────────────────────────────────────────────
 // HELPER COMPONENTS
 // ──────────────────────────────────────────────────────────
+function toggleMultiValue(values, value) {
+  return values.includes(value)
+    ? values.filter(item => item !== value)
+    : [...values, value]
+}
+
+function FilterSection({ title, children }) {
+  return (
+    <div className="border-t pt-3">
+      <div className="text-xs font-semibold text-gray-600 uppercase mb-2">{title}</div>
+      <div className="flex flex-wrap gap-2">{children}</div>
+    </div>
+  )
+}
+
+function MultiFilterChip({ filters, setFilters, field, value, label }) {
+  const selected = filters[field] || []
+
+  return (
+    <FilterChip
+      active={selected.includes(value)}
+      onClick={() => setFilters({
+        ...filters,
+        [field]: toggleMultiValue(selected, value),
+      })}
+      label={label}
+    />
+  )
+}
+
+function FilterCheckboxGroup({ title, field, options, filters, setFilters }) {
+  const selected = filters[field] || []
+
+  return (
+    <div className="border rounded-lg p-3 bg-gray-50">
+      <div className="text-xs font-semibold text-gray-600 uppercase mb-2">{title}</div>
+      <div className="flex flex-wrap gap-x-4 gap-y-2">
+        {options.map(option => (
+          <label key={option.value} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={selected.includes(option.value)}
+              onChange={() => setFilters({
+                ...filters,
+                [field]: toggleMultiValue(selected, option.value),
+              })}
+              className="rounded border-gray-300 text-primary focus:ring-primary"
+            />
+            <span>{option.label}</span>
+          </label>
+        ))}
+        {options.length === 0 && (
+          <span className="text-xs text-gray-400">Nessuna opzione configurata</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function FilterChip({ active, onClick, label, variant = 'primary' }) {
   const styles = {
     primary: active ? 'bg-primary text-white border-primary' : 'bg-white text-gray-700 border-gray-200 hover:border-primary',
