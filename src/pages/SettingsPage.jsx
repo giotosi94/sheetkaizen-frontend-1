@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Settings, Plus, Edit2, Trash2, Eye, EyeOff, X, Save, Search, GripVertical, ChevronRight, ChevronDown, Info, Factory, Cpu, Upload } from 'lucide-react'
+import { Settings, Plus, Edit2, Trash2, Eye, EyeOff, X, Save, Search, GripVertical, ChevronRight, ChevronDown, Info, Factory, Cpu, Upload, Copy, CopyPlus } from 'lucide-react'
 import api from '../services/api'
 import UserPicker from '../components/UserPicker'
 
@@ -392,6 +392,7 @@ function RepartiTreePlaceholder() {
             <RepartoCard
               key={reparto._id}
               reparto={reparto}
+              allReparti={reparti}
               expanded={expandedReparti.has(reparto._id)}
               onToggle={() => toggleReparto(reparto._id)}
               expandedLinee={expandedLinee}
@@ -416,11 +417,60 @@ function RepartiTreePlaceholder() {
   )
 }
 
-function RepartoCard({ reparto, expanded, onToggle, expandedLinee, onToggleLinea, onEdit, onDelete, onToggleAttivo, onChange }) {
+function genLocalId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  return String(Date.now()) + Math.random().toString(16).slice(2)
+}
+
+function RepartoCard({ reparto, allReparti = [], expanded, onToggle, expandedLinee, onToggleLinea, onEdit, onDelete, onToggleAttivo, onChange }) {
   const [showLineaForm, setShowLineaForm] = useState(false)
   const [editingLinea, setEditingLinea] = useState(null)
+  const [draggedLineaId, setDraggedLineaId] = useState(null)
   const linee = reparto.linee || []
   const totMacchine = linee.reduce((s, l) => s + (l.macchine?.length || 0), 0)
+
+  async function saveLineeOrder(newLinee) {
+    try {
+      await api.put(`/reparti/${reparto._id}`, {
+        nome: reparto.nome,
+        codice: reparto.codice,
+        descrizione: reparto.descrizione,
+        attivo: reparto.attivo,
+        linee: newLinee,
+      })
+      onChange()
+    } catch (err) {
+      alert('Errore riordino: ' + (err.response?.data?.detail || err.message))
+    }
+  }
+
+  function handleLineaDrop(targetId) {
+    if (!draggedLineaId || draggedLineaId === targetId) { setDraggedLineaId(null); return }
+    const from = linee.findIndex(l => l.id === draggedLineaId)
+    const to = linee.findIndex(l => l.id === targetId)
+    if (from === -1 || to === -1) { setDraggedLineaId(null); return }
+    const reordered = [...linee]
+    const [moved] = reordered.splice(from, 1)
+    reordered.splice(to, 0, moved)
+    setDraggedLineaId(null)
+    saveLineeOrder(reordered)
+  }
+
+  async function handleDuplicateLinea(linea) {
+    const clonedMacchine = (linea.macchine || []).map(m => ({ ...m, id: genLocalId() }))
+    try {
+      await api.post(`/reparti/${reparto._id}/linee`, {
+        nome: `${linea.nome} (copia)`,
+        codice: '',
+        descrizione: linea.descrizione || '',
+        attivo: true,
+        macchine: clonedMacchine,
+      })
+      onChange()
+    } catch (err) {
+      alert('Errore duplicazione: ' + (err.response?.data?.detail || err.message))
+    }
+  }
 
   async function handleDeleteLinea(linea) {
     if (!confirm(`Eliminare la linea "${linea.nome}" e tutte le sue macchine?`)) return
@@ -480,16 +530,26 @@ function RepartoCard({ reparto, expanded, onToggle, expandedLinee, onToggleLinea
             </div>
           ) : (
             linee.map(linea => (
-              <LineaCard
+              <div
                 key={linea.id}
-                reparto={reparto}
-                linea={linea}
-                expanded={expandedLinee.has(`${reparto._id}_${linea.id}`)}
-                onToggle={() => onToggleLinea(`${reparto._id}_${linea.id}`)}
-                onEdit={() => { setEditingLinea(linea); setShowLineaForm(true) }}
-                onDelete={() => handleDeleteLinea(linea)}
-                onChange={onChange}
-              />
+                draggable
+                onDragStart={() => setDraggedLineaId(linea.id)}
+                onDragOver={(e) => { if (draggedLineaId) e.preventDefault() }}
+                onDrop={() => handleLineaDrop(linea.id)}
+                className={draggedLineaId === linea.id ? 'opacity-40' : ''}
+              >
+                <LineaCard
+                  reparto={reparto}
+                  allReparti={allReparti}
+                  linea={linea}
+                  expanded={expandedLinee.has(`${reparto._id}_${linea.id}`)}
+                  onToggle={() => onToggleLinea(`${reparto._id}_${linea.id}`)}
+                  onEdit={() => { setEditingLinea(linea); setShowLineaForm(true) }}
+                  onDelete={() => handleDeleteLinea(linea)}
+                  onDuplicate={() => handleDuplicateLinea(linea)}
+                  onChange={onChange}
+                />
+              </div>
             ))
           )}
           <button
@@ -513,9 +573,11 @@ function RepartoCard({ reparto, expanded, onToggle, expandedLinee, onToggleLinea
   )
 }
 
-function LineaCard({ reparto, linea, expanded, onToggle, onEdit, onDelete, onChange }) {
+function LineaCard({ reparto, allReparti = [], linea, expanded, onToggle, onEdit, onDelete, onDuplicate, onChange }) {
   const [showMacchinaForm, setShowMacchinaForm] = useState(false)
   const [editingMacchina, setEditingMacchina] = useState(null)
+  const [draggedMacchinaId, setDraggedMacchinaId] = useState(null)
+  const [showCopyModal, setShowCopyModal] = useState(false)
   const macchine = linea.macchine || []
 
   async function handleDeleteMacchina(macchina) {
@@ -526,6 +588,41 @@ function LineaCard({ reparto, linea, expanded, onToggle, onEdit, onDelete, onCha
     } catch (err) {
       alert('Errore: ' + (err.response?.data?.detail || err.message))
     }
+  }
+
+  async function saveMacchine(newMacchine) {
+    try {
+      await api.put(`/reparti/${reparto._id}/linee/${linea.id}`, {
+        id: linea.id,
+        nome: linea.nome,
+        codice: linea.codice || null,
+        descrizione: linea.descrizione || '',
+        attivo: linea.attivo !== false,
+        macchine: newMacchine,
+      })
+      onChange()
+    } catch (err) {
+      alert('Errore riordino macchine: ' + (err.response?.data?.detail || err.message))
+    }
+  }
+
+  function handleMacchinaDrop(targetId) {
+    if (!draggedMacchinaId || draggedMacchinaId === targetId) { setDraggedMacchinaId(null); return }
+    const from = macchine.findIndex(m => m.id === draggedMacchinaId)
+    const to = macchine.findIndex(m => m.id === targetId)
+    if (from === -1 || to === -1) { setDraggedMacchinaId(null); return }
+    const reordered = [...macchine]
+    const [moved] = reordered.splice(from, 1)
+    reordered.splice(to, 0, moved)
+    setDraggedMacchinaId(null)
+    saveMacchine(reordered)
+  }
+
+  async function copyFromLinea(sourceLinea, mode) {
+    const cloned = (sourceLinea.macchine || []).map(m => ({ ...m, id: genLocalId() }))
+    const newMacchine = mode === 'replace' ? cloned : [...macchine, ...cloned]
+    setShowCopyModal(false)
+    await saveMacchine(newMacchine)
   }
 
   return (
@@ -549,6 +646,14 @@ function LineaCard({ reparto, linea, expanded, onToggle, onEdit, onDelete, onCha
           )}
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0">
+          <button onClick={() => setShowCopyModal(true)} className="p-0.5 hover:bg-indigo-100 rounded text-indigo-600" title="Copia struttura da un'altra linea">
+            <Copy size={12} />
+          </button>
+          {onDuplicate && (
+            <button onClick={onDuplicate} className="p-0.5 hover:bg-blue-100 rounded text-blue-600" title="Duplica questa linea">
+              <CopyPlus size={12} />
+            </button>
+          )}
           <button onClick={onEdit} className="p-0.5 hover:bg-yellow-100 rounded text-yellow-600" title="Modifica">
             <Edit2 size={12} />
           </button>
@@ -566,7 +671,15 @@ function LineaCard({ reparto, linea, expanded, onToggle, onEdit, onDelete, onCha
             </div>
           ) : (
             macchine.map(m => (
-              <div key={m.id} className={`flex items-center gap-2 px-2 py-1 bg-gray-50 rounded text-xs ${!m.attivo ? 'opacity-50' : ''}`}>
+              <div
+                key={m.id}
+                draggable
+                onDragStart={() => setDraggedMacchinaId(m.id)}
+                onDragOver={(e) => { if (draggedMacchinaId) e.preventDefault() }}
+                onDrop={() => handleMacchinaDrop(m.id)}
+                className={`flex items-center gap-2 px-2 py-1 bg-gray-50 rounded text-xs ${!m.attivo ? 'opacity-50' : ''} ${draggedMacchinaId === m.id ? 'opacity-40' : ''}`}
+              >
+                <GripVertical size={12} className="text-gray-400 flex-shrink-0 cursor-grab" />
                 <Cpu size={12} className="text-gray-500 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <span className="font-medium">{m.nome}</span>
@@ -614,6 +727,98 @@ function LineaCard({ reparto, linea, expanded, onToggle, onEdit, onDelete, onCha
           onSaved={() => { setShowMacchinaForm(false); setEditingMacchina(null); onChange() }}
         />
       )}
+
+      {showCopyModal && (
+        <CopyStructureModal
+          allReparti={allReparti}
+          currentLineaId={linea.id}
+          targetLineaNome={linea.nome}
+          onClose={() => setShowCopyModal(false)}
+          onCopy={copyFromLinea}
+        />
+      )}
+    </div>
+  )
+}
+
+function CopyStructureModal({ allReparti, currentLineaId, targetLineaNome, onClose, onCopy }) {
+  const [search, setSearch] = useState('')
+  const [mode, setMode] = useState('add')
+
+  const sorgenti = []
+  allReparti.forEach(rep => {
+    (rep.linee || []).forEach(l => {
+      if (l.id === currentLineaId) return
+      sorgenti.push({ reparto: rep, linea: l })
+    })
+  })
+
+  const filtered = search.trim()
+    ? sorgenti.filter(({ reparto, linea }) =>
+        linea.nome?.toLowerCase().includes(search.toLowerCase()) ||
+        reparto.nome?.toLowerCase().includes(search.toLowerCase())
+      )
+    : sorgenti
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="bg-indigo-600 text-white px-5 py-3 flex justify-between items-center">
+          <h2 className="font-semibold">Copia struttura in "{targetLineaNome}"</h2>
+          <button onClick={onClose}><X size={20} /></button>
+        </div>
+        <div className="p-4 border-b space-y-3">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cerca linea sorgente..."
+              className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm"
+              autoFocus
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setMode('add')}
+              className={`flex-1 px-3 py-2 rounded-lg text-sm border-2 ${mode === 'add' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600'}`}
+            >
+              Aggiungi alle esistenti
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('replace')}
+              className={`flex-1 px-3 py-2 rounded-lg text-sm border-2 ${mode === 'replace' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-600'}`}
+            >
+              Sostituisci tutte
+            </button>
+          </div>
+        </div>
+        <div className="overflow-y-auto flex-1 p-3 space-y-1.5">
+          {filtered.length === 0 ? (
+            <div className="text-center py-8 text-sm text-gray-400">Nessuna linea sorgente disponibile</div>
+          ) : (
+            filtered.map(({ reparto, linea }) => (
+              <button
+                key={`${reparto._id}_${linea.id}`}
+                type="button"
+                onClick={() => {
+                  if (mode === 'replace' && !confirm(`Sostituire tutte le macchine di "${targetLineaNome}" con quelle di "${linea.nome}"?`)) return
+                  onCopy(linea, mode)
+                }}
+                className="w-full text-left border rounded-lg px-3 py-2 hover:border-indigo-400 hover:bg-indigo-50 flex items-center justify-between gap-2"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{linea.nome}</div>
+                  <div className="text-xs text-gray-500 truncate">{reparto.nome} · {(linea.macchine || []).length} macchine</div>
+                </div>
+                <ChevronRight size={16} className="text-gray-400 flex-shrink-0" />
+              </button>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   )
 }
