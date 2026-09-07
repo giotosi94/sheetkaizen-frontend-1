@@ -21,7 +21,7 @@ export default function ActionPlanPage() {
   const [viewMode, setViewMode] = useState('list')
   const [calendarDays, setCalendarDays] = useState(30)  // giorni "prossime settimane"
   const [filters, setFilters] = useState({
-    search: '', stato: '', tipo: '', priorita: '',
+    search: '', stato: [], tipo: [], priorita: [], parent_type: [],
     categoria_perdita: '', quinta_m: '',
     responsabile: '', reparto: '', linea: '', macchina: '',
     pillar_id: '', dashboard_id: '',
@@ -29,7 +29,6 @@ export default function ActionPlanPage() {
     include_cancelled: false,
     only_cancelled: false,
   })
-  const [showFilters, setShowFilters] = useState(false)
   const [reparti, setReparti] = useState([])
   const [pillars, setPillars] = useState([])
   const [dashboards, setDashboards] = useState([])
@@ -79,11 +78,12 @@ export default function ActionPlanPage() {
     })
   }, [])
 
-  const activeFiltersCount = Object.entries(filters).filter(([k, v]) => {
-    if (['search'].includes(k)) return false
-    if (typeof v === 'boolean') return v === true
-    return v !== '' && v !== null && v !== undefined
-  }).length
+  const activeFiltersCount = Object.entries(filters).reduce((count, [key, value]) => {
+    if (key === 'search') return count
+    if (Array.isArray(value)) return count + value.length
+    if (typeof value === 'boolean') return count + (value ? 1 : 0)
+    return count + (value !== '' && value !== null && value !== undefined ? 1 : 0)
+  }, 0)
 
   const lineeFiltrate = filters.reparto
     ? (reparti.find(r => r.nome === filters.reparto)?.linee || [])
@@ -97,7 +97,7 @@ export default function ActionPlanPage() {
   function resetFilters() {
     setFilters({
       search: filters.search,
-      stato: '', tipo: '', priorita: '',
+      stato: [], tipo: [], priorita: [], parent_type: [],
       categoria_perdita: '', quinta_m: '',
       responsabile: '', reparto: '', linea: '', macchina: '',
       pillar_id: '', dashboard_id: '',
@@ -111,9 +111,14 @@ export default function ActionPlanPage() {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      Object.entries(filters).forEach(([k, v]) => {
-        if (v === true) params.append(k, 'true')
-        else if (v) params.append(k, v)
+      Object.entries(filters).forEach(([key, value]) => {
+        if (Array.isArray(value)) {
+          value.forEach(item => params.append(key, item))
+        } else if (value === true) {
+          params.append(key, 'true')
+        } else if (value) {
+          params.append(key, value)
+        }
       })
       const [plansRes, statsRes] = await Promise.all([
         api.get(`/action-plans/?${params.toString()}`),
@@ -168,7 +173,7 @@ export default function ActionPlanPage() {
       {/* HEADER */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">🎯 Action Plan Management</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">Action Plan Management</h1>
           <p className="text-gray-500 text-sm">Gestione piani d'azione trasversali</p>
         </div>
         <div className="flex gap-2 items-center">
@@ -179,155 +184,135 @@ export default function ActionPlanPage() {
         </div>
       </div>
 
-      {/* SEARCH + FILTRI AVANZATI */}
-      <div className="bg-white p-3 rounded-lg shadow-sm">
-        <div className="flex gap-2 items-center">
+      <div className="bg-white p-4 rounded-xl shadow-sm space-y-4">
+        <div className="flex gap-3 items-center">
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
             <input
               type="text"
               placeholder="Cerca titolo, numero, tag, descrizione..."
               value={filters.search}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              onChange={event => setFilters({ ...filters, search: event.target.value })}
               className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm"
             />
           </div>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 border-2 transition-all ${
-              showFilters || activeFiltersCount > 0
-                ? 'bg-primary text-white border-primary shadow-md'
-                : 'bg-white border-gray-200 hover:border-primary text-gray-700'
-            }`}
-          >
-            <Filter size={16} />
-            Filtri avanzati
-            {activeFiltersCount > 0 && (
-              <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold ${
-                showFilters ? 'bg-white text-primary' : 'bg-primary text-white'
-              }`}>
-                {activeFiltersCount}
-              </span>
-            )}
-            <ChevronDown size={14} className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />
-          </button>
           {activeFiltersCount > 0 && (
             <button
+              type="button"
               onClick={resetFilters}
-              className="px-3 py-2 rounded-lg text-sm border-2 border-gray-200 text-gray-600 hover:bg-gray-100 hover:border-gray-300"
-              title="Pulisci tutti i filtri"
+              className="px-3 py-2 rounded-lg text-sm border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center gap-1"
             >
-              🔄 Reset
+              <X size={15} /> Azzera filtri
             </button>
           )}
         </div>
 
-        {showFilters && (
-          <div className="mt-3 pt-3 border-t space-y-3">
-            {/* Riga 1: Vista */}
-            <div>
-              <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block"> Vista</label>
-              <div className="flex flex-wrap gap-2">
-                <FilterChip
-                  active={!filters.only_cancelled && !filters.include_cancelled && !filters.overdue}
-                  onClick={() => setFilters({ ...filters, only_cancelled: false, include_cancelled: false, overdue: false })}
-                  label="Attivi"
-                />
-                <FilterChip
-                  active={filters.overdue}
-                  onClick={() => setFilters({ ...filters, overdue: !filters.overdue, only_cancelled: false })}
-                  label="Scaduti"
-                />
-                <FilterChip
-                  active={filters.include_cancelled && !filters.only_cancelled}
-                  onClick={() => setFilters({ ...filters, include_cancelled: true, only_cancelled: false })}
-                  label="Mostra anche annullati"
-                />
-                <FilterChip
-                  active={filters.only_cancelled}
-                  onClick={() => setFilters({ ...filters, only_cancelled: true, include_cancelled: false })}
-                  label="Solo annullati"
-                  variant="danger"
-                />
-              </div>
-            </div>
+        <FilterSection title="Vista">
+          <FilterChip
+            active={!filters.only_cancelled && !filters.include_cancelled && !filters.overdue}
+            onClick={() => setFilters({ ...filters, only_cancelled: false, include_cancelled: false, overdue: false })}
+            label="Attivi"
+          />
+          <FilterChip
+            active={filters.overdue}
+            onClick={() => setFilters({ ...filters, overdue: !filters.overdue, only_cancelled: false })}
+            label="Scaduti"
+          />
+          <FilterChip
+            active={filters.include_cancelled && !filters.only_cancelled}
+            onClick={() => setFilters({ ...filters, include_cancelled: !filters.include_cancelled, only_cancelled: false })}
+            label="Anche annullati"
+          />
+          <FilterChip
+            active={filters.only_cancelled}
+            onClick={() => setFilters({ ...filters, only_cancelled: !filters.only_cancelled, include_cancelled: false })}
+            label="Solo annullati"
+            variant="danger"
+          />
+        </FilterSection>
 
-            {/* Riga 2: Classificazione */}
-            <div>
-              <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">🏷️ Classificazione</label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <select value={filters.stato} onChange={(e) => setFilters({ ...filters, stato: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
-                  <option value="">Tutti gli stati</option>
-                  {statiConfig.map(s => <option key={s._id} value={s.label}>{s.icon ? `${s.icon} ` : ''}{s.label}</option>)}
-                </select>
-                <select value={filters.tipo} onChange={(e) => setFilters({ ...filters, tipo: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
-                  <option value="">Tutti i tipi</option>
-                  {tipiConfig.map(t => <option key={t._id} value={t.label}>{t.icon ? `${t.icon} ` : ''}{t.label}</option>)}
-                </select>
-                <select value={filters.priorita} onChange={(e) => setFilters({ ...filters, priorita: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
-                  <option value="">Tutte le priorità</option>
-                  {prioritaConfig.map(p => <option key={p._id} value={p.label}>{p.icon ? `${p.icon} ` : ''}{p.label}</option>)}
-                </select>
-                <select value={filters.categoria_perdita} onChange={(e) => setFilters({ ...filters, categoria_perdita: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
-                  <option value="">Tutte categorie perdita</option>
-                  {(configs.categorie_perdita || []).map(c => <option key={c._id} value={c.label}>{c.icon ? `${c.icon} ` : ''}{c.label}</option>)}
-                </select>
-              </div>
-            </div>
+        <FilterSection title="Origine">
+          <MultiFilterChip filters={filters} setFilters={setFilters} field="parent_type" value="standalone" label="Manuale" />
+          <MultiFilterChip filters={filters} setFilters={setFilters} field="parent_type" value="segnalazione" label="Segnalazione" />
+          <MultiFilterChip filters={filters} setFilters={setFilters} field="parent_type" value="dashboard" label="Meeting" />
+          <MultiFilterChip filters={filters} setFilters={setFilters} field="parent_type" value="kaizen" label="Kaizen" />
+          <MultiFilterChip filters={filters} setFilters={setFilters} field="parent_type" value="pillar" label="Pillar" />
+        </FilterSection>
 
-            {/* Riga 3: Struttura aziendale */}
-            <div>
-              <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">🏭 Struttura aziendale</label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <select value={filters.reparto} onChange={(e) => setFilters({ ...filters, reparto: e.target.value, linea: '', macchina: '' })} className="border rounded-lg px-3 py-2 text-sm">
-                  <option value="">Tutti i reparti</option>
-                  {reparti.filter(r => r.attivo !== false).map(r => <option key={r._id} value={r.nome}>{r.nome}{r.codice ? ` [${r.codice}]` : ''}</option>)}
-                </select>
-                <select value={filters.linea} onChange={(e) => setFilters({ ...filters, linea: e.target.value, macchina: '' })} disabled={!filters.reparto} className="border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100">
-                  <option value="">{filters.reparto ? '🔹 Tutte le linee' : '— prima il reparto —'}</option>
-                  {lineeFiltrate.filter(l => l.attivo !== false).map(l => <option key={l.id} value={l.nome}>{l.nome}{l.codice ? ` [${l.codice}]` : ''}</option>)}
-                </select>
-                <select value={filters.macchina} onChange={(e) => setFilters({ ...filters, macchina: e.target.value })} disabled={!filters.linea} className="border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100">
-                  <option value="">{filters.linea ? 'Tutte le macchine' : '— prima la linea —'}</option>
-                  {macchineFiltrate.filter(m => m.attivo !== false).map(m => <option key={m.id} value={m.nome}>{m.nome}{m.codice ? ` [${m.codice}]` : ''}</option>)}
-                </select>
-                <select value={filters.quinta_m} onChange={(e) => setFilters({ ...filters, quinta_m: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
-                  <option value="">Tutte le 5M</option>
-                  <option value="Machine">Machine</option>
-                  <option value="Manodopera">Manodopera</option>
-                  <option value="Metodo">Metodo</option>
-                  <option value="Materiale">Materiale</option>
-                  <option value="Misurazione">Misurazione</option>
-                </select>
-              </div>
-            </div>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <FilterCheckboxGroup
+            title="Stato"
+            field="stato"
+            options={statiConfig.map(item => ({ value: item.label, label: item.label }))}
+            filters={filters}
+            setFilters={setFilters}
+          />
+          <FilterCheckboxGroup
+            title="Tipo"
+            field="tipo"
+            options={tipiConfig.map(item => ({ value: item.label, label: item.label }))}
+            filters={filters}
+            setFilters={setFilters}
+          />
+          <FilterCheckboxGroup
+            title="Priorità"
+            field="priorita"
+            options={prioritaConfig.map(item => ({ value: item.label, label: item.label }))}
+            filters={filters}
+            setFilters={setFilters}
+          />
+        </div>
 
-            {/* Riga 4: Contesto */}
+        <div className="border-t pt-4">
+          <div className="text-xs font-semibold text-gray-600 uppercase mb-2">Struttura e contesto</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
+            <select value={filters.reparto} onChange={event => setFilters({ ...filters, reparto: event.target.value, linea: '', macchina: '' })} className="border rounded-lg px-3 py-2 text-sm">
+              <option value="">Tutti i reparti</option>
+              {reparti.filter(item => item.attivo !== false).map(item => <option key={item._id} value={item.nome}>{item.nome}</option>)}
+            </select>
+            <select value={filters.linea} onChange={event => setFilters({ ...filters, linea: event.target.value, macchina: '' })} disabled={!filters.reparto} className="border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100">
+              <option value="">{filters.reparto ? 'Tutte le linee' : 'Prima seleziona il reparto'}</option>
+              {lineeFiltrate.filter(item => item.attivo !== false).map(item => <option key={item.id} value={item.nome}>{item.nome}</option>)}
+            </select>
+            <select value={filters.macchina} onChange={event => setFilters({ ...filters, macchina: event.target.value })} disabled={!filters.linea} className="border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100">
+              <option value="">{filters.linea ? 'Tutte le macchine' : 'Prima seleziona la linea'}</option>
+              {macchineFiltrate.filter(item => item.attivo !== false).map(item => <option key={item.id} value={item.nome}>{item.nome}</option>)}
+            </select>
+            <select value={filters.quinta_m} onChange={event => setFilters({ ...filters, quinta_m: event.target.value })} className="border rounded-lg px-3 py-2 text-sm">
+              <option value="">Tutte le 5M</option>
+              <option value="Machine">Machine</option>
+              <option value="Manodopera">Manodopera</option>
+              <option value="Metodo">Metodo</option>
+              <option value="Materiale">Materiale</option>
+              <option value="Misurazione">Misurazione</option>
+            </select>
+            <select value={filters.categoria_perdita} onChange={event => setFilters({ ...filters, categoria_perdita: event.target.value })} className="border rounded-lg px-3 py-2 text-sm">
+              <option value="">Tutte le categorie perdita</option>
+              {(configs.categorie_perdita || []).map(item => <option key={item._id} value={item.label}>{item.label}</option>)}
+            </select>
+            <select value={filters.pillar_id} onChange={event => setFilters({ ...filters, pillar_id: event.target.value })} className="border rounded-lg px-3 py-2 text-sm">
+              <option value="">Tutti i Pillar</option>
+              {pillars.filter(item => item.attivo !== false).map(item => <option key={item._id} value={item._id}>{item.sigla} - {item.label}</option>)}
+            </select>
+            <select value={filters.dashboard_id} onChange={event => setFilters({ ...filters, dashboard_id: event.target.value })} className="border rounded-lg px-3 py-2 text-sm">
+              <option value="">Tutti i Meeting</option>
+              {dashboards.map(item => <option key={item._id} value={item._id}>{item.nome || item.label || item.titolo || 'Meeting'}</option>)}
+            </select>
             <div>
-              <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">🔗 Contesto</label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                <select value={filters.pillar_id} onChange={(e) => setFilters({ ...filters, pillar_id: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
-                  <option value="">Tutti i pillars</option>
-                  {pillars.filter(p => p.attivo !== false).map(p => (
-                    <option key={p._id} value={p._id}>{p.icon ? `${p.icon} ` : ''}{p.sigla} — {p.label}</option>
-                  ))}
-                </select>
-                <select value={filters.dashboard_id} onChange={(e) => setFilters({ ...filters, dashboard_id: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
-                  <option value="">Tutte le dashboard</option>
-                  {dashboards.map(d => (
-                    <option key={d._id} value={d._id}>{d.icon ? `${d.icon} ` : '📊 '}{d.nome || d.label || d.titolo || 'Dashboard'}</option>
-                  ))}
-                </select>
-                <input type="text" list="responsabili-list" placeholder="Responsabile" value={filters.responsabile}
-                  onChange={(e) => setFilters({ ...filters, responsabile: e.target.value })}
-                  className="border rounded-lg px-3 py-2 text-sm" />
-                <datalist id="responsabili-list">
-                  {responsabiliUnici.map(r => <option key={r} value={r} />)}
-                </datalist>
-              </div>
+              <input
+                type="text"
+                list="responsabili-list"
+                placeholder="Responsabile"
+                value={filters.responsabile}
+                onChange={event => setFilters({ ...filters, responsabile: event.target.value })}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              />
+              <datalist id="responsabili-list">
+                {responsabiliUnici.map(item => <option key={item} value={item} />)}
+              </datalist>
             </div>
           </div>
-        )}
+        </div>
       </div>
       {/* LISTA/KANBAN */}
       {loading ? (
