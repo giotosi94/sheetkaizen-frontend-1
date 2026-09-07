@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Plus, Search, Filter, ChevronDown, Archive, Trash2, RotateCcw } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useAllConfigurations } from '../hooks/useConfigurations'
 import { usePillars } from '../hooks/usePillars'
@@ -144,9 +144,20 @@ function SearchableMultiSelect({ title, field, options, filters, setFilters, dis
 
 export default function KaizenListPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [kaizens, setKaizens] = useState([])
   const [showModal, setShowModal] = useState(false)
   const [newKaizen, setNewKaizen] = useState(INITIAL_KAIZEN)
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      const did = searchParams.get('dashboard_id') || ''
+      const dnome = searchParams.get('dashboard_nome') || ''
+      setNewKaizen({ ...INITIAL_KAIZEN, dashboard_id: did, dashboard_nome: dnome })
+      setShowModal(true)
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
   const [filters, setFilters] = useState(INITIAL_FILTERS)
   const [showFilters, setShowFilters] = useState(false)
   const [dashboards, setDashboards] = useState([])
