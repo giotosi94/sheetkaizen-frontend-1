@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import {
-  Save, ChevronDown, X, History, RefreshCw, Lock, RotateCcw,
+  Save, ChevronDown, X, History, RefreshCw, Lock, RotateCcw, ArrowLeft,
   Zap, BarChart3, Trophy, FileText, Activity, User, Target,
   Factory, MapPin, Cog, Building2, CalendarDays, Check, AlertTriangle, Info,
 } from 'lucide-react'
@@ -189,6 +189,9 @@ function buildTabsForLivello(livello, isAdmin) {
 
 export default function KaizenDetailPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const fromDashboard = searchParams.get('from_dashboard')
   const { isAdmin } = useAuth()
   const [kaizen, setKaizen] = useState(null)
   const [activeTab, setActiveTab] = useState('quickkaizen')
@@ -489,6 +492,13 @@ export default function KaizenDetailPage() {
   return (
     <div>
       <div className="bg-primary text-white rounded-xl p-6 mb-6">
+        <button
+          onClick={() => navigate(fromDashboard ? `/dashboard/${fromDashboard}` : '/kaizen')}
+          className="flex items-center gap-2 text-white text-opacity-90 hover:text-opacity-100 mb-4 text-sm"
+        >
+          <ArrowLeft size={18} />
+          {fromDashboard ? 'Torna al Meeting' : 'Torna ai Kaizen'}
+        </button>
         <div className="flex justify-between items-start mb-5">
           <div>
             <h1 className="text-2xl font-bold">{kaizen.titolo || 'Kaizen'}</h1>
