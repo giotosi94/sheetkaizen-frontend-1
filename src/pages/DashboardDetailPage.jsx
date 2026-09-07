@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import GridLayout from 'react-grid-layout'
 import api from '../services/api'
-import { Save, ArrowLeft, Plus, Trash2, Settings, Edit2, X } from 'lucide-react'
+import { Save, ArrowLeft, Plus, Trash2, Settings, Edit2, X, Check } from 'lucide-react'
 import ActionPlanWidget from '../components/widgets/ActionPlanWidget'
 import KaizenWidget from '../components/widgets/KaizenWidget'
 import KPICard from '../components/widgets/KPICard'
@@ -27,16 +27,43 @@ const WIDGET_TYPES = [
   { id: 'gantt', label: 'Gantt', icon: 'GNT', defaultSize: { w: 12, h: 8 } },
 ]
 
+function buildTabId() {
+  return `tab_${Date.now()}_${Math.floor(Math.random() * 1000)}`
+}
+
+function normalizeTabs(data) {
+  if (Array.isArray(data.tabs) && data.tabs.length > 0) {
+    return data.tabs
+      .map((tab, index) => ({
+        id: tab.id || buildTabId(),
+        titolo: tab.titolo || `Pagina ${index + 1}`,
+        ordine: tab.ordine != null ? tab.ordine : index,
+        layout: Array.isArray(tab.layout) ? tab.layout : [],
+      }))
+      .sort((a, b) => a.ordine - b.ordine)
+  }
+  return [{
+    id: buildTabId(),
+    titolo: 'Panoramica',
+    ordine: 0,
+    layout: Array.isArray(data.layout) ? data.layout : [],
+  }]
+}
+
 export default function DashboardDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [dashboard, setDashboard] = useState(null)
+  const [tabs, setTabs] = useState([])
+  const [activeTabId, setActiveTabId] = useState(null)
   const [editMode, setEditMode] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showAddWidget, setShowAddWidget] = useState(false)
   const [editingWidget, setEditingWidget] = useState(null)
   const [editingTitolo, setEditingTitolo] = useState(false)
   const [titoloDraft, setTitoloDraft] = useState('')
+  const [renamingTabId, setRenamingTabId] = useState(null)
+  const [tabNameDraft, setTabNameDraft] = useState('')
 
   useEffect(() => { loadDashboard() }, [id])
 
@@ -44,7 +71,16 @@ export default function DashboardDetailPage() {
     try {
       const res = await api.get(`/dashboards/${id}`)
       setDashboard(res.data)
+      const normalized = normalizeTabs(res.data)
+      setTabs(normalized)
+      setActiveTabId(normalized[0].id)
     } catch (err) { console.error(err) }
+  }
+
+  const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0]
+
+  const updateActiveTabLayout = (newLayout) => {
+    setTabs(prev => prev.map(t => (t.id === activeTabId ? { ...t, layout: newLayout } : t)))
   }
 
   const saveTitolo = async () => {
@@ -66,7 +102,16 @@ export default function DashboardDetailPage() {
   const saveDashboard = async () => {
     setSaving(true)
     try {
-      await api.put(`/dashboards/${id}`, { layout: dashboard.layout })
+      const payload = {
+        tabs: tabs.map((t, index) => ({
+          id: t.id,
+          titolo: t.titolo,
+          ordine: index,
+          layout: t.layout || [],
+        })),
+        layout: tabs[0]?.layout || [],
+      }
+      await api.put(`/dashboards/${id}`, payload)
       alert('Dashboard salvata!')
       setEditMode(false)
     } catch (err) {
@@ -74,6 +119,39 @@ export default function DashboardDetailPage() {
       alert('Errore salvataggio')
     }
     setSaving(false)
+  }
+
+  const addTab = () => {
+    const newTab = {
+      id: buildTabId(),
+      titolo: `Pagina ${tabs.length + 1}`,
+      ordine: tabs.length,
+      layout: [],
+    }
+    setTabs([...tabs, newTab])
+    setActiveTabId(newTab.id)
+    setRenamingTabId(newTab.id)
+    setTabNameDraft(newTab.titolo)
+  }
+
+  const confirmRenameTab = () => {
+    const nome = tabNameDraft.trim()
+    if (nome) {
+      setTabs(prev => prev.map(t => (t.id === renamingTabId ? { ...t, titolo: nome } : t)))
+    }
+    setRenamingTabId(null)
+    setTabNameDraft('')
+  }
+
+  const removeTab = (tabId) => {
+    if (tabs.length <= 1) {
+      alert('Deve rimanere almeno una pagina')
+      return
+    }
+    if (!confirm('Eliminare questa pagina e tutti i suoi widget?')) return
+    const remaining = tabs.filter(t => t.id !== tabId)
+    setTabs(remaining)
+    if (activeTabId === tabId) setActiveTabId(remaining[0].id)
   }
 
   const addWidget = (type) => {
@@ -85,36 +163,31 @@ export default function DashboardDetailPage() {
       posizione: { x: 0, y: 0, w: widgetType.defaultSize.w, h: widgetType.defaultSize.h },
       config: {},
     }
-    setDashboard({ ...dashboard, layout: [...(dashboard.layout || []), newWidget] })
+    updateActiveTabLayout([...(activeTab.layout || []), newWidget])
     setShowAddWidget(false)
   }
 
   const removeWidget = (widgetId) => {
-    setDashboard({
-      ...dashboard,
-      layout: dashboard.layout.filter(w => w.widget_id !== widgetId),
-    })
+    updateActiveTabLayout(activeTab.layout.filter(w => w.widget_id !== widgetId))
   }
 
   const updateWidgetConfig = (widgetId, newConfig) => {
-    setDashboard({
-      ...dashboard,
-      layout: dashboard.layout.map(w =>
+    updateActiveTabLayout(
+      activeTab.layout.map(w =>
         w.widget_id === widgetId ? { ...w, config: { ...w.config, ...newConfig } } : w
-      ),
-    })
+      )
+    )
   }
 
   const onLayoutChange = (newLayout) => {
     if (!editMode) return
-    setDashboard({
-      ...dashboard,
-      layout: dashboard.layout.map(w => {
+    updateActiveTabLayout(
+      activeTab.layout.map(w => {
         const l = newLayout.find(item => item.i === w.widget_id)
         if (l) return { ...w, posizione: { x: l.x, y: l.y, w: l.w, h: l.h } }
         return w
-      }),
-    })
+      })
+    )
   }
 
   const renderWidget = (widget) => {
@@ -160,9 +233,9 @@ export default function DashboardDetailPage() {
     }
   }
 
-  if (!dashboard) return <div className="text-center py-8">Caricamento...</div>
+  if (!dashboard || !activeTab) return <div className="text-center py-8">Caricamento...</div>
 
-  const gridLayout = (dashboard.layout || []).map(w => ({
+  const gridLayout = (activeTab.layout || []).map(w => ({
     i: w.widget_id,
     x: w.posizione?.x || 0,
     y: w.posizione?.y || 0,
@@ -173,7 +246,7 @@ export default function DashboardDetailPage() {
   return (
     <div>
       {/* Header */}
-      <div className="bg-primary text-white rounded-xl p-4 mb-6 flex justify-between items-center">
+      <div className="bg-primary text-white rounded-xl p-4 mb-4 flex justify-between items-center">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/dashboard')} className="hover:bg-primary-light p-2 rounded">
             <ArrowLeft size={20} />
@@ -221,13 +294,77 @@ export default function DashboardDetailPage() {
         </div>
       </div>
 
-      {/* Grid */}
-      {(!dashboard.layout || dashboard.layout.length === 0) ? (
-        <div className="bg-white rounded-xl shadow p-12 text-center">
-          <p className="text-gray-400 mb-4">Nessun widget. Aggiungine uno per iniziare!</p>
-          <button onClick={() => { setEditMode(true); setShowAddWidget(true) }} className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-light">
-            Aggiungi primo widget
+      {/* Barra Tab */}
+      <div className="flex items-center gap-1 mb-4 border-b border-gray-200 flex-wrap">
+        {tabs.map(tab => (
+          <div key={tab.id} className="flex items-center">
+            {renamingTabId === tab.id ? (
+              <div className="flex items-center gap-1 px-2 py-1">
+                <input
+                  value={tabNameDraft}
+                  onChange={(e) => setTabNameDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') confirmRenameTab() }}
+                  className="border rounded px-2 py-1 text-sm"
+                  autoFocus
+                />
+                <button onClick={confirmRenameTab} className="text-green-600 p-1 hover:bg-green-50 rounded">
+                  <Check size={14} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setActiveTabId(tab.id)}
+                onDoubleClick={() => {
+                  if (editMode) {
+                    setRenamingTabId(tab.id)
+                    setTabNameDraft(tab.titolo)
+                  }
+                }}
+                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                  activeTabId === tab.id
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+                title={editMode ? 'Doppio clic per rinominare' : ''}
+              >
+                {tab.titolo}
+                {editMode && activeTabId === tab.id && tabs.length > 1 && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => { e.stopPropagation(); removeTab(tab.id) }}
+                    className="ml-2 text-red-500 hover:text-red-700"
+                  >
+                    &times;
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
+        ))}
+        {editMode && (
+          <button
+            onClick={addTab}
+            className="px-3 py-2 text-sm text-primary hover:bg-primary/5 rounded-t-lg flex items-center gap-1"
+          >
+            <Plus size={14} /> Pagina
           </button>
+        )}
+      </div>
+
+      {/* Grid del tab attivo */}
+      {(!activeTab.layout || activeTab.layout.length === 0) ? (
+        <div className="bg-white rounded-xl shadow p-12 text-center">
+          <p className="text-gray-400 mb-4">Nessun widget in questa pagina.</p>
+          {editMode ? (
+            <button onClick={() => setShowAddWidget(true)} className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-light">
+              Aggiungi widget
+            </button>
+          ) : (
+            <button onClick={() => { setEditMode(true); setShowAddWidget(true) }} className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-light">
+              Modifica e aggiungi widget
+            </button>
+          )}
         </div>
       ) : (
         <GridLayout
@@ -241,7 +378,7 @@ export default function DashboardDetailPage() {
           isResizable={editMode}
           draggableCancel=".widget-action-btn"
         >
-          {dashboard.layout.map(widget => (
+          {activeTab.layout.map(widget => (
             <div key={widget.widget_id} className="relative">
               {editMode && (
                 <div className="absolute top-1 right-1 z-20 flex gap-1 widget-action-btn">
