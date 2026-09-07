@@ -48,6 +48,14 @@ export default function KaizenWidget({ dashboardId, dashboardName, title = 'Kaiz
     navigate(`/kaizen?${params.toString()}`)
   }
 
+  const apriKaizen = (kaizenId) => {
+    if (dashboardId) {
+      navigate(`/kaizen/${kaizenId}?from_dashboard=${dashboardId}`)
+    } else {
+      navigate(`/kaizen/${kaizenId}`)
+    }
+  }
+
   return (
     <div className="bg-white rounded-xl shadow p-3 h-full flex flex-col overflow-hidden">
       <div className="flex justify-between items-center mb-2 border-b pb-2">
@@ -77,7 +85,7 @@ export default function KaizenWidget({ dashboardId, dashboardName, title = 'Kaiz
               <div
                 key={k._id}
                 className="py-2 px-1 flex items-center gap-2 hover:bg-gray-50 cursor-pointer"
-                onClick={() => navigate(`/kaizen/${k._id}`)}
+                onClick={() => apriKaizen(k._id)}
               >
                 <span className="font-mono text-xs font-bold text-primary w-16 flex-shrink-0">{k.numero}</span>
                 <span className="flex-1 text-sm text-gray-700 truncate">{k.titolo}</span>
