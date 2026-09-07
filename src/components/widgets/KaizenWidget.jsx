@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../../services/api'
-import { Lightbulb, ExternalLink, Plus, X } from 'lucide-react'
+import { Lightbulb, ExternalLink, Plus } from 'lucide-react'
 
 const LIVELLO_COLOR = {
   Quick: 'bg-emerald-100 text-emerald-700',
@@ -10,25 +10,15 @@ const LIVELLO_COLOR = {
 }
 
 const STATO_COLOR = {
-  Aperto: 'bg-yellow-100 text-yellow-700',
-  'In Corso': 'bg-blue-100 text-blue-700',
-  Chiuso: 'bg-green-100 text-green-700',
+  Aperto: 'bg-blue-100 text-blue-700',
+  'In Corso': 'bg-yellow-100 text-yellow-700',
+  Chiuso: 'bg-gray-200 text-gray-700',
 }
-
-const LIVELLI = ['Quick', 'Standard', 'Major']
 
 export default function KaizenWidget({ dashboardId, dashboardName, title = 'Kaizen collegati' }) {
   const [kaizens, setKaizens] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [nuovoTitolo, setNuovoTitolo] = useState('')
-  const [nuovoLivello, setNuovoLivello] = useState('Quick')
   const navigate = useNavigate()
-
-  const savedUser = (() => {
-    try { return JSON.parse(localStorage.getItem('user') || '{}') } catch { return {} }
-  })()
 
   useEffect(() => { load() }, [dashboardId])
 
@@ -48,33 +38,14 @@ export default function KaizenWidget({ dashboardId, dashboardName, title = 'Kaiz
     }
   }
 
-  const creaKaizen = async () => {
-    const titolo = nuovoTitolo.trim()
-    if (!titolo) return
-    setCreating(true)
-    try {
-      const payload = {
-        titolo,
-        livello: nuovoLivello,
-        dashboard_id: dashboardId,
-        dashboard_nome: dashboardName || '',
-        creatore_id: savedUser.id || savedUser._id || null,
-        creatore_nome: savedUser.name || savedUser.nome || savedUser.full_name || null,
-      }
-      const res = await api.post('/kaizens', payload)
-      const newId = res.data?.id
-      if (newId) {
-        navigate(`/kaizen/${newId}`)
-      } else {
-        await load()
-        setShowForm(false)
-      }
-    } catch (err) {
-      console.error(err)
-      alert('Errore creazione Kaizen: ' + (err.response?.data?.detail || err.message))
-    } finally {
-      setCreating(false)
-    }
+  const apriNuovoKaizen = (e) => {
+    e.stopPropagation()
+    const params = new URLSearchParams({
+      new: '1',
+      dashboard_id: dashboardId || '',
+      dashboard_nome: dashboardName || '',
+    })
+    navigate(`/kaizen?${params.toString()}`)
   }
 
   return (
@@ -88,49 +59,12 @@ export default function KaizenWidget({ dashboardId, dashboardName, title = 'Kaiz
         <button
           type="button"
           onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => { e.stopPropagation(); setShowForm(v => !v); setNuovoTitolo(''); setNuovoLivello('Quick') }}
+          onClick={apriNuovoKaizen}
           className="widget-action-btn bg-primary text-white rounded px-2 py-1 text-xs flex items-center gap-1 hover:bg-primary-light flex-shrink-0"
         >
           <Plus size={13} /> Nuovo
         </button>
       </div>
-
-      {showForm && (
-        <div className="mb-2 border rounded-lg p-2 bg-gray-50 space-y-2" onMouseDown={(e) => e.stopPropagation()}>
-          <input
-            value={nuovoTitolo}
-            onChange={(e) => setNuovoTitolo(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') creaKaizen() }}
-            placeholder="Titolo del Kaizen..."
-            className="w-full border rounded px-2 py-1.5 text-sm"
-            autoFocus
-          />
-          <div className="flex gap-2 items-center">
-            <select
-              value={nuovoLivello}
-              onChange={(e) => setNuovoLivello(e.target.value)}
-              className="border rounded px-2 py-1.5 text-sm flex-1"
-            >
-              {LIVELLI.map(l => <option key={l} value={l}>{l}</option>)}
-            </select>
-            <button
-              type="button"
-              onClick={creaKaizen}
-              disabled={creating || !nuovoTitolo.trim()}
-              className="bg-primary text-white rounded px-3 py-1.5 text-sm hover:bg-primary-light disabled:opacity-50"
-            >
-              {creating ? '...' : 'Crea e apri'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="text-gray-400 hover:text-gray-700 p-1"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-      )}
 
       <div className="overflow-y-auto flex-1">
         {loading ? (
@@ -147,9 +81,9 @@ export default function KaizenWidget({ dashboardId, dashboardName, title = 'Kaiz
               >
                 <span className="font-mono text-xs font-bold text-primary w-16 flex-shrink-0">{k.numero}</span>
                 <span className="flex-1 text-sm text-gray-700 truncate">{k.titolo}</span>
-                {k.livello && (
+                {(k.livello || k.tipo) && (
                   <span className={`text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${LIVELLO_COLOR[k.livello] || 'bg-gray-100 text-gray-600'}`}>
-                    {k.livello}
+                    {k.livello || 'Quick'}
                   </span>
                 )}
                 {k.stato && (
