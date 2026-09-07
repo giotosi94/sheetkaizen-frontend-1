@@ -65,6 +65,18 @@ export default function DashboardDetailPage() {
   const [renamingTabId, setRenamingTabId] = useState(null)
   const [tabNameDraft, setTabNameDraft] = useState('')
   const [draggedTabId, setDraggedTabId] = useState(null)
+  const [gridWidth, setGridWidth] = useState(1200)
+  const gridContainerRef = useState(null)
+
+  useEffect(() => {
+    const el = document.getElementById('dashboard-grid-container')
+    if (!el) return
+    const update = () => setGridWidth(el.offsetWidth)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [activeTabId])
 
   useEffect(() => { loadDashboard() }, [id])
 
@@ -394,12 +406,13 @@ export default function DashboardDetailPage() {
           )}
         </div>
       ) : (
+        <div id="dashboard-grid-container">
         <GridLayout
           className="layout"
           layout={gridLayout}
           cols={12}
           rowHeight={50}
-          width={1200}
+          width={gridWidth}
           onLayoutChange={onLayoutChange}
           isDraggable={editMode}
           isResizable={editMode}
@@ -433,6 +446,7 @@ export default function DashboardDetailPage() {
             </div>
           ))}
         </GridLayout>
+        </div>
       )}
 
       {/* Modal Add Widget */}
