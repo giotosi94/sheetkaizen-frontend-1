@@ -278,7 +278,7 @@ function RepartiTreePlaceholder() {
   async function load() {
     setLoading(true)
     try {
-      const res = await api.get('/reparti/')
+      const res = await api.get('/reparti/?include_inactive=true')
       setReparti(res.data)
     } catch (err) {
       const detail = err.response?.data?.detail
@@ -320,6 +320,9 @@ function RepartiTreePlaceholder() {
   }
 
   async function handleToggleAttivoReparto(reparto) {
+    if (reparto.attivo) {
+      if (!confirm(`Disattivare il reparto "${reparto.nome}"?\n\nNON verra eliminato: resta salvato con tutte le sue linee e macchine, ma verra mostrato in grigio come disattivato.`)) return
+    }
     try {
       await api.put(`/reparti/${reparto._id}`, { attivo: !reparto.attivo })
       load()
@@ -508,6 +511,11 @@ function RepartoCard({ reparto, allReparti = [], expanded, onToggle, expandedLin
             <span className="text-xs text-gray-500">
               {linee.length} linee, {totMacchine} macchine
             </span>
+            {!reparto.attivo && (
+              <span className="text-[10px] px-1.5 py-0.5 bg-gray-200 text-gray-600 rounded font-medium uppercase">
+                Disattivato
+              </span>
+            )}
           </div>
           {reparto.descrizione && (
             <div className="text-xs text-gray-600 truncate">{reparto.descrizione}</div>
