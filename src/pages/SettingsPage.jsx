@@ -426,6 +426,8 @@ function RepartoCard({ reparto, allReparti = [], expanded, onToggle, expandedLin
   const [showLineaForm, setShowLineaForm] = useState(false)
   const [editingLinea, setEditingLinea] = useState(null)
   const [draggedLineaId, setDraggedLineaId] = useState(null)
+  const [dragEnabledLineaId, setDragEnabledLineaId] = useState(null)
+  const [dragOverLineaId, setDragOverLineaId] = useState(null)
   const linee = reparto.linee || []
   const totMacchine = linee.reduce((s, l) => s + (l.macchine?.length || 0), 0)
 
@@ -444,15 +446,21 @@ function RepartoCard({ reparto, allReparti = [], expanded, onToggle, expandedLin
     }
   }
 
+  function resetLineaDrag() {
+    setDraggedLineaId(null)
+    setDragEnabledLineaId(null)
+    setDragOverLineaId(null)
+  }
+
   function handleLineaDrop(targetId) {
-    if (!draggedLineaId || draggedLineaId === targetId) { setDraggedLineaId(null); return }
+    if (!draggedLineaId || draggedLineaId === targetId) { resetLineaDrag(); return }
     const from = linee.findIndex(l => l.id === draggedLineaId)
     const to = linee.findIndex(l => l.id === targetId)
-    if (from === -1 || to === -1) { setDraggedLineaId(null); return }
+    if (from === -1 || to === -1) { resetLineaDrag(); return }
     const reordered = [...linee]
     const [moved] = reordered.splice(from, 1)
     reordered.splice(to, 0, moved)
-    setDraggedLineaId(null)
+    resetLineaDrag()
     saveLineeOrder(reordered)
   }
 
@@ -532,16 +540,20 @@ function RepartoCard({ reparto, allReparti = [], expanded, onToggle, expandedLin
             linee.map(linea => (
               <div
                 key={linea.id}
-                draggable
-                onDragStart={() => setDraggedLineaId(linea.id)}
+                draggable={dragEnabledLineaId === linea.id}
+                onDragStart={(e) => { e.stopPropagation(); setDraggedLineaId(linea.id) }}
+                onDragEnter={() => { if (draggedLineaId && draggedLineaId !== linea.id) setDragOverLineaId(linea.id) }}
                 onDragOver={(e) => { if (draggedLineaId) e.preventDefault() }}
-                onDrop={() => handleLineaDrop(linea.id)}
-                className={draggedLineaId === linea.id ? 'opacity-40' : ''}
+                onDrop={(e) => { e.stopPropagation(); handleLineaDrop(linea.id) }}
+                onDragEnd={resetLineaDrag}
+                className={`rounded transition-all ${draggedLineaId === linea.id ? 'opacity-40' : ''} ${dragOverLineaId === linea.id ? 'border-t-2 border-indigo-500 pt-1' : ''}`}
               >
                 <LineaCard
                   reparto={reparto}
                   allReparti={allReparti}
                   linea={linea}
+                  onGrabStart={() => setDragEnabledLineaId(linea.id)}
+                  onGrabEnd={() => setDragEnabledLineaId(null)}
                   expanded={expandedLinee.has(`${reparto._id}_${linea.id}`)}
                   onToggle={() => onToggleLinea(`${reparto._id}_${linea.id}`)}
                   onEdit={() => { setEditingLinea(linea); setShowLineaForm(true) }}
@@ -573,10 +585,12 @@ function RepartoCard({ reparto, allReparti = [], expanded, onToggle, expandedLin
   )
 }
 
-function LineaCard({ reparto, allReparti = [], linea, expanded, onToggle, onEdit, onDelete, onDuplicate, onChange }) {
+function LineaCard({ reparto, allReparti = [], linea, expanded, onToggle, onEdit, onDelete, onDuplicate, onChange, onGrabStart, onGrabEnd }) {
   const [showMacchinaForm, setShowMacchinaForm] = useState(false)
   const [editingMacchina, setEditingMacchina] = useState(null)
   const [draggedMacchinaId, setDraggedMacchinaId] = useState(null)
+  const [dragEnabledMacchinaId, setDragEnabledMacchinaId] = useState(null)
+  const [dragOverMacchinaId, setDragOverMacchinaId] = useState(null)
   const [showCopyModal, setShowCopyModal] = useState(false)
   const macchine = linea.macchine || []
 
@@ -606,15 +620,21 @@ function LineaCard({ reparto, allReparti = [], linea, expanded, onToggle, onEdit
     }
   }
 
+  function resetMacchinaDrag() {
+    setDraggedMacchinaId(null)
+    setDragEnabledMacchinaId(null)
+    setDragOverMacchinaId(null)
+  }
+
   function handleMacchinaDrop(targetId) {
-    if (!draggedMacchinaId || draggedMacchinaId === targetId) { setDraggedMacchinaId(null); return }
+    if (!draggedMacchinaId || draggedMacchinaId === targetId) { resetMacchinaDrag(); return }
     const from = macchine.findIndex(m => m.id === draggedMacchinaId)
     const to = macchine.findIndex(m => m.id === targetId)
-    if (from === -1 || to === -1) { setDraggedMacchinaId(null); return }
+    if (from === -1 || to === -1) { resetMacchinaDrag(); return }
     const reordered = [...macchine]
     const [moved] = reordered.splice(from, 1)
     reordered.splice(to, 0, moved)
-    setDraggedMacchinaId(null)
+    resetMacchinaDrag()
     saveMacchine(reordered)
   }
 
@@ -628,6 +648,13 @@ function LineaCard({ reparto, allReparti = [], linea, expanded, onToggle, onEdit
   return (
     <div className={`border-l-2 border-blue-300 ml-2 rounded transition-all ${!linea.attivo ? 'opacity-50' : ''}`}>
       <div className="bg-blue-50 px-3 py-1.5 flex items-center gap-2 rounded-r">
+        <GripVertical
+          size={14}
+          className="text-blue-400 flex-shrink-0 cursor-grab active:cursor-grabbing"
+          title="Trascina per riordinare la linea"
+          onMouseDown={() => onGrabStart && onGrabStart()}
+          onMouseUp={() => onGrabEnd && onGrabEnd()}
+        />
         <button onClick={onToggle} className="p-0.5 hover:bg-blue-100 rounded">
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
@@ -673,13 +700,20 @@ function LineaCard({ reparto, allReparti = [], linea, expanded, onToggle, onEdit
             macchine.map(m => (
               <div
                 key={m.id}
-                draggable
-                onDragStart={() => setDraggedMacchinaId(m.id)}
+                draggable={dragEnabledMacchinaId === m.id}
+                onDragStart={(e) => { e.stopPropagation(); setDraggedMacchinaId(m.id) }}
+                onDragEnter={() => { if (draggedMacchinaId && draggedMacchinaId !== m.id) setDragOverMacchinaId(m.id) }}
                 onDragOver={(e) => { if (draggedMacchinaId) e.preventDefault() }}
-                onDrop={() => handleMacchinaDrop(m.id)}
-                className={`flex items-center gap-2 px-2 py-1 bg-gray-50 rounded text-xs ${!m.attivo ? 'opacity-50' : ''} ${draggedMacchinaId === m.id ? 'opacity-40' : ''}`}
+                onDrop={(e) => { e.stopPropagation(); handleMacchinaDrop(m.id) }}
+                onDragEnd={resetMacchinaDrag}
+                className={`flex items-center gap-2 px-2 py-1 bg-gray-50 rounded text-xs ${!m.attivo ? 'opacity-50' : ''} ${draggedMacchinaId === m.id ? 'opacity-40' : ''} ${dragOverMacchinaId === m.id ? 'border-t-2 border-indigo-500' : ''}`}
               >
-                <GripVertical size={12} className="text-gray-400 flex-shrink-0 cursor-grab" />
+                <GripVertical
+                  size={14}
+                  className="text-gray-400 flex-shrink-0 cursor-grab active:cursor-grabbing"
+                  onMouseDown={() => setDragEnabledMacchinaId(m.id)}
+                  onMouseUp={() => setDragEnabledMacchinaId(null)}
+                />
                 <Cpu size={12} className="text-gray-500 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <span className="font-medium">{m.nome}</span>
