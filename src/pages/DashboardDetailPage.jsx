@@ -64,6 +64,7 @@ export default function DashboardDetailPage() {
   const [titoloDraft, setTitoloDraft] = useState('')
   const [renamingTabId, setRenamingTabId] = useState(null)
   const [tabNameDraft, setTabNameDraft] = useState('')
+  const [draggedTabId, setDraggedTabId] = useState(null)
 
   useEffect(() => { loadDashboard() }, [id])
 
@@ -141,6 +142,24 @@ export default function DashboardDetailPage() {
     }
     setRenamingTabId(null)
     setTabNameDraft('')
+  }
+
+  const handleTabDrop = (targetTabId) => {
+    if (!draggedTabId || draggedTabId === targetTabId) {
+      setDraggedTabId(null)
+      return
+    }
+    const fromIndex = tabs.findIndex(t => t.id === draggedTabId)
+    const toIndex = tabs.findIndex(t => t.id === targetTabId)
+    if (fromIndex === -1 || toIndex === -1) {
+      setDraggedTabId(null)
+      return
+    }
+    const reordered = [...tabs]
+    const [moved] = reordered.splice(fromIndex, 1)
+    reordered.splice(toIndex, 0, moved)
+    setTabs(reordered.map((t, index) => ({ ...t, ordine: index })))
+    setDraggedTabId(null)
   }
 
   const removeTab = (tabId) => {
@@ -297,7 +316,14 @@ export default function DashboardDetailPage() {
       {/* Barra Tab */}
       <div className="flex items-center gap-1 mb-4 border-b border-gray-200 flex-wrap">
         {tabs.map(tab => (
-          <div key={tab.id} className="flex items-center">
+          <div
+            key={tab.id}
+            className={`flex items-center ${draggedTabId === tab.id ? 'opacity-40' : ''}`}
+            draggable={editMode && renamingTabId !== tab.id}
+            onDragStart={() => { if (editMode) setDraggedTabId(tab.id) }}
+            onDragOver={(e) => { if (editMode && draggedTabId) e.preventDefault() }}
+            onDrop={() => { if (editMode) handleTabDrop(tab.id) }}
+          >
             {renamingTabId === tab.id ? (
               <div className="flex items-center gap-1 px-2 py-1">
                 <input
@@ -325,7 +351,8 @@ export default function DashboardDetailPage() {
                     ? 'border-primary text-primary'
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
-                title={editMode ? 'Doppio clic per rinominare' : ''}
+                title={editMode ? 'Doppio clic per rinominare - Trascina per riordinare' : ''}
+                style={editMode ? { cursor: 'grab' } : undefined}
               >
                 {tab.titolo}
                 {editMode && activeTabId === tab.id && tabs.length > 1 && (
