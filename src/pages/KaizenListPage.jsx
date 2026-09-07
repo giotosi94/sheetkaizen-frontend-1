@@ -317,10 +317,13 @@ export default function KaizenListPage() {
         }
       }
 
+      const fromDashboard = newKaizen.dashboard_id
       setShowModal(false)
       setNewKaizen(INITIAL_KAIZEN)
       if (res.data?.id) {
-        navigate(`/kaizen/${res.data.id}`)
+        navigate(fromDashboard
+          ? `/kaizen/${res.data.id}?from_dashboard=${fromDashboard}`
+          : `/kaizen/${res.data.id}`)
       } else {
         loadKaizens()
       }
