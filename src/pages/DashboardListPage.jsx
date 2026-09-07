@@ -16,6 +16,7 @@ export default function DashboardListPage() {
 
   const [form, setForm] = useState({
     nome: '',
+    titolo_pagina: '',
     descrizione: '',
     tipo: '',
     reparto: '',
@@ -47,6 +48,7 @@ export default function DashboardListPage() {
   const resetForm = () => {
     setForm({
       nome: '',
+      titolo_pagina: '',
       descrizione: '',
       tipo: tipiMeeting[0]?.label || 'Custom',
       reparto: '',
@@ -72,6 +74,7 @@ export default function DashboardListPage() {
     try {
       const payload = {
         nome: form.nome,
+        titolo_pagina: form.titolo_pagina || form.nome,
         descrizione: form.descrizione,
         tipo: form.tipo || 'Custom',
         reparto: form.visibilita === 'reparto' ? form.reparto : null,
@@ -204,6 +207,16 @@ export default function DashboardListPage() {
                   className="w-full border rounded-lg px-3 py-2"
                   placeholder="Es: PCS Fabbrica - Weekly Meeting"
                   autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Titolo pagina</label>
+                <input
+                  value={form.titolo_pagina}
+                  onChange={(e) => setForm({ ...form, titolo_pagina: e.target.value })}
+                  className="w-full border rounded-lg px-3 py-2"
+                  placeholder="Se vuoto, usa il nome del meeting"
                 />
               </div>
 
