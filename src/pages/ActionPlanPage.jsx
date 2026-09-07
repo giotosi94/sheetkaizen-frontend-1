@@ -239,36 +239,35 @@ export default function ActionPlanPage() {
           />
         </FilterSection>
 
-        <FilterCheckboxGroup
-          title="Origine"
-          field="parent_type"
-          options={[
-            { value: 'standalone', label: 'Manuale' },
-            { value: 'segnalazione', label: 'Segnalazione' },
-            { value: 'dashboard', label: 'Meeting' },
-            { value: 'kaizen', label: 'Kaizen' },
-            { value: 'pillar', label: 'Pillar' },
-          ]}
-          filters={filters}
-          setFilters={setFilters}
-        />
-
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <FilterCheckboxGroup
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <SearchableMultiSelect
+            title="Origine"
+            field="parent_type"
+            options={[
+              { value: 'standalone', label: 'Manuale' },
+              { value: 'segnalazione', label: 'Segnalazione' },
+              { value: 'dashboard', label: 'Meeting' },
+              { value: 'kaizen', label: 'Kaizen' },
+              { value: 'pillar', label: 'Pillar' },
+            ]}
+            filters={filters}
+            setFilters={setFilters}
+          />
+          <SearchableMultiSelect
             title="Stato"
             field="stato"
             options={statiConfig.map(item => ({ value: item.label, label: item.label }))}
             filters={filters}
             setFilters={setFilters}
           />
-          <FilterCheckboxGroup
+          <SearchableMultiSelect
             title="Tipo"
             field="tipo"
             options={tipiConfig.map(item => ({ value: item.label, label: item.label }))}
             filters={filters}
             setFilters={setFilters}
           />
-          <FilterCheckboxGroup
+          <SearchableMultiSelect
             title="Priorità"
             field="priorita"
             options={prioritaConfig.map(item => ({ value: item.label, label: item.label }))}
@@ -279,21 +278,21 @@ export default function ActionPlanPage() {
 
         <div className="border-t pt-4">
           <div className="text-xs font-semibold text-gray-600 uppercase mb-2">Struttura e contesto</div>
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <FilterCheckboxGroup title="Reparto" field="reparto" options={repartiAttivi.map(item => ({ value: item.nome, label: item.nome }))} filters={filters} setFilters={setFilters} />
-            <FilterCheckboxGroup title="Linea" field="linea" options={lineeDisponibili.map(item => ({ value: item.nome, label: item.nome }))} filters={filters} setFilters={setFilters} />
-            <FilterCheckboxGroup title="Macchina" field="macchina" options={macchineDisponibili.map(item => ({ value: item.nome, label: item.nome }))} filters={filters} setFilters={setFilters} />
-            <FilterCheckboxGroup title="5M" field="quinta_m" options={[
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            <SearchableMultiSelect title="Reparto" field="reparto" options={repartiAttivi.map(item => ({ value: item.nome, label: item.nome }))} filters={filters} setFilters={setFilters} />
+            <SearchableMultiSelect title="Linea" field="linea" options={lineeDisponibili.map(item => ({ value: item.nome, label: item.nome }))} filters={filters} setFilters={setFilters} disabled={repartiAttivi.length > 0 && filters.reparto.length === 0} disabledText="Seleziona prima un reparto" />
+            <SearchableMultiSelect title="Macchina" field="macchina" options={macchineDisponibili.map(item => ({ value: item.nome, label: item.nome }))} filters={filters} setFilters={setFilters} disabled={lineeDisponibili.length > 0 && filters.linea.length === 0} disabledText="Seleziona prima una linea" />
+            <SearchableMultiSelect title="5M" field="quinta_m" options={[
               { value: 'Machine', label: 'Machine' },
               { value: 'Manodopera', label: 'Manodopera' },
               { value: 'Metodo', label: 'Metodo' },
               { value: 'Materiale', label: 'Materiale' },
               { value: 'Misurazione', label: 'Misurazione' },
             ]} filters={filters} setFilters={setFilters} />
-            <FilterCheckboxGroup title="Categoria perdita" field="categoria_perdita" options={(configs.categorie_perdita || []).map(item => ({ value: item.label, label: item.label }))} filters={filters} setFilters={setFilters} />
-            <FilterCheckboxGroup title="Pillar" field="pillar_id" options={pillars.filter(item => item.attivo !== false).map(item => ({ value: item._id, label: `${item.sigla} - ${item.label}` }))} filters={filters} setFilters={setFilters} />
-            <FilterCheckboxGroup title="Meeting" field="dashboard_id" options={dashboards.map(item => ({ value: item._id, label: item.nome || item.label || item.titolo || 'Meeting' }))} filters={filters} setFilters={setFilters} />
-            <FilterCheckboxGroup title="Responsabile" field="responsabile" options={responsabiliUnici.map(item => ({ value: item, label: item }))} filters={filters} setFilters={setFilters} />
+            <SearchableMultiSelect title="Categoria perdita" field="categoria_perdita" options={(configs.categorie_perdita || []).map(item => ({ value: item.label, label: item.label }))} filters={filters} setFilters={setFilters} />
+            <SearchableMultiSelect title="Pillar" field="pillar_id" options={pillars.filter(item => item.attivo !== false).map(item => ({ value: item._id, label: `${item.sigla} - ${item.label}` }))} filters={filters} setFilters={setFilters} />
+            <SearchableMultiSelect title="Meeting" field="dashboard_id" options={dashboards.map(item => ({ value: item._id, label: item.nome || item.label || item.titolo || 'Meeting' }))} filters={filters} setFilters={setFilters} />
+            <SearchableMultiSelect title="Responsabile" field="responsabile" options={responsabiliUnici.map(item => ({ value: item, label: item }))} filters={filters} setFilters={setFilters} />
           </div>
         </div>
           </div>
@@ -385,31 +384,116 @@ function MultiFilterChip({ filters, setFilters, field, value, label }) {
   )
 }
 
-function FilterCheckboxGroup({ title, field, options, filters, setFilters }) {
+function SearchableMultiSelect({
+  title,
+  field,
+  options,
+  filters,
+  setFilters,
+  disabled = false,
+  disabledText = '',
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
   const selected = filters[field] || []
+  const normalizedQuery = query.trim().toLowerCase()
+  const filteredOptions = normalizedQuery
+    ? options.filter(option => option.label.toLowerCase().includes(normalizedQuery))
+    : options
+
+  function toggleOption(value) {
+    setFilters({
+      ...filters,
+      [field]: toggleMultiValue(selected, value),
+    })
+  }
+
+  function clearSelection(event) {
+    event.stopPropagation()
+    setFilters({ ...filters, [field]: [] })
+  }
+
+  const selectedLabels = options
+    .filter(option => selected.includes(option.value))
+    .map(option => option.label)
 
   return (
-    <div className="border rounded-lg p-3 bg-gray-50">
-      <div className="text-xs font-semibold text-gray-600 uppercase mb-2">{title}</div>
-      <div className="flex flex-wrap gap-x-4 gap-y-2">
-        {options.map(option => (
-          <label key={option.value} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={selected.includes(option.value)}
-              onChange={() => setFilters({
-                ...filters,
-                [field]: toggleMultiValue(selected, option.value),
-              })}
-              className="rounded border-gray-300 text-primary focus:ring-primary"
-            />
-            <span>{option.label}</span>
-          </label>
-        ))}
-        {options.length === 0 && (
-          <span className="text-xs text-gray-400">Nessuna opzione configurata</span>
-        )}
-      </div>
+    <div className="relative">
+      <div className="text-xs font-semibold text-gray-600 uppercase mb-1.5">{title}</div>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(value => !value)}
+        className="w-full min-h-10 px-3 py-2 border rounded-lg bg-white text-left text-sm flex items-center justify-between gap-2 disabled:bg-gray-100 disabled:text-gray-400"
+      >
+        <span className="truncate">
+          {disabled
+            ? disabledText
+            : selectedLabels.length === 0
+              ? `Tutti: ${title}`
+              : selectedLabels.length <= 2
+                ? selectedLabels.join(', ')
+                : `${selectedLabels.length} selezionati`}
+        </span>
+        <span className="flex items-center gap-1 flex-shrink-0">
+          {selected.length > 0 && (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={clearSelection}
+              onKeyDown={event => {
+                if (event.key === 'Enter' || event.key === ' ') clearSelection(event)
+              }}
+              className="text-gray-400 hover:text-gray-700 p-0.5"
+              title="Azzera selezione"
+            >
+              <X size={14} />
+            </span>
+          )}
+          <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+        </span>
+      </button>
+
+      {open && !disabled && (
+        <div className="absolute z-40 mt-1 w-full min-w-64 bg-white border rounded-lg shadow-xl overflow-hidden">
+          <div className="p-2 border-b">
+            <div className="relative">
+              <Search size={14} className="absolute left-2.5 top-2.5 text-gray-400" />
+              <input
+                type="text"
+                value={query}
+                onChange={event => setQuery(event.target.value)}
+                placeholder={`Cerca ${title.toLowerCase()}...`}
+                className="w-full pl-8 pr-3 py-2 border rounded-md text-sm"
+                autoFocus
+              />
+            </div>
+          </div>
+          <div className="max-h-56 overflow-y-auto p-1">
+            {filteredOptions.length === 0 ? (
+              <div className="px-3 py-3 text-sm text-gray-400">Nessun risultato</div>
+            ) : (
+              filteredOptions.map(option => (
+                <label key={option.value} className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-50 cursor-pointer text-sm">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(option.value)}
+                    onChange={() => toggleOption(option.value)}
+                    className="rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <span className="truncate">{option.label}</span>
+                </label>
+              ))
+            )}
+          </div>
+          {selected.length > 0 && (
+            <div className="border-t p-2 flex justify-between items-center text-xs">
+              <span className="text-gray-500">{selected.length} selezionati</span>
+              <button type="button" onClick={clearSelection} className="text-primary hover:underline">Azzera</button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
