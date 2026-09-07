@@ -18,9 +18,9 @@ export default function ActionPlanPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState({
     search: '', stato: [], tipo: [], priorita: [], parent_type: [],
-    categoria_perdita: '', quinta_m: '',
-    responsabile: '', reparto: '', linea: '', macchina: '',
-    pillar_id: '', dashboard_id: '',
+    categoria_perdita: [], quinta_m: [],
+    responsabile: [], reparto: [], linea: [], macchina: [],
+    pillar_id: [], dashboard_id: [],
     tag: '', overdue: false,
     include_cancelled: false,
     only_cancelled: false,
@@ -81,22 +81,24 @@ export default function ActionPlanPage() {
     return count + (value !== '' && value !== null && value !== undefined ? 1 : 0)
   }, 0)
 
-  const lineeFiltrate = filters.reparto
-    ? (reparti.find(r => r.nome === filters.reparto)?.linee || [])
-    : []
-  const macchineFiltrate = filters.linea
-    ? (lineeFiltrate.find(l => l.nome === filters.linea)?.macchine || [])
-    : []
-
-  const responsabiliUnici = [...new Set(plans.map(p => p.responsabile).filter(Boolean))].sort()
+  const repartiAttivi = reparti.filter(item => item.attivo !== false)
+  const lineeDisponibili = repartiAttivi
+    .filter(item => filters.reparto.length === 0 || filters.reparto.includes(item.nome))
+    .flatMap(item => item.linee || [])
+    .filter((item, index, array) => item.attivo !== false && array.findIndex(other => other.nome === item.nome) === index)
+  const macchineDisponibili = lineeDisponibili
+    .filter(item => filters.linea.length === 0 || filters.linea.includes(item.nome))
+    .flatMap(item => item.macchine || [])
+    .filter((item, index, array) => item.attivo !== false && array.findIndex(other => other.nome === item.nome) === index)
+  const responsabiliUnici = [...new Set(plans.map(item => item.responsabile).filter(Boolean))].sort()
 
   function resetFilters() {
     setFilters({
       search: filters.search,
       stato: [], tipo: [], priorita: [], parent_type: [],
-      categoria_perdita: '', quinta_m: '',
-      responsabile: '', reparto: '', linea: '', macchina: '',
-      pillar_id: '', dashboard_id: '',
+      categoria_perdita: [], quinta_m: [],
+      responsabile: [], reparto: [], linea: [], macchina: [],
+      pillar_id: [], dashboard_id: [],
       tag: '', overdue: false,
       include_cancelled: false,
       only_cancelled: false,
@@ -237,13 +239,19 @@ export default function ActionPlanPage() {
           />
         </FilterSection>
 
-        <FilterSection title="Origine">
-          <MultiFilterChip filters={filters} setFilters={setFilters} field="parent_type" value="standalone" label="Manuale" />
-          <MultiFilterChip filters={filters} setFilters={setFilters} field="parent_type" value="segnalazione" label="Segnalazione" />
-          <MultiFilterChip filters={filters} setFilters={setFilters} field="parent_type" value="dashboard" label="Meeting" />
-          <MultiFilterChip filters={filters} setFilters={setFilters} field="parent_type" value="kaizen" label="Kaizen" />
-          <MultiFilterChip filters={filters} setFilters={setFilters} field="parent_type" value="pillar" label="Pillar" />
-        </FilterSection>
+        <FilterCheckboxGroup
+          title="Origine"
+          field="parent_type"
+          options={[
+            { value: 'standalone', label: 'Manuale' },
+            { value: 'segnalazione', label: 'Segnalazione' },
+            { value: 'dashboard', label: 'Meeting' },
+            { value: 'kaizen', label: 'Kaizen' },
+            { value: 'pillar', label: 'Pillar' },
+          ]}
+          filters={filters}
+          setFilters={setFilters}
+        />
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
           <FilterCheckboxGroup
@@ -271,52 +279,21 @@ export default function ActionPlanPage() {
 
         <div className="border-t pt-4">
           <div className="text-xs font-semibold text-gray-600 uppercase mb-2">Struttura e contesto</div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
-            <select value={filters.reparto} onChange={event => setFilters({ ...filters, reparto: event.target.value, linea: '', macchina: '' })} className="border rounded-lg px-3 py-2 text-sm">
-              <option value="">Tutti i reparti</option>
-              {reparti.filter(item => item.attivo !== false).map(item => <option key={item._id} value={item.nome}>{item.nome}</option>)}
-            </select>
-            <select value={filters.linea} onChange={event => setFilters({ ...filters, linea: event.target.value, macchina: '' })} disabled={!filters.reparto} className="border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100">
-              <option value="">{filters.reparto ? 'Tutte le linee' : 'Prima seleziona il reparto'}</option>
-              {lineeFiltrate.filter(item => item.attivo !== false).map(item => <option key={item.id} value={item.nome}>{item.nome}</option>)}
-            </select>
-            <select value={filters.macchina} onChange={event => setFilters({ ...filters, macchina: event.target.value })} disabled={!filters.linea} className="border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100">
-              <option value="">{filters.linea ? 'Tutte le macchine' : 'Prima seleziona la linea'}</option>
-              {macchineFiltrate.filter(item => item.attivo !== false).map(item => <option key={item.id} value={item.nome}>{item.nome}</option>)}
-            </select>
-            <select value={filters.quinta_m} onChange={event => setFilters({ ...filters, quinta_m: event.target.value })} className="border rounded-lg px-3 py-2 text-sm">
-              <option value="">Tutte le 5M</option>
-              <option value="Machine">Machine</option>
-              <option value="Manodopera">Manodopera</option>
-              <option value="Metodo">Metodo</option>
-              <option value="Materiale">Materiale</option>
-              <option value="Misurazione">Misurazione</option>
-            </select>
-            <select value={filters.categoria_perdita} onChange={event => setFilters({ ...filters, categoria_perdita: event.target.value })} className="border rounded-lg px-3 py-2 text-sm">
-              <option value="">Tutte le categorie perdita</option>
-              {(configs.categorie_perdita || []).map(item => <option key={item._id} value={item.label}>{item.label}</option>)}
-            </select>
-            <select value={filters.pillar_id} onChange={event => setFilters({ ...filters, pillar_id: event.target.value })} className="border rounded-lg px-3 py-2 text-sm">
-              <option value="">Tutti i Pillar</option>
-              {pillars.filter(item => item.attivo !== false).map(item => <option key={item._id} value={item._id}>{item.sigla} - {item.label}</option>)}
-            </select>
-            <select value={filters.dashboard_id} onChange={event => setFilters({ ...filters, dashboard_id: event.target.value })} className="border rounded-lg px-3 py-2 text-sm">
-              <option value="">Tutti i Meeting</option>
-              {dashboards.map(item => <option key={item._id} value={item._id}>{item.nome || item.label || item.titolo || 'Meeting'}</option>)}
-            </select>
-            <div>
-              <input
-                type="text"
-                list="responsabili-list"
-                placeholder="Responsabile"
-                value={filters.responsabile}
-                onChange={event => setFilters({ ...filters, responsabile: event.target.value })}
-                className="w-full border rounded-lg px-3 py-2 text-sm"
-              />
-              <datalist id="responsabili-list">
-                {responsabiliUnici.map(item => <option key={item} value={item} />)}
-              </datalist>
-            </div>
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <FilterCheckboxGroup title="Reparto" field="reparto" options={repartiAttivi.map(item => ({ value: item.nome, label: item.nome }))} filters={filters} setFilters={setFilters} />
+            <FilterCheckboxGroup title="Linea" field="linea" options={lineeDisponibili.map(item => ({ value: item.nome, label: item.nome }))} filters={filters} setFilters={setFilters} />
+            <FilterCheckboxGroup title="Macchina" field="macchina" options={macchineDisponibili.map(item => ({ value: item.nome, label: item.nome }))} filters={filters} setFilters={setFilters} />
+            <FilterCheckboxGroup title="5M" field="quinta_m" options={[
+              { value: 'Machine', label: 'Machine' },
+              { value: 'Manodopera', label: 'Manodopera' },
+              { value: 'Metodo', label: 'Metodo' },
+              { value: 'Materiale', label: 'Materiale' },
+              { value: 'Misurazione', label: 'Misurazione' },
+            ]} filters={filters} setFilters={setFilters} />
+            <FilterCheckboxGroup title="Categoria perdita" field="categoria_perdita" options={(configs.categorie_perdita || []).map(item => ({ value: item.label, label: item.label }))} filters={filters} setFilters={setFilters} />
+            <FilterCheckboxGroup title="Pillar" field="pillar_id" options={pillars.filter(item => item.attivo !== false).map(item => ({ value: item._id, label: `${item.sigla} - ${item.label}` }))} filters={filters} setFilters={setFilters} />
+            <FilterCheckboxGroup title="Meeting" field="dashboard_id" options={dashboards.map(item => ({ value: item._id, label: item.nome || item.label || item.titolo || 'Meeting' }))} filters={filters} setFilters={setFilters} />
+            <FilterCheckboxGroup title="Responsabile" field="responsabile" options={responsabiliUnici.map(item => ({ value: item, label: item }))} filters={filters} setFilters={setFilters} />
           </div>
         </div>
           </div>
