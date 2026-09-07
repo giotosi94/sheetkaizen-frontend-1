@@ -640,13 +640,21 @@ function OrigineFilterBar({ plans, value, onChange }) {
       {ORIGINE_CHIPS.map(chip => {
         const active = value === chip.id
         const count = getCount(chip.id)
+        const baseClass = 'px-3 py-1.5 rounded-full text-xs font-medium border'
+        const activeClass = 'bg-primary text-white border-primary'
+        const inactiveClass = 'bg-white text-gray-600 border-gray-200 hover:border-primary'
 
         return (
           <button
             key={chip.id}
             type="button"
             onClick={() => onChange(chip.id)}
-            className={
-              active
-                ? 'px-3 py-1.5 rounded-full text-xs font-medium border bg-primary text-white border-primary'
-                : 'px-3 py-1.5 rounded-full text-xs font-medium border bg-white text
+            className={`${baseClass} ${active ? activeClass : inactiveClass}`}
+          >
+            {chip.label} ({count})
+          </button>
+        )
+      })}
+    </div>
+  )
+}
