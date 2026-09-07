@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Plus, Search, X } from 'lucide-react'
+import { Plus, Search, Filter, X, ChevronDown } from 'lucide-react'
 import api from '../services/api'
 import { useAllConfigurations } from '../hooks/useConfigurations'
 import ActionPlanFormShared from '../components/ActionPlanFormShared'
@@ -15,6 +15,7 @@ export default function ActionPlanPage() {
   const [editingPlan, setEditingPlan] = useState(null)
   const [selectedPlan, setSelectedPlan] = useState(null)
   const [viewMode] = useState('list')
+  const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState({
     search: '', stato: [], tipo: [], priorita: [], parent_type: [],
     categoria_perdita: '', quinta_m: '',
@@ -187,6 +188,18 @@ export default function ActionPlanPage() {
               className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm"
             />
           </div>
+          <button
+            type="button"
+            onClick={() => setShowFilters(value => !value)}
+            className={`px-3 py-2 rounded-lg text-sm border flex items-center gap-2 ${showFilters || activeFiltersCount > 0 ? 'border-primary text-primary bg-primary/5' : 'border-gray-300 text-gray-600 hover:bg-gray-100'}`}
+          >
+            <Filter size={16} />
+            Filtri
+            {activeFiltersCount > 0 && (
+              <span className="bg-primary text-white rounded-full px-2 py-0.5 text-xs">{activeFiltersCount}</span>
+            )}
+            <ChevronDown size={15} className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+          </button>
           {activeFiltersCount > 0 && (
             <button
               type="button"
@@ -198,6 +211,8 @@ export default function ActionPlanPage() {
           )}
         </div>
 
+        {showFilters && (
+          <div className="space-y-4 border-t pt-1">
         <FilterSection title="Vista">
           <FilterChip
             active={!filters.only_cancelled && !filters.include_cancelled && !filters.overdue}
@@ -304,6 +319,8 @@ export default function ActionPlanPage() {
             </div>
           </div>
         </div>
+          </div>
+        )}
       </div>
       {/* LISTA/KANBAN */}
       {loading ? (
