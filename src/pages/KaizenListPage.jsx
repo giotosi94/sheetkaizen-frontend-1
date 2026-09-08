@@ -16,6 +16,7 @@ const TIPOLOGIE_KAIZEN = [
 const INITIAL_KAIZEN = {
   titolo: '',
   tipo: 'Quick',
+  route_id: '',
   reparto: '',
   linea: '',
   macchina: '',
@@ -161,6 +162,7 @@ export default function KaizenListPage() {
   const [filters, setFilters] = useState(INITIAL_FILTERS)
   const [showFilters, setShowFilters] = useState(false)
   const [dashboards, setDashboards] = useState([])
+  const [routes, setRoutes] = useState([])
 
   const { configs } = useAllConfigurations()
   const { pillars } = usePillars()
@@ -173,6 +175,7 @@ export default function KaizenListPage() {
   useEffect(() => {
     api.get('/reparti/').then(res => setReparti(res.data || [])).catch(() => setReparti([]))
     api.get('/dashboards/').then(res => setDashboards(res.data || [])).catch(() => setDashboards([]))
+    api.get('/route-catalog/?stato=pubblicata').then(res => setRoutes(res.data || [])).catch(() => setRoutes([]))
   }, [])
 
   // Linee/Macchine per FORM (in base al reparto del nuovo Kaizen)
@@ -272,6 +275,35 @@ export default function KaizenListPage() {
   const createKaizen = async () => {
     if (!newKaizen.titolo.trim()) return alert('Inserisci un titolo')
     if (!newKaizen.tipo) return alert('Seleziona una tipologia Kaizen')
+
+    if (newKaizen.tipo === 'Major') {
+      if (!newKaizen.route_id) return alert('Seleziona una tipologia di progetto (Route)')
+      try {
+        const payloadMajor = {
+          titolo: newKaizen.titolo,
+          route_id: newKaizen.route_id,
+          reparto: newKaizen.reparto || null,
+          linea: newKaizen.linea || null,
+          macchina: newKaizen.macchina || null,
+          pillar_id: newKaizen.pillar_id || null,
+          dashboard_id: newKaizen.dashboard_id || null,
+          dashboard_nome: newKaizen.dashboard_nome || null,
+        }
+        const resMajor = await api.post('/major-kaizen/', payloadMajor)
+        setShowModal(false)
+        setNewKaizen(INITIAL_KAIZEN)
+        if (resMajor.data?._id) {
+          navigate(`/major-kaizen/${resMajor.data._id}`)
+        } else {
+          loadKaizens()
+        }
+      } catch (err) {
+        console.error(err)
+        alert('Errore creazione Major: ' + (err.response?.data?.detail || err.message))
+      }
+      return
+    }
+
     try {
       const { team_members_data, ...formClean } = newKaizen
 
@@ -683,6 +715,31 @@ export default function KaizenListPage() {
                   ))}
                 </div>
               </div>
+
+              {newKaizen.tipo === 'Major' && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Tipologia di progetto (Route) <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={newKaizen.route_id}
+                    onChange={(e) => setNewKaizen({ ...newKaizen, route_id: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2"
+                  >
+                    <option value="">Seleziona una Route</option>
+                    {routes.map(r => (
+                      <option key={r._id} value={r._id}>
+                        {r.nome} (v{r.versione})
+                      </option>
+                    ))}
+                  </select>
+                  {routes.length === 0 && (
+                    <div className="text-xs text-orange-600 mt-1">
+                      Nessuna Route pubblicata. Lancia il seed o pubblica una Route nei Settings.
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Reparto → Linea → Macchina */}
               <div className="grid grid-cols-3 gap-2">
