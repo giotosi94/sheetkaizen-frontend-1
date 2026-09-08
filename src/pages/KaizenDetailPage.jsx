@@ -647,14 +647,14 @@ export default function KaizenDetailPage() {
 
       <div className="flex items-center justify-between mb-6">
         <div>
-
-        {kaizen.livello_storia && kaizen.livello_storia.length > 0 && (
-          <button onClick={() => setShowStoria(!showStoria)} className="flex items-center gap-1 text-sm text-gray-600 hover:text-primary transition-colors">
-            <History size={16} />
-            <span>Storia metodologie ({kaizen.livello_storia.length})</span>
-            <ChevronDown size={14} className={`transition-transform ${showStoria ? 'rotate-180' : ''}`} />
-          </button>
-        )}
+          {kaizen.livello_storia && kaizen.livello_storia.length > 0 && (
+            <button onClick={() => setShowStoria(!showStoria)} className="flex items-center gap-1 text-sm text-gray-600 hover:text-primary transition-colors">
+              <History size={16} />
+              <span>Storia metodologie ({kaizen.livello_storia.length})</span>
+              <ChevronDown size={14} className={`transition-transform ${showStoria ? 'rotate-180' : ''}`} />
+            </button>
+          )}
+        </div>
       </div>
 
       {showStoria && kaizen.livello_storia && (
