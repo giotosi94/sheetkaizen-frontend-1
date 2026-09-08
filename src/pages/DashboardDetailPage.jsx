@@ -27,26 +27,26 @@ const WIDGET_TYPES = [
   { id: 'gantt', label: 'Gantt', icon: 'GNT', defaultSize: { w: 12, h: 8 } },
 ]
 
-function buildTabId() {
+function genTabId() {
   return `tab_${Date.now()}_${Math.floor(Math.random() * 1000)}`
 }
 
 function normalizeTabs(data) {
-  if (Array.isArray(data.tabs) && data.tabs.length > 0) {
+  if (data.tabs && data.tabs.length > 0) {
     return data.tabs
-      .map((tab, index) => ({
-        id: tab.id || buildTabId(),
-        titolo: tab.titolo || `Pagina ${index + 1}`,
-        ordine: tab.ordine != null ? tab.ordine : index,
-        layout: Array.isArray(tab.layout) ? tab.layout : [],
+      .map((t, i) => ({
+        id: t.id || genTabId(),
+        titolo: t.titolo || `Pagina ${i + 1}`,
+        ordine: t.ordine ?? i,
+        layout: t.layout || [],
       }))
       .sort((a, b) => a.ordine - b.ordine)
   }
   return [{
-    id: buildTabId(),
+    id: genTabId(),
     titolo: 'Panoramica',
     ordine: 0,
-    layout: Array.isArray(data.layout) ? data.layout : [],
+    layout: data.layout || [],
   }]
 }
 
@@ -64,19 +64,6 @@ export default function DashboardDetailPage() {
   const [titoloDraft, setTitoloDraft] = useState('')
   const [renamingTabId, setRenamingTabId] = useState(null)
   const [tabNameDraft, setTabNameDraft] = useState('')
-  const [draggedTabId, setDraggedTabId] = useState(null)
-  const [gridWidth, setGridWidth] = useState(1200)
-  const gridContainerRef = useState(null)
-
-  useEffect(() => {
-    const el = document.getElementById('dashboard-grid-container')
-    if (!el) return
-    const update = () => setGridWidth(el.offsetWidth)
-    update()
-    const ro = new ResizeObserver(update)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [activeTabId])
 
   useEffect(() => { loadDashboard() }, [id])
 
@@ -86,15 +73,11 @@ export default function DashboardDetailPage() {
       setDashboard(res.data)
       const normalized = normalizeTabs(res.data)
       setTabs(normalized)
-      setActiveTabId(normalized[0].id)
+      setActiveTabId(normalized[0]?.id || null)
     } catch (err) { console.error(err) }
   }
 
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0]
-
-  const updateActiveTabLayout = (newLayout) => {
-    setTabs(prev => prev.map(t => (t.id === activeTabId ? { ...t, layout: newLayout } : t)))
-  }
 
   const saveTitolo = async () => {
     const nuovoTitolo = titoloDraft.trim()
@@ -115,17 +98,9 @@ export default function DashboardDetailPage() {
   const saveDashboard = async () => {
     setSaving(true)
     try {
-      const payload = {
-        tabs: tabs.map((t, index) => ({
-          id: t.id,
-          titolo: t.titolo,
-          ordine: index,
-          layout: t.layout || [],
-        })),
-        layout: tabs[0]?.layout || [],
-      }
-      await api.put(`/dashboards/${id}`, payload)
-      alert('Dashboard salvata!')
+      const tabsToSave = tabs.map((t, i) => ({ ...t, ordine: i }))
+      await api.put(`/dashboards/${id}`, { tabs: tabsToSave, layout: tabsToSave[0]?.layout || [] })
+      alert('Meeting salvato!')
       setEditMode(false)
     } catch (err) {
       console.error(err)
@@ -134,9 +109,17 @@ export default function DashboardDetailPage() {
     setSaving(false)
   }
 
+  const updateActiveTabLayout = (updater) => {
+    setTabs(prev => prev.map(t => {
+      if (t.id !== activeTabId) return t
+      const newLayout = typeof updater === 'function' ? updater(t.layout || []) : updater
+      return { ...t, layout: newLayout }
+    }))
+  }
+
   const addTab = () => {
     const newTab = {
-      id: buildTabId(),
+      id: genTabId(),
       titolo: `Pagina ${tabs.length + 1}`,
       ordine: tabs.length,
       layout: [],
@@ -150,39 +133,23 @@ export default function DashboardDetailPage() {
   const confirmRenameTab = () => {
     const nome = tabNameDraft.trim()
     if (nome) {
-      setTabs(prev => prev.map(t => (t.id === renamingTabId ? { ...t, titolo: nome } : t)))
+      setTabs(prev => prev.map(t => t.id === renamingTabId ? { ...t, titolo: nome } : t))
     }
     setRenamingTabId(null)
     setTabNameDraft('')
   }
 
-  const handleTabDrop = (targetTabId) => {
-    if (!draggedTabId || draggedTabId === targetTabId) {
-      setDraggedTabId(null)
-      return
-    }
-    const fromIndex = tabs.findIndex(t => t.id === draggedTabId)
-    const toIndex = tabs.findIndex(t => t.id === targetTabId)
-    if (fromIndex === -1 || toIndex === -1) {
-      setDraggedTabId(null)
-      return
-    }
-    const reordered = [...tabs]
-    const [moved] = reordered.splice(fromIndex, 1)
-    reordered.splice(toIndex, 0, moved)
-    setTabs(reordered.map((t, index) => ({ ...t, ordine: index })))
-    setDraggedTabId(null)
-  }
-
-  const removeTab = (tabId) => {
+  const deleteTab = (tabId) => {
     if (tabs.length <= 1) {
-      alert('Deve rimanere almeno una pagina')
+      alert('Deve rimanere almeno un tab.')
       return
     }
-    if (!confirm('Eliminare questa pagina e tutti i suoi widget?')) return
+    if (!confirm('Eliminare questo tab e tutti i suoi widget?')) return
     const remaining = tabs.filter(t => t.id !== tabId)
     setTabs(remaining)
-    if (activeTabId === tabId) setActiveTabId(remaining[0].id)
+    if (activeTabId === tabId) {
+      setActiveTabId(remaining[0]?.id || null)
+    }
   }
 
   const addWidget = (type) => {
@@ -194,31 +161,27 @@ export default function DashboardDetailPage() {
       posizione: { x: 0, y: 0, w: widgetType.defaultSize.w, h: widgetType.defaultSize.h },
       config: {},
     }
-    updateActiveTabLayout([...(activeTab.layout || []), newWidget])
+    updateActiveTabLayout(layout => [...layout, newWidget])
     setShowAddWidget(false)
   }
 
   const removeWidget = (widgetId) => {
-    updateActiveTabLayout(activeTab.layout.filter(w => w.widget_id !== widgetId))
+    updateActiveTabLayout(layout => layout.filter(w => w.widget_id !== widgetId))
   }
 
   const updateWidgetConfig = (widgetId, newConfig) => {
-    updateActiveTabLayout(
-      activeTab.layout.map(w =>
-        w.widget_id === widgetId ? { ...w, config: { ...w.config, ...newConfig } } : w
-      )
-    )
+    updateActiveTabLayout(layout => layout.map(w =>
+      w.widget_id === widgetId ? { ...w, config: { ...w.config, ...newConfig } } : w
+    ))
   }
 
   const onLayoutChange = (newLayout) => {
     if (!editMode) return
-    updateActiveTabLayout(
-      activeTab.layout.map(w => {
-        const l = newLayout.find(item => item.i === w.widget_id)
-        if (l) return { ...w, posizione: { x: l.x, y: l.y, w: l.w, h: l.h } }
-        return w
-      })
-    )
+    updateActiveTabLayout(layout => layout.map(w => {
+      const l = newLayout.find(item => item.i === w.widget_id)
+      if (l) return { ...w, posizione: { x: l.x, y: l.y, w: l.w, h: l.h } }
+      return w
+    }))
   }
 
   const renderWidget = (widget) => {
@@ -264,9 +227,10 @@ export default function DashboardDetailPage() {
     }
   }
 
-  if (!dashboard || !activeTab) return <div className="text-center py-8">Caricamento...</div>
+  if (!dashboard) return <div className="text-center py-8">Caricamento...</div>
 
-  const gridLayout = (activeTab.layout || []).map(w => ({
+  const currentLayout = activeTab?.layout || []
+  const gridLayout = currentLayout.map(w => ({
     i: w.widget_id,
     x: w.posizione?.x || 0,
     y: w.posizione?.y || 0,
@@ -326,27 +290,20 @@ export default function DashboardDetailPage() {
       </div>
 
       {/* Barra Tab */}
-      <div className="flex items-center gap-1 mb-4 border-b border-gray-200 flex-wrap">
+      <div className="flex items-center gap-1 mb-6 border-b overflow-x-auto">
         {tabs.map(tab => (
-          <div
-            key={tab.id}
-            className={`flex items-center ${draggedTabId === tab.id ? 'opacity-40' : ''}`}
-            draggable={editMode && renamingTabId !== tab.id}
-            onDragStart={() => { if (editMode) setDraggedTabId(tab.id) }}
-            onDragOver={(e) => { if (editMode && draggedTabId) e.preventDefault() }}
-            onDrop={() => { if (editMode) handleTabDrop(tab.id) }}
-          >
+          <div key={tab.id} className="flex items-center flex-shrink-0">
             {renamingTabId === tab.id ? (
               <div className="flex items-center gap-1 px-2 py-1">
                 <input
                   value={tabNameDraft}
                   onChange={(e) => setTabNameDraft(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') confirmRenameTab() }}
-                  className="border rounded px-2 py-1 text-sm"
+                  className="border rounded px-2 py-1 text-sm w-32"
                   autoFocus
                 />
-                <button onClick={confirmRenameTab} className="text-green-600 p-1 hover:bg-green-50 rounded">
-                  <Check size={14} />
+                <button onClick={confirmRenameTab} className="text-green-600 hover:bg-green-50 p-1 rounded">
+                  <Check size={15} />
                 </button>
               </div>
             ) : (
@@ -358,23 +315,35 @@ export default function DashboardDetailPage() {
                     setTabNameDraft(tab.titolo)
                   }
                 }}
-                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                className={`px-4 py-2 font-medium text-sm whitespace-nowrap flex items-center gap-2 ${
                   activeTabId === tab.id
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ? 'border-b-2 border-primary text-primary'
+                    : 'text-gray-500 hover:text-gray-700'
                 }`}
-                title={editMode ? 'Doppio clic per rinominare - Trascina per riordinare' : ''}
-                style={editMode ? { cursor: 'grab' } : undefined}
               >
                 {tab.titolo}
-                {editMode && activeTabId === tab.id && tabs.length > 1 && (
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => { e.stopPropagation(); removeTab(tab.id) }}
-                    className="ml-2 text-red-500 hover:text-red-700"
-                  >
-                    &times;
+                {editMode && activeTabId === tab.id && (
+                  <span className="flex items-center gap-1">
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => { e.stopPropagation(); setRenamingTabId(tab.id); setTabNameDraft(tab.titolo) }}
+                      className="text-gray-400 hover:text-primary"
+                      title="Rinomina"
+                    >
+                      <Edit2 size={13} />
+                    </span>
+                    {tabs.length > 1 && (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); deleteTab(tab.id) }}
+                        className="text-gray-400 hover:text-red-500"
+                        title="Elimina tab"
+                      >
+                        <X size={14} />
+                      </span>
+                    )}
                   </span>
                 )}
               </button>
@@ -384,41 +353,36 @@ export default function DashboardDetailPage() {
         {editMode && (
           <button
             onClick={addTab}
-            className="px-3 py-2 text-sm text-primary hover:bg-primary/5 rounded-t-lg flex items-center gap-1"
+            className="px-3 py-2 text-sm text-primary hover:bg-blue-50 rounded flex items-center gap-1 flex-shrink-0"
+            title="Aggiungi tab"
           >
-            <Plus size={14} /> Pagina
+            <Plus size={15} /> Tab
           </button>
         )}
       </div>
 
       {/* Grid del tab attivo */}
-      {(!activeTab.layout || activeTab.layout.length === 0) ? (
+      {currentLayout.length === 0 ? (
         <div className="bg-white rounded-xl shadow p-12 text-center">
-          <p className="text-gray-400 mb-4">Nessun widget in questa pagina.</p>
-          {editMode ? (
-            <button onClick={() => setShowAddWidget(true)} className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-light">
-              Aggiungi widget
-            </button>
-          ) : (
-            <button onClick={() => { setEditMode(true); setShowAddWidget(true) }} className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-light">
-              Modifica e aggiungi widget
-            </button>
-          )}
+          <p className="text-gray-400 mb-4">Nessun widget in questo tab. Aggiungine uno per iniziare!</p>
+          <button onClick={() => { setEditMode(true); setShowAddWidget(true) }} className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-light">
+            Aggiungi primo widget
+          </button>
         </div>
       ) : (
-        <div id="dashboard-grid-container">
         <GridLayout
+          key={activeTabId}
           className="layout"
           layout={gridLayout}
           cols={12}
           rowHeight={50}
-          width={gridWidth}
+          width={1200}
           onLayoutChange={onLayoutChange}
           isDraggable={editMode}
           isResizable={editMode}
           draggableCancel=".widget-action-btn"
         >
-          {activeTab.layout.map(widget => (
+          {currentLayout.map(widget => (
             <div key={widget.widget_id} className="relative">
               {editMode && (
                 <div className="absolute top-1 right-1 z-20 flex gap-1 widget-action-btn">
@@ -446,7 +410,6 @@ export default function DashboardDetailPage() {
             </div>
           ))}
         </GridLayout>
-        </div>
       )}
 
       {/* Modal Add Widget */}
