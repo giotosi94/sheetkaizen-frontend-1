@@ -28,6 +28,18 @@ export default function MajorKaizenDetailPage() {
     }
   }
 
+  const saveMajor = async (changes) => {
+    try {
+      const res = await api.put(`/major-kaizen/${id}`, changes)
+      setMajor(res.data)
+      return true
+    } catch (err) {
+      console.error(err)
+      alert('Errore salvataggio Major: ' + (err.response?.data?.detail || err.message))
+      return false
+    }
+  }
+
   const snapshot = major?.route_snapshot || {}
   const steps = snapshot.steps || []
   const stepsData = major?.steps_data || {}
@@ -71,7 +83,7 @@ export default function MajorKaizenDetailPage() {
         onSelect={setActiveKey}
       />
       {activeKey === 'overview' ? (
-        <MajorOverview major={major} />
+        <MajorOverview major={major} onSave={saveMajor} />
       ) : activeStep ? (
         <MajorStepContainer
           step={activeStep}
