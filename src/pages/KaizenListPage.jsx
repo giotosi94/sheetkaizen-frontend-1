@@ -279,11 +279,25 @@ const majorKaizens =
 
   const archiviaSelezionati = async () => {
     if (selected.size === 0) return
+
+    const contieneMajor = kaizens.some(
+      item =>
+        selected.has(item._id) &&
+        item.entity_type === 'major_kaizen'
+    )
+
+    if (contieneMajor) {
+      alert(
+        'I Major Kaizen non possono ancora essere archiviati. Seleziona soltanto Quick e Standard oppure usa Elimina.'
+      )
+      return
+    }
+
     if (!confirm(`Archiviare ${selected.size} kaizen?\n\nNon verranno eliminati: restano salvati e li ritrovi nella vista "Archiviati".`)) return
     try {
       await Promise.all([...selected].map(id => api.put(`/kaizens/${id}`, { archiviato: true })))
       setSelected(new Set())
-      loadKaizens()
+      await loadKaizens()
     } catch (err) {
       alert('Errore archiviazione: ' + (err.response?.data?.detail || err.message))
     }
@@ -302,13 +316,56 @@ const majorKaizens =
 
   const eliminaSelezionati = async () => {
     if (selected.size === 0) return
-    if (!confirm(`ELIMINARE DEFINITIVAMENTE ${selected.size} kaizen?\n\nQuesta azione non puo essere annullata.`)) return
+
+    const elementiSelezionati = kaizens.filter(item =>
+      selected.has(item._id)
+    )
+
+    const majorSelezionati = elementiSelezionati.filter(
+      item => item.entity_type === 'major_kaizen'
+    ).length
+
+    const kaizenClassiciSelezionati =
+      elementiSelezionati.length - majorSelezionati
+
+    const dettaglio = [
+      kaizenClassiciSelezionati > 0
+        ? `${kaizenClassiciSelezionati} Quick/Standard`
+        : null,
+      majorSelezionati > 0
+        ? `${majorSelezionati} Major`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(' e ')
+
+    if (
+      !confirm(
+        `ELIMINARE ${dettaglio}?\n\nQuesta azione non può essere annullata dalla Kaizen Sheet.`
+      )
+    ) {
+      return
+    }
+
     try {
-      await Promise.all([...selected].map(id => api.delete(`/kaizens/${id}`)))
+      await Promise.all(
+        elementiSelezionati.map(item => {
+          if (item.entity_type === 'major_kaizen') {
+            return api.delete(`/major-kaizen/${item._id}`)
+          }
+
+          return api.delete(`/kaizens/${item._id}`)
+        })
+      )
+
       setSelected(new Set())
-      loadKaizens()
+      await loadKaizens()
     } catch (err) {
-      alert('Errore eliminazione: ' + (err.response?.data?.detail || err.message))
+      console.error('Errore eliminazione Kaizen:', err)
+      alert(
+        'Errore eliminazione: ' +
+          (err.response?.data?.detail || err.message)
+      )
     }
   }
 
@@ -643,22 +700,16 @@ const majorKaizens =
             <tr className="text-left text-gray-500">
               <th className="p-4 w-10">
                 <input
-  type="checkbox"
-  checked={
-    filtered.filter(k => k.entity_type !== 'major_kaizen').length > 0 &&
-    filtered
-      .filter(k => k.entity_type !== 'major_kaizen')
-      .every(k => selected.has(k._id))
-  }
-  onChange={() =>
-    toggleSelectAll(
-      filtered
-        .filter(k => k.entity_type !== 'major_kaizen')
-        .map(k => k._id)
-    )
-  }
-  className="w-4 h-4"
-/>
+                  type="checkbox"
+                  checked={
+                    filtered.length > 0 &&
+                    filtered.every(k => selected.has(k._id))
+                  }
+                  onChange={() =>
+                    toggleSelectAll(filtered.map(k => k._id))
+                  }
+                  className="w-4 h-4"
+                />
               </th>
               <th className="p-4">Numero</th>
               <th className="p-4">Titolo</th>
@@ -680,17 +731,11 @@ const majorKaizens =
                 <tr key={k._id} className={`border-t hover:bg-gray-50 ${selected.has(k._id) ? 'bg-blue-50' : ''}`}>
                   <td className="p-4">
                     <input
-  type="checkbox"
-  checked={selected.has(k._id)}
-  onChange={() => toggleSelect(k._id)}
-  disabled={k.entity_type === 'major_kaizen'}
-  title={
-    k.entity_type === 'major_kaizen'
-      ? 'Le azioni massive per i Major Kaizen saranno gestite separatamente'
-      : ''
-  }
-  className="w-4 h-4 disabled:opacity-30 disabled:cursor-not-allowed"
-/>
+                      type="checkbox"
+                      checked={selected.has(k._id)}
+                      onChange={() => toggleSelect(k._id)}
+                      className="w-4 h-4"
+                    />
                   </td>
                   <td className="p-4">
                     <Link
