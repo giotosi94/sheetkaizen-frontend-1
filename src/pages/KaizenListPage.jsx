@@ -228,20 +228,21 @@ const loadKaizens = async () => {
         }))
       : []
 
-  const majorKaizens =
-    majorsResult.status === 'fulfilled'
-      ? (majorsResult.value.data || []).map(item => ({
-          ...item,
-          entity_type: 'major_kaizen',
-          livello: 'Major',
-          tipo: 'Major Kaizen',
-          data_apertura: item.data_inizio || item.created_at,
-          creatore_nome:
-            item.ruoli_progetto?.project_leader?.nome ||
-            item.ruoli_progetto?.sponsor?.nome ||
-            '',
-        }))
-      : []
+const majorKaizens =
+  majorsResult.status === 'fulfilled'
+    ? (majorsResult.value.data || []).map(item => ({
+        ...item,
+        entity_type: 'major_kaizen',
+        livello: 'Major',
+        tipo: 'Major Kaizen',
+        data_apertura: item.data_inizio || item.created_at,
+        creatore_nome:
+          item.creatore_nome ||
+          item.ruoli_progetto?.project_leader?.nome ||
+          item.ruoli_progetto?.sponsor?.nome ||
+          '',
+      }))
+    : []
 
   if (kaizensResult.status === 'rejected') {
     console.error('Errore caricamento Quick e Standard:', kaizensResult.reason)
@@ -316,18 +317,34 @@ const loadKaizens = async () => {
     if (!newKaizen.tipo) return alert('Seleziona una tipologia Kaizen')
 
     if (newKaizen.tipo === 'Major') {
-      if (!newKaizen.route_id) return alert('Seleziona una tipologia di progetto (Route)')
-      try {
-        const payloadMajor = {
-          titolo: newKaizen.titolo,
-          route_id: newKaizen.route_id,
-          reparto: newKaizen.reparto || null,
-          linea: newKaizen.linea || null,
-          macchina: newKaizen.macchina || null,
-          pillar_id: newKaizen.pillar_id || null,
-          dashboard_id: newKaizen.dashboard_id || null,
-          dashboard_nome: newKaizen.dashboard_nome || null,
-        }
+  if (!newKaizen.route_id) return alert('Seleziona una tipologia di progetto (Route)')
+
+  const selectedPillar = pillars.find(
+    pillar => pillar._id === newKaizen.pillar_id
+  )
+
+  try {
+    const payloadMajor = {
+      titolo: newKaizen.titolo,
+      route_id: newKaizen.route_id,
+      creatore_id: user?.id || null,
+      creatore_nome:
+        user?.full_name ||
+        user?.username ||
+        'Default User',
+      reparto: newKaizen.reparto || null,
+      linea: newKaizen.linea || null,
+      macchina: newKaizen.macchina || null,
+      pillar_id: selectedPillar?._id || null,
+      pillar_sigla: selectedPillar?.sigla || null,
+      pillar_label:
+        selectedPillar?.label ||
+        selectedPillar?.nome ||
+        selectedPillar?.titolo ||
+        null,
+      dashboard_id: newKaizen.dashboard_id || null,
+      dashboard_nome: newKaizen.dashboard_nome || null,
+    }
         const resMajor = await api.post('/major-kaizen/', payloadMajor)
         setShowModal(false)
         setNewKaizen(INITIAL_KAIZEN)
