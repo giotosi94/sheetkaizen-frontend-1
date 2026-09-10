@@ -658,7 +658,7 @@ export default function KaizenDetailPage() {
 
           {showDropdown && (
             <div className="absolute top-full left-0 mt-2 bg-white border rounded-lg shadow-xl z-50 min-w-[260px] overflow-hidden">
-              {LIVELLI.map(lvl => {
+              {LIVELLI.filter(lvl => lvl !== 'Major').map(lvl => {
                 const cfg = livelloConfig[lvl]
                 const DropIcon = cfg.Icon
                 const isCurrent = lvl === livelloAttuale
