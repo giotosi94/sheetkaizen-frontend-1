@@ -214,12 +214,51 @@ export default function KaizenListPage() {
 
   useEffect(() => { loadKaizens() }, [])
 
-  const loadKaizens = async () => {
-    try {
-      const res = await api.get('/kaizens')
-      setKaizens(res.data)
-    } catch (err) { console.error(err) }
+const loadKaizens = async () => {
+  const [kaizensResult, majorsResult] = await Promise.allSettled([
+    api.get('/kaizens'),
+    api.get('/major-kaizen/'),
+  ])
+
+  const kaizensClassici =
+    kaizensResult.status === 'fulfilled'
+      ? (kaizensResult.value.data || []).map(item => ({
+          ...item,
+          entity_type: 'kaizen',
+        }))
+      : []
+
+  const majorKaizens =
+    majorsResult.status === 'fulfilled'
+      ? (majorsResult.value.data || []).map(item => ({
+          ...item,
+          entity_type: 'major_kaizen',
+          livello: 'Major',
+          tipo: 'Major Kaizen',
+          data_apertura: item.data_inizio || item.created_at,
+          creatore_nome:
+            item.ruoli_progetto?.project_leader?.nome ||
+            item.ruoli_progetto?.sponsor?.nome ||
+            '',
+        }))
+      : []
+
+  if (kaizensResult.status === 'rejected') {
+    console.error('Errore caricamento Quick e Standard:', kaizensResult.reason)
   }
+
+  if (majorsResult.status === 'rejected') {
+    console.error('Errore caricamento Major:', majorsResult.reason)
+  }
+
+  const tuttiKaizen = [...kaizensClassici, ...majorKaizens].sort((a, b) => {
+    const dataA = new Date(a.created_at || a.data_apertura || 0).getTime()
+    const dataB = new Date(b.created_at || b.data_apertura || 0).getTime()
+    return dataB - dataA
+  })
+
+  setKaizens(tuttiKaizen)
+}
 
   const toggleSelect = (id) => {
     setSelected(prev => {
@@ -389,7 +428,11 @@ export default function KaizenListPage() {
         k.numero?.toLowerCase().includes(filters.search.toLowerCase())
 
       // Tipo
-      const tipoNormalizzato = k.livello || (k.tipo?.includes('Major') ? 'Major' : k.tipo?.includes('Standard') ? 'Standard' : 'Quick')
+      const tipoNormalizzato =
+  k.entity_type === 'major_kaizen'
+    ? 'Major'
+    : k.livello ||
+      (k.tipo?.includes('Standard') ? 'Standard' : 'Quick')
       const matchTipo = filters.tipo.length === 0 || filters.tipo.includes(tipoNormalizzato)
 
       // Stato
@@ -582,7 +625,23 @@ export default function KaizenListPage() {
           <thead className="bg-gray-50">
             <tr className="text-left text-gray-500">
               <th className="p-4 w-10">
-                <input type="checkbox" checked={filtered.length > 0 && filtered.every(k => selected.has(k._id))} onChange={() => toggleSelectAll(filtered.map(k => k._id))} className="w-4 h-4" />
+                <input
+  type="checkbox"
+  checked={
+    filtered.filter(k => k.entity_type !== 'major_kaizen').length > 0 &&
+    filtered
+      .filter(k => k.entity_type !== 'major_kaizen')
+      .every(k => selected.has(k._id))
+  }
+  onChange={() =>
+    toggleSelectAll(
+      filtered
+        .filter(k => k.entity_type !== 'major_kaizen')
+        .map(k => k._id)
+    )
+  }
+  className="w-4 h-4"
+/>
               </th>
               <th className="p-4">Numero</th>
               <th className="p-4">Titolo</th>
@@ -603,10 +662,30 @@ export default function KaizenListPage() {
               return (
                 <tr key={k._id} className={`border-t hover:bg-gray-50 ${selected.has(k._id) ? 'bg-blue-50' : ''}`}>
                   <td className="p-4">
-                    <input type="checkbox" checked={selected.has(k._id)} onChange={() => toggleSelect(k._id)} className="w-4 h-4" />
+                    <input
+  type="checkbox"
+  checked={selected.has(k._id)}
+  onChange={() => toggleSelect(k._id)}
+  disabled={k.entity_type === 'major_kaizen'}
+  title={
+    k.entity_type === 'major_kaizen'
+      ? 'Le azioni massive per i Major Kaizen saranno gestite separatamente'
+      : ''
+  }
+  className="w-4 h-4 disabled:opacity-30 disabled:cursor-not-allowed"
+/>
                   </td>
                   <td className="p-4">
-                    <Link to={`/kaizen/${k._id}`} className="text-primary font-mono hover:underline">{k.numero}</Link>
+                    <Link
+  to={
+    k.entity_type === 'major_kaizen'
+      ? `/major-kaizen/${k._id}`
+      : `/kaizen/${k._id}`
+  }
+  className="text-primary font-mono hover:underline"
+>
+  {k.numero}
+</Link>
                   </td>
                   <td className="p-4 font-medium">{k.titolo}</td>
                   <td className="p-4">
