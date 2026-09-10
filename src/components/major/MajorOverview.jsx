@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import api from '../../services/api'
 import UserPicker from '../UserPicker'
 import { Save } from 'lucide-react'
+import LinkedKaizens from './LinkedKaizens'
 
 export default function MajorOverview({ major, onSave }) {
   const [editing, setEditing] = useState(false)
@@ -149,6 +150,8 @@ export default function MajorOverview({ major, onSave }) {
         </div>
       </Section>
 
+      <LinkedKaizens majorId={major._id} />
+      
       <Section title="Stato degli step">
         <div className="space-y-2">
           {steps.map(step => {
