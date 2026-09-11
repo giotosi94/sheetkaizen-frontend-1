@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Save, Trash2 } from 'lucide-react'
+import { ExternalLink, Plus, Save, Trash2 } from 'lucide-react'
+import api from '../../../../services/api'
+import ActionPlanFormShared from '../../../ActionPlanFormShared'
+import ActionPlanDetailPanel from '../../../ActionPlanDetailPanel'
 import IshikawaDiagram from '../../../kaizen/IshikawaDiagram'
 import FiveWhysFlowChart from '../../../kaizen/FiveWhysFlowChart'
 import RiskPrioritizationChart from '../../../kaizen/RiskPrioritizationChart'
@@ -18,10 +21,7 @@ const EMPTY_COUNTERMEASURE = {
   id: '',
   causa_radice: '',
   contromisura: '',
-  responsabile: '',
-  scadenza: '',
-  stato: 'Da avviare',
-  action_plan: '',
+  action_plan_id: '',
   kaizen_collegato: '',
   risultato: '',
 }
@@ -36,14 +36,58 @@ const EMPTY_VERIFICATION = {
   ricorrenze_dopo: '',
 }
 
-export default function AnomalyAnalysis({ stepData, onChange }) {
+export default function AnomalyAnalysis({ stepData, onChange, major }) {
   const [form, setForm] = useState(() => buildForm(stepData?.dati || {}))
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [actionPlans, setActionPlans] = useState([])
+  const [showActionPlanForm, setShowActionPlanForm] = useState(false)
+  const [selectedCountermeasureId, setSelectedCountermeasureId] = useState(null)
+  const [selectedActionPlan, setSelectedActionPlan] = useState(null)
 
   useEffect(() => {
     setForm(buildForm(stepData?.dati || {}))
   }, [stepData?.dati])
+
+  useEffect(() => {
+    loadActionPlans()
+  }, [major?._id])
+
+  const loadActionPlans = async () => {
+    if (!major?._id) return
+    try {
+      const response = await api.get('/action-plans/')
+      setActionPlans((response.data || []).filter(item =>
+        item.parent_type === 'major_kaizen' && item.parent_id === major._id
+      ))
+    } catch (error) {
+      console.error('Errore caricamento Action Plan del Major:', error)
+      setActionPlans([])
+    }
+  }
+
+  const createActionPlan = item => {
+    setSelectedCountermeasureId(item.id)
+    setShowActionPlanForm(true)
+  }
+
+  const handleActionPlanSaved = async plan => {
+    setForm(current => ({
+      ...current,
+      contromisure: current.contromisure.map(item =>
+        item.id === selectedCountermeasureId
+          ? { ...item, action_plan_id: plan._id }
+          : item
+      ),
+    }))
+    setShowActionPlanForm(false)
+    setSelectedCountermeasureId(null)
+    await loadActionPlans()
+  }
+
+  const unlinkActionPlan = countermeasureId => {
+    updateCountermeasure(countermeasureId, 'action_plan_id', '')
+  }
 
   const pareto = useMemo(() => {
     const totale = form.anomalie.reduce(
@@ -222,9 +266,7 @@ export default function AnomalyAnalysis({ stepData, onChange }) {
           prioritizzazione_rischio: hasRiskEvaluation(form.ishikawa.rami),
           cause_radice_validate: summary.causeValidate > 0,
           contromisure: form.contromisure.length > 0,
-          follow_up_contromisure: form.contromisure.some(item =>
-            item.responsabile.trim() && item.scadenza
-          ),
+          follow_up_contromisure: form.contromisure.some(item => item.action_plan_id),
           risultati_test: form.verifiche_cause.some(item => item.risultato_test.trim()),
           tabella_ricorrenze: form.verifiche_cause.some(item => item.ricorrenze_prima !== ''),
           verifica_non_ricorrenza:
@@ -368,9 +410,6 @@ export default function AnomalyAnalysis({ stepData, onChange }) {
               <tr>
                 <th className="p-2 text-left">Causa radice</th>
                 <th className="p-2 text-left">Contromisura</th>
-                <th className="p-2 text-left">Responsabile</th>
-                <th className="p-2 text-left">Scadenza</th>
-                <th className="p-2 text-left">Stato</th>
                 <th className="p-2 text-left">Action Plan</th>
                 <th className="p-2 text-left">Quick / Standard collegato</th>
                 <th className="p-2 text-left">Risultato</th>
@@ -380,7 +419,7 @@ export default function AnomalyAnalysis({ stepData, onChange }) {
             <tbody>
               {form.contromisure.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="p-8 text-center text-gray-400">
+                  <td colSpan="6" className="p-8 text-center text-gray-400">
                     Nessuna contromisura inserita
                   </td>
                 </tr>
@@ -389,10 +428,14 @@ export default function AnomalyAnalysis({ stepData, onChange }) {
                   <tr key={item.id} className="border-t">
                     <TableInput value={item.causa_radice} onChange={value => updateCountermeasure(item.id, 'causa_radice', value)} />
                     <TableInput value={item.contromisura} onChange={value => updateCountermeasure(item.id, 'contromisura', value)} />
-                    <TableInput value={item.responsabile} onChange={value => updateCountermeasure(item.id, 'responsabile', value)} />
-                    <TableInput type="date" value={item.scadenza} onChange={value => updateCountermeasure(item.id, 'scadenza', value)} />
-                    <TableSelect value={item.stato} onChange={value => updateCountermeasure(item.id, 'stato', value)} options={['Da avviare', 'In corso', 'Completata', 'Bloccata']} />
-                    <TableInput value={item.action_plan} onChange={value => updateCountermeasure(item.id, 'action_plan', value)} />
+                    <td className="p-2 min-w-[280px]">
+                      <ActionPlanCell
+                        plan={actionPlans.find(plan => plan._id === item.action_plan_id)}
+                        onCreate={() => createActionPlan(item)}
+                        onOpen={setSelectedActionPlan}
+                        onUnlink={() => unlinkActionPlan(item.id)}
+                      />
+                    </td>
                     <TableInput value={item.kaizen_collegato} onChange={value => updateCountermeasure(item.id, 'kaizen_collegato', value)} />
                     <TableInput value={item.risultato} onChange={value => updateCountermeasure(item.id, 'risultato', value)} />
                     <DeleteCell onClick={() => removeCountermeasure(item.id)} />
@@ -493,6 +536,32 @@ export default function AnomalyAnalysis({ stepData, onChange }) {
           <Save size={16} /> {saving ? 'Salvataggio...' : 'Salva Stabilizzare'}
         </button>
       </div>
+
+      {showActionPlanForm && (
+        <ActionPlanFormShared
+          plan={null}
+          prefilledParent={{
+            parent_type: 'major_kaizen',
+            parent_id: major?._id,
+            parent_label: `${major?.numero || ''} · ${major?.titolo || ''}`,
+            pillar_id: major?.pillar_id || null,
+          }}
+          prefilledKaizen={null}
+          onClose={() => {
+            setShowActionPlanForm(false)
+            setSelectedCountermeasureId(null)
+          }}
+          onSaved={handleActionPlanSaved}
+        />
+      )}
+
+      {selectedActionPlan && (
+        <ActionPlanDetailPanel
+          plan={selectedActionPlan}
+          onClose={() => setSelectedActionPlan(null)}
+          onUpdated={loadActionPlans}
+        />
+      )}
     </div>
   )
 }
@@ -605,19 +674,25 @@ function TableInput({ value, onChange, type = 'text' }) {
   )
 }
 
-function TableSelect({ value, onChange, options }) {
+function ActionPlanCell({ plan, onCreate, onOpen, onUnlink }) {
+  if (!plan) {
+    return (
+      <button type="button" onClick={onCreate} className="px-3 py-2 bg-primary text-white rounded-lg text-xs">
+        Crea Action Plan
+      </button>
+    )
+  }
+
   return (
-    <td className="p-2">
-      <select
-        value={value}
-        onChange={event => onChange(event.target.value)}
-        className="w-full border rounded px-2 py-1.5 text-sm"
-      >
-        {options.map(option => (
-          <option key={option} value={option}>{option}</option>
-        ))}
-      </select>
-    </td>
+    <div className="flex items-center gap-2 rounded-lg border bg-gray-50 p-2">
+      <button type="button" onClick={() => onOpen(plan)} className="flex-1 text-left min-w-0">
+        <div className="font-mono text-xs font-bold text-primary">{plan.numero}</div>
+        <div className="text-xs font-medium text-gray-800 truncate">{plan.titolo}</div>
+        <div className="text-xs text-gray-500">{plan.responsabile || 'Senza responsabile'} · {plan.stato_visuale || plan.stato || 'Aperto'}</div>
+      </button>
+      <button type="button" onClick={() => onOpen(plan)} className="p-1.5 text-primary" title="Apri Action Plan"><ExternalLink size={15} /></button>
+      <button type="button" onClick={onUnlink} className="p-1.5 text-red-600" title="Scollega Action Plan"><Trash2 size={15} /></button>
+    </div>
   )
 }
 
