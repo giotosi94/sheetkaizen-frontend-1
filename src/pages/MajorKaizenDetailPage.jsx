@@ -88,6 +88,7 @@ export default function MajorKaizenDetailPage() {
         <MajorStepContainer
           step={activeStep}
           stepData={stepsData[activeStep.step_id]}
+          allStepsData={stepsData}
           onSaveStep={saveStep}
           onApproveGate={approveGate}
         />
