@@ -13,6 +13,19 @@ const EMPTY_ANOMALY = {
   prioritaria: false,
 }
 
+
+const EMPTY_COUNTERMEASURE = {
+  id: '',
+  causa_radice: '',
+  contromisura: '',
+  responsabile: '',
+  scadenza: '',
+  stato: 'Da avviare',
+  action_plan: '',
+  kaizen_collegato: '',
+  risultato: '',
+}
+
 const EMPTY_VERIFICATION = {
   id: '',
   causa_radice: '',
@@ -119,6 +132,35 @@ export default function AnomalyAnalysis({ stepData, onChange }) {
     }))
   }
 
+  const addCountermeasure = () => {
+    setSaved(false)
+    setForm(current => ({
+      ...current,
+      contromisure: [
+        ...current.contromisure,
+        { ...EMPTY_COUNTERMEASURE, id: createId('countermeasure') },
+      ],
+    }))
+  }
+
+  const updateCountermeasure = (id, field, value) => {
+    setSaved(false)
+    setForm(current => ({
+      ...current,
+      contromisure: current.contromisure.map(item =>
+        item.id === id ? { ...item, [field]: value } : item
+      ),
+    }))
+  }
+
+  const removeCountermeasure = id => {
+    setSaved(false)
+    setForm(current => ({
+      ...current,
+      contromisure: current.contromisure.filter(item => item.id !== id),
+    }))
+  }
+
   const addVerification = () => {
     setSaved(false)
     setForm(current => ({
@@ -158,6 +200,9 @@ export default function AnomalyAnalysis({ stepData, onChange }) {
     if (!form.ishikawa.effetto.trim()) {
       return alert('Definisci il problema nel diagramma Ishikawa')
     }
+    if (form.contromisure.length === 0) {
+      return alert('Inserisci almeno una contromisura')
+    }
     if (form.verifiche_cause.length === 0) {
       return alert('Inserisci almeno una verifica della causa radice')
     }
@@ -176,6 +221,10 @@ export default function AnomalyAnalysis({ stepData, onChange }) {
           cinque_perche: hasRootCauses(form.ishikawa.rami),
           prioritizzazione_rischio: hasRiskEvaluation(form.ishikawa.rami),
           cause_radice_validate: summary.causeValidate > 0,
+          contromisure: form.contromisure.length > 0,
+          follow_up_contromisure: form.contromisure.some(item =>
+            item.responsabile.trim() && item.scadenza
+          ),
           risultati_test: form.verifiche_cause.some(item => item.risultato_test.trim()),
           tabella_ricorrenze: form.verifiche_cause.some(item => item.ricorrenze_prima !== ''),
           verifica_non_ricorrenza:
@@ -299,6 +348,65 @@ export default function AnomalyAnalysis({ stepData, onChange }) {
       <section className="bg-white rounded-xl border p-4">
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
+            <h3 className="font-bold text-gray-800">Contromisure e follow-up</h3>
+            <p className="text-xs text-gray-500 mt-1">
+              Trasforma le cause validate in azioni tracciabili e associa gli eventuali Action Plan o Kaizen figli.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={addCountermeasure}
+            className="px-3 py-2 bg-primary text-white rounded-lg text-sm flex items-center gap-2"
+          >
+            <Plus size={15} /> Aggiungi contromisura
+          </button>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1500px] text-sm">
+            <thead className="bg-gray-50 text-gray-600">
+              <tr>
+                <th className="p-2 text-left">Causa radice</th>
+                <th className="p-2 text-left">Contromisura</th>
+                <th className="p-2 text-left">Responsabile</th>
+                <th className="p-2 text-left">Scadenza</th>
+                <th className="p-2 text-left">Stato</th>
+                <th className="p-2 text-left">Action Plan</th>
+                <th className="p-2 text-left">Quick / Standard collegato</th>
+                <th className="p-2 text-left">Risultato</th>
+                <th className="p-2 w-10" />
+              </tr>
+            </thead>
+            <tbody>
+              {form.contromisure.length === 0 ? (
+                <tr>
+                  <td colSpan="9" className="p-8 text-center text-gray-400">
+                    Nessuna contromisura inserita
+                  </td>
+                </tr>
+              ) : (
+                form.contromisure.map(item => (
+                  <tr key={item.id} className="border-t">
+                    <TableInput value={item.causa_radice} onChange={value => updateCountermeasure(item.id, 'causa_radice', value)} />
+                    <TableInput value={item.contromisura} onChange={value => updateCountermeasure(item.id, 'contromisura', value)} />
+                    <TableInput value={item.responsabile} onChange={value => updateCountermeasure(item.id, 'responsabile', value)} />
+                    <TableInput type="date" value={item.scadenza} onChange={value => updateCountermeasure(item.id, 'scadenza', value)} />
+                    <TableSelect value={item.stato} onChange={value => updateCountermeasure(item.id, 'stato', value)} options={['Da avviare', 'In corso', 'Completata', 'Bloccata']} />
+                    <TableInput value={item.action_plan} onChange={value => updateCountermeasure(item.id, 'action_plan', value)} />
+                    <TableInput value={item.kaizen_collegato} onChange={value => updateCountermeasure(item.id, 'kaizen_collegato', value)} />
+                    <TableInput value={item.risultato} onChange={value => updateCountermeasure(item.id, 'risultato', value)} />
+                    <DeleteCell onClick={() => removeCountermeasure(item.id)} />
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="bg-white rounded-xl border p-4">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div>
             <h3 className="font-bold text-gray-800">Validazione cause e non ricorrenza</h3>
             <p className="text-xs text-gray-500 mt-1">
               Verifica le cause radice individuate con gli strumenti condivisi.
@@ -396,6 +504,11 @@ function buildForm(data) {
       effetto: data.ishikawa?.effetto || '',
       rami: data.ishikawa?.rami || {},
     },
+    contromisure: mapItems(
+      data.contromisure,
+      EMPTY_COUNTERMEASURE,
+      'countermeasure'
+    ),
     verifiche_cause: mapItems(
       data.verifiche_cause,
       EMPTY_VERIFICATION,
@@ -488,6 +601,22 @@ function TableInput({ value, onChange, type = 'text' }) {
         step={type === 'number' ? 'any' : undefined}
         className="w-full border rounded px-2 py-1.5 text-sm"
       />
+    </td>
+  )
+}
+
+function TableSelect({ value, onChange, options }) {
+  return (
+    <td className="p-2">
+      <select
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        className="w-full border rounded px-2 py-1.5 text-sm"
+      >
+        {options.map(option => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
     </td>
   )
 }
