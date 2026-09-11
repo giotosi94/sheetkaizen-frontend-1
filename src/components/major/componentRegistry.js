@@ -4,6 +4,7 @@ import BasicConditions from './routes/processScrapReduction/BasicConditions'
 import ScrapEventRegister from './routes/processScrapReduction/ScrapEventRegister'
 import AnomalyAnalysis from './routes/processScrapReduction/AnomalyAnalysis'
 import EcrsAnalysis from './routes/processScrapReduction/EcrsAnalysis'
+import SustainmentPlan from './routes/processScrapReduction/SustainmentPlan'
 
 const COMPONENT_REGISTRY = {
   scrap_baseline: ScrapBaseline,
@@ -11,6 +12,7 @@ const COMPONENT_REGISTRY = {
   scrap_event_register: ScrapEventRegister,
   anomaly_analysis: AnomalyAnalysis,
   ecrs_analysis: EcrsAnalysis,
+  sustainment_plan: SustainmentPlan,
 }
 
 export function getStepComponent(componente) {
