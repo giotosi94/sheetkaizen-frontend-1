@@ -13,6 +13,7 @@ export default function MajorStepContainer({
   onSaveStep,
   onApproveGate,
   allStepsData = {},
+  major = null,
 }) {
   const [innerTab, setInnerTab] = useState('lavoro')
   const StepComponent = getStepComponent(step.componente)
@@ -127,6 +128,7 @@ export default function MajorStepContainer({
           step={step}
           stepData={sd}
           allStepsData={allStepsData}
+          major={major}
           onChange={changes =>
             onSaveStep({
               ...changes,
