@@ -1446,6 +1446,24 @@ export default function KaizenDetailPage() {
   )
 }
 
+function updateRootCauseStatus(rami, nodeId, stato) {
+  const walk = nodes => nodes.map(node => {
+    if (node.id === nodeId) {
+      return { ...node, root_cause_stato: stato }
+    }
+    if (node.children?.length) {
+      return { ...node, children: walk(node.children) }
+    }
+    return node
+  })
+
+  const next = {}
+  Object.entries(rami).forEach(([ramoId, cause]) => {
+    next[ramoId] = Array.isArray(cause) ? walk(cause) : cause
+  })
+  return next
+}
+
 // ──────────────────────────────────────────────────────────
 // COMPONENTE PLACEHOLDER
 // ──────────────────────────────────────────────────────────
