@@ -18,18 +18,6 @@ export default function MajorStepContainer({
   const [innerTab, setInnerTab] = useState('lavoro')
   const StepComponent = getStepComponent(step.componente)
   const sd = stepData || {}
-  const metodologieUsate = sd.metodologie_usate || []
-
-  const toggleMetodologia = metodologia => {
-    const next = metodologieUsate.includes(metodologia)
-      ? metodologieUsate.filter(item => item !== metodologia)
-      : [...metodologieUsate, metodologia]
-
-    onSaveStep({
-      metodologie_usate: next,
-      stato: sd.stato === 'completato' ? 'completato' : 'in_corso',
-    })
-  }
 
   return (
     <div className="space-y-4">
@@ -53,40 +41,6 @@ export default function MajorStepContainer({
                 </p>
               )}
             </div>
-
-            {(step.metodologie || []).length > 0 && (
-              <div className="mt-4">
-                <div className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                  Metodologie previste
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {step.metodologie.map(metodologia => {
-                    const utilizzata = metodologieUsate.includes(metodologia)
-
-                    return (
-                      <button
-                        key={metodologia}
-                        type="button"
-                        onClick={() => toggleMetodologia(metodologia)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                          utilizzata
-                            ? 'bg-primary text-white border-primary'
-                            : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-primary'
-                        }`}
-                        title={
-                          utilizzata
-                            ? 'Metodologia utilizzata. Clicca per deselezionare.'
-                            : 'Clicca per indicare che la metodologia è stata utilizzata.'
-                        }
-                      >
-                        {metodologia}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
 
           <span
             className={`text-xs px-2 py-1 rounded flex-shrink-0 ${
