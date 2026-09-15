@@ -41,6 +41,7 @@ export default function MajorStepContainer({
                 </p>
               )}
             </div>
+          </div>
 
           <span
             className={`text-xs px-2 py-1 rounded flex-shrink-0 ${
