@@ -230,7 +230,7 @@ function NodoView({ nodo, depth, isCausa, expandedNodes, onUpdate, onAddChild, o
           onChange={(e) => onUpdate(nodo.id, { label: e.target.value })}
           placeholder={isCausa ? 'Causa' : 'Perché?'}
           className={`flex-1 text-sm border-0 bg-transparent focus:outline-none focus:bg-white focus:border focus:rounded px-2 py-1 ${
-            nodo.is_root_cause ? 'font-bold text-red-700' : ''
+            nodo.is_root_cause ? 'font-bold text-gray-900' : ''
           }`}
         />
         
@@ -263,12 +263,16 @@ function NodoView({ nodo, depth, isCausa, expandedNodes, onUpdate, onAddChild, o
 
         <button
           onClick={() => onToggleRootCause(nodo.id)}
-          className={`p-1 rounded ${
+                   className={`p-1 rounded ${
             nodo.is_root_cause
-              ? 'bg-red-500 text-white'
+              ? nodo.root_cause_stato === 'confermata'
+                ? 'bg-green-600 text-white'
+                : nodo.root_cause_stato === 'scartata'
+                  ? 'bg-gray-400 text-white'
+                  : 'bg-yellow-500 text-white'
               : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
           }`}
-          title={nodo.is_root_cause ? 'Rimuovi ROOT CAUSE' : 'Segna come ROOT CAUSE'}
+          title={nodo.is_root_cause ? 'Rimuovi proposta di causa radice' : 'Proponi come causa radice'}
         >
           <Target size={12} />
         </button>
@@ -468,6 +472,7 @@ function createNewNode() {
     label: '',
     voti: 0,
     is_root_cause: false,
+    root_cause_stato: 'da_valutare',
     severity: '',
     occurrence: '',
     detection: '',
@@ -499,11 +504,19 @@ function removeNodoRecursive(nodes, nodeId) {
 
 function setRootCauseRecursive(nodes, nodeId) {
   return nodes.map(n => {
-    const isTarget = n.id === nodeId
+    if (n.id === nodeId) {
+      const next = !n.is_root_cause
+      return {
+        ...n,
+        is_root_cause: next,
+        root_cause_stato: next ? 'da_valutare' : null,
+        children: n.children?.length ? setRootCauseRecursive(n.children, nodeId) : [],
+      }
+    }
     return {
       ...n,
-      is_root_cause: isTarget ? !n.is_root_cause : false,
-      children: n.children?.length ? setRootCauseRecursive(n.children, nodeId) : [],
+      children: n.children?.length ? setRootCauseRecursive(n.children, nodeId) : n.children || [],
     }
   })
 }
+
