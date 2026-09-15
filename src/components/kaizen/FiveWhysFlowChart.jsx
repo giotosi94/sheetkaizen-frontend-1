@@ -1,4 +1,4 @@
-import { ClipboardList, Target } from 'lucide-react'
+import { Check, ClipboardList, Target, X } from 'lucide-react'
 
 const RAMI = {
   people: 'People',
@@ -13,12 +13,12 @@ export default function FiveWhysFlowChart({
   rami = {},
   effetto = '',
   onCreateActionPlan,
+  onValidateRootCause,
 }) {
   const catene = []
 
   Object.entries(rami).forEach(([ramoId, cause]) => {
     if (!Array.isArray(cause)) return
-
     cause.forEach(causa => {
       const totalNodes = countTreeNodes(causa)
       const maxDepth = getTreeDepth(causa)
@@ -42,8 +42,7 @@ export default function FiveWhysFlowChart({
   if (catene.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow p-12 text-center text-gray-400">
-        Nessuna causa identificata nello Step 2. Vai a compilare
-        l&apos;Ishikawa per visualizzare qui l&apos;albero dei 5 Perché.
+        Nessuna causa identificata. Compila l&apos;Ishikawa per visualizzare qui l&apos;albero dei 5 Perché.
       </div>
     )
   }
@@ -54,7 +53,6 @@ export default function FiveWhysFlowChart({
         <label className="block text-xs font-bold uppercase text-gray-600 mb-1">
           Effetto / Problema
         </label>
-
         <div className="text-lg font-bold text-gray-800">
           {effetto || '(non specificato)'}
         </div>
@@ -65,13 +63,13 @@ export default function FiveWhysFlowChart({
           <h3 className="text-sm font-bold uppercase text-gray-600">
             Alberi dei 5 Perché ({catenePopolate.length})
           </h3>
-
           {catenePopolate.map((catena, index) => (
             <CatenaCard
               key={`${catena.ramo}_${catena.tree.id}_${index}`}
               catena={catena}
               effetto={effetto}
               onCreateActionPlan={onCreateActionPlan}
+              onValidateRootCause={onValidateRootCause}
             />
           ))}
         </div>
@@ -85,12 +83,9 @@ export default function FiveWhysFlowChart({
               ? 'causa senza perché esplorati'
               : 'cause senza perché esplorati'}
           </div>
-
           <div className="text-xs text-yellow-700">
-            Torna allo Step 2 e usa il pulsante <strong>+</strong> sulla causa
-            per aggiungere uno o più Perché.
+            Torna all&apos;Ishikawa e usa il pulsante <strong>+</strong> sulla causa per aggiungere uno o più Perché.
           </div>
-
           <div className="mt-2 flex flex-wrap gap-2">
             {cateneVuote.map((catena, index) => (
               <span
@@ -100,7 +95,6 @@ export default function FiveWhysFlowChart({
                 <span className="text-[10px] uppercase opacity-60">
                   {catena.ramoLabel}
                 </span>
-
                 <span className="ml-1 font-medium">
                   {catena.causaLabel || '(causa senza descrizione)'}
                 </span>
@@ -113,21 +107,11 @@ export default function FiveWhysFlowChart({
   )
 }
 
-function CatenaCard({
-  catena,
-  effetto,
-  onCreateActionPlan,
-}) {
-  const {
-    ramoLabel,
-    tree,
-    maxDepth,
-    totalNodes,
-    rootCauses,
-  } = catena
-
+function CatenaCard({ catena, effetto, onCreateActionPlan, onValidateRootCause }) {
+  const { ramoLabel, tree, maxDepth, totalNodes, rootCauses } = catena
   const whyLevels = Math.max(0, maxDepth - 1)
   const whyCount = Math.max(0, totalNodes - 1)
+  const confermate = rootCauses.filter(item => item.root_cause_stato === 'confermata')
 
   return (
     <div className="w-full min-w-0 bg-white rounded-xl shadow p-4">
@@ -135,30 +119,20 @@ function CatenaCard({
         <span className="text-[10px] uppercase font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
           {ramoLabel}
         </span>
-
         <span className="text-xs text-gray-400">·</span>
-
         <span className="text-sm text-gray-600">
-          {whyLevels}{' '}
-          {whyLevels === 1
-            ? 'livello di Perché'
-            : 'livelli di Perché'}
+          {whyLevels} {whyLevels === 1 ? 'livello di Perché' : 'livelli di Perché'}
         </span>
-
         <span className="text-xs text-gray-400">·</span>
-
         <span className="text-sm text-gray-600">
-          {whyCount}{' '}
-          {whyCount === 1 ? 'Perché inserito' : 'Perché inseriti'}
+          {whyCount} {whyCount === 1 ? 'Perché inserito' : 'Perché inseriti'}
         </span>
-
-        {rootCauses.length > 0 && (
-          <span className="ml-auto text-[10px] uppercase font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded flex items-center gap-1">
-            <Target size={10} />
-
-            {rootCauses.length === 1
-              ? 'Root Cause individuata'
-              : `${rootCauses.length} Root Cause individuate`}
+        {confermate.length > 0 && (
+          <span className="ml-auto text-[10px] uppercase font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded flex items-center gap-1">
+            <Check size={10} />
+            {confermate.length === 1
+              ? 'Causa radice confermata'
+              : `${confermate.length} cause radice confermate`}
           </span>
         )}
       </div>
@@ -168,93 +142,153 @@ function CatenaCard({
           <CausalTreeNode
             node={tree}
             depth={0}
+            onValidateRootCause={onValidateRootCause}
           />
         </div>
       </div>
 
-      {rootCauses.length > 0 && onCreateActionPlan && (
+      {rootCauses.length > 0 && (
         <div className="mt-4 pt-3 border-t space-y-2">
           <div className="text-xs font-bold uppercase text-gray-500">
-            Root Cause individuate
+            Cause radice proposte
           </div>
+          {rootCauses.map(rootCause => {
+            const stato = rootCause.root_cause_stato || 'da_valutare'
+            const isConfermata = stato === 'confermata'
+            const isScartata = stato === 'scartata'
 
-          {rootCauses.map(rootCause => (
-            <div
-              key={rootCause.id}
-              className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg p-2"
-            >
-              <Target
-                size={14}
-                className="text-red-600 flex-shrink-0"
-              />
-
-              <span className="flex-1 text-sm font-medium text-red-900">
-                {rootCause.label || '(Root Cause senza descrizione)'}
-              </span>
-
-              <button
-                type="button"
-                onClick={() => onCreateActionPlan(
-                  rootCause,
-                  effetto || catena.causaLabel
-                )}
-                className="flex-shrink-0 text-xs px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 flex items-center gap-1.5 font-medium"
+            return (
+              <div
+                key={rootCause.id}
+                className={`flex items-center gap-3 border rounded-lg p-2 ${
+                  isConfermata
+                    ? 'bg-green-50 border-green-200'
+                    : isScartata
+                      ? 'bg-gray-50 border-gray-200'
+                      : 'bg-yellow-50 border-yellow-200'
+                }`}
               >
-                <ClipboardList size={13} />
-                Crea Action Plan
-              </button>
-            </div>
-          ))}
+                <Target
+                  size={14}
+                  className={`flex-shrink-0 ${
+                    isConfermata
+                      ? 'text-green-600'
+                      : isScartata
+                        ? 'text-gray-400'
+                        : 'text-yellow-600'
+                  }`}
+                />
+                <span
+                  className={`flex-1 text-sm font-medium ${
+                    isScartata ? 'text-gray-400 line-through' : 'text-gray-800'
+                  }`}
+                >
+                  {rootCause.label || '(causa senza descrizione)'}
+                </span>
+
+                {onValidateRootCause && !isConfermata && (
+                  <button
+                    type="button"
+                    onClick={() => onValidateRootCause(rootCause.id, 'confermata')}
+                    className="flex-shrink-0 text-xs px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1.5 font-medium"
+                  >
+                    <Check size={13} /> Conferma
+                  </button>
+                )}
+
+                {onValidateRootCause && !isScartata && (
+                  <button
+                    type="button"
+                    onClick={() => onValidateRootCause(rootCause.id, 'scartata')}
+                    className="flex-shrink-0 text-xs px-3 py-1.5 border border-gray-300 text-gray-600 rounded hover:bg-gray-100 flex items-center gap-1.5"
+                  >
+                    <X size={13} /> Scarta
+                  </button>
+                )}
+
+                {onValidateRootCause && stato !== 'da_valutare' && (
+                  <button
+                    type="button"
+                    onClick={() => onValidateRootCause(rootCause.id, 'da_valutare')}
+                    className="flex-shrink-0 text-xs px-2 py-1.5 text-gray-500 hover:underline"
+                  >
+                    Reimposta
+                  </button>
+                )}
+
+                {isConfermata && onCreateActionPlan && (
+                  <button
+                    type="button"
+                    onClick={() => onCreateActionPlan(rootCause, effetto || catena.causaLabel)}
+                    className="flex-shrink-0 text-xs px-3 py-1.5 bg-primary text-white rounded hover:bg-primary-light flex items-center gap-1.5 font-medium"
+                  >
+                    <ClipboardList size={13} /> Crea Action Plan
+                  </button>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
   )
 }
 
-function CausalTreeNode({
-  node,
-  depth,
-}) {
-  const children = Array.isArray(node.children)
-    ? node.children
-    : []
-
+function CausalTreeNode({ node, depth, onValidateRootCause }) {
+  const children = Array.isArray(node.children) ? node.children : []
   const hasChildren = children.length > 0
-  const isRoot = node.is_root_cause === true
+  const isProposta = node.is_root_cause === true
+  const stato = node.root_cause_stato || 'da_valutare'
+  const isConfermata = isProposta && stato === 'confermata'
+  const isScartata = isProposta && stato === 'scartata'
 
   return (
     <div className="flex items-center">
       <div className="flex-shrink-0">
         <div
           className={`relative min-w-[180px] max-w-[220px] border-2 rounded-lg p-3 ${
-            isRoot
-              ? 'border-red-500 bg-red-50'
-              : depth === 0
-                ? 'border-primary bg-yellow-50'
-                : 'border-gray-300 bg-white'
+            isConfermata
+              ? 'border-green-500 bg-green-50'
+              : isScartata
+                ? 'border-gray-300 bg-gray-100 opacity-70'
+                : isProposta
+                  ? 'border-yellow-500 bg-yellow-50'
+                  : depth === 0
+                    ? 'border-primary bg-yellow-50'
+                    : 'border-gray-300 bg-white'
           }`}
         >
           <div
             className={`text-[9px] font-bold uppercase mb-1 ${
-              isRoot
-                ? 'text-red-700'
-                : depth === 0
-                  ? 'text-primary'
-                  : 'text-gray-500'
+              isConfermata
+                ? 'text-green-700'
+                : isScartata
+                  ? 'text-gray-500'
+                  : isProposta
+                    ? 'text-yellow-700'
+                    : depth === 0
+                      ? 'text-primary'
+                      : 'text-gray-500'
             }`}
           >
-            {isRoot
-              ? 'Root Cause'
-              : depth === 0
-                ? 'Causa'
-                : `Perché livello ${depth}`}
+            {isConfermata
+              ? 'Causa radice confermata'
+              : isScartata
+                ? 'Causa radice scartata'
+                : isProposta
+                  ? 'Causa radice proposta'
+                  : depth === 0
+                    ? 'Causa'
+                    : `Perché livello ${depth}`}
           </div>
 
           <div
             className={`text-sm break-words ${
-              isRoot
-                ? 'font-bold text-red-900'
-                : 'text-gray-800'
+              isConfermata
+                ? 'font-bold text-green-900'
+                : isScartata
+                  ? 'text-gray-400 line-through'
+                  : 'text-gray-800'
             }`}
           >
             {node.label || '(vuoto)'}
@@ -267,12 +301,33 @@ function CausalTreeNode({
                   key={value}
                   className="w-1.5 h-1.5 rounded-full"
                   style={{
-                    backgroundColor: value <= node.voti
-                      ? '#A9791C'
-                      : '#e5e7eb',
+                    backgroundColor: value <= node.voti ? '#A9791C' : '#e5e7eb',
                   }}
                 />
               ))}
+            </div>
+          )}
+
+          {isProposta && onValidateRootCause && (
+            <div className="flex gap-1 mt-2">
+              {!isConfermata && (
+                <button
+                  type="button"
+                  onClick={() => onValidateRootCause(node.id, 'confermata')}
+                  className="flex-1 text-[10px] px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 flex items-center justify-center gap-1"
+                >
+                  <Check size={11} /> Conferma
+                </button>
+              )}
+              {!isScartata && (
+                <button
+                  type="button"
+                  onClick={() => onValidateRootCause(node.id, 'scartata')}
+                  className="flex-1 text-[10px] px-2 py-1 border border-gray-300 text-gray-600 rounded hover:bg-gray-100 flex items-center justify-center gap-1"
+                >
+                  <X size={11} /> Scarta
+                </button>
+              )}
             </div>
           )}
 
@@ -287,22 +342,17 @@ function CausalTreeNode({
       {hasChildren && (
         <>
           <div className="w-10 h-px bg-gray-400 flex-shrink-0" />
-
           <div className="relative flex flex-col gap-3 py-2">
             {children.length > 1 && (
               <div className="absolute left-0 top-[24px] bottom-[24px] w-px bg-gray-400" />
             )}
-
             {children.map(child => (
-              <div
-                key={child.id}
-                className="relative flex items-center"
-              >
+              <div key={child.id} className="relative flex items-center">
                 <div className="w-8 h-px bg-gray-400 flex-shrink-0" />
-
                 <CausalTreeNode
                   node={child}
                   depth={depth + 1}
+                  onValidateRootCause={onValidateRootCause}
                 />
               </div>
             ))}
@@ -314,44 +364,22 @@ function CausalTreeNode({
 }
 
 function countTreeNodes(node) {
-  const children = Array.isArray(node.children)
-    ? node.children
-    : []
-
-  return 1 + children.reduce(
-    (total, child) => total + countTreeNodes(child),
-    0
-  )
+  const children = Array.isArray(node.children) ? node.children : []
+  return 1 + children.reduce((total, child) => total + countTreeNodes(child), 0)
 }
 
 function getTreeDepth(node) {
-  const children = Array.isArray(node.children)
-    ? node.children
-    : []
-
-  if (children.length === 0) {
-    return 1
-  }
-
-  return 1 + Math.max(
-    ...children.map(child => getTreeDepth(child))
-  )
+  const children = Array.isArray(node.children) ? node.children : []
+  if (children.length === 0) return 1
+  return 1 + Math.max(...children.map(child => getTreeDepth(child)))
 }
 
 function findAllRootCauses(node) {
   const results = []
-
-  if (node.is_root_cause === true) {
-    results.push(node)
-  }
-
-  const children = Array.isArray(node.children)
-    ? node.children
-    : []
-
+  if (node.is_root_cause === true) results.push(node)
+  const children = Array.isArray(node.children) ? node.children : []
   children.forEach(child => {
     results.push(...findAllRootCauses(child))
   })
-
   return results
 }
