@@ -28,10 +28,30 @@ export default function BasicConditions({ stepData, onChange }) {
   const [form, setForm] = useState(() => buildForm(stepData?.dati || {}))
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [dirty, setDirty] = useState(false)
 
   useEffect(() => {
     setForm(buildForm(stepData?.dati || {}))
   }, [stepData?.dati])
+
+  useEffect(() => {
+    if (!dirty) return
+    const timer = setTimeout(() => {
+      onChange({
+        dati: { ...form, riepilogo: summary },
+        output_compilati: {
+          elenco_anomalie: form.anomalie.length > 0,
+          registro_tag: form.anomalie.some(item => item.area_componente.trim()),
+          fotografie_prima_dopo: form.immagini_prima.length > 0 && form.immagini_dopo.length > 0,
+          parametri_critici: form.parametri_critici.length > 0,
+          standard_corrente: Boolean(form.standard_corrente.trim()),
+          evidenza_formazione: !form.formazione_necessaria || form.evidenze_formazione.length > 0,
+        },
+      })
+      setDirty(false)
+    }, 800)
+    return () => clearTimeout(timer)
+  }, [dirty, form, summary, onChange])
 
   const summary = useMemo(() => {
     const totale = form.anomalie.length
@@ -53,6 +73,7 @@ export default function BasicConditions({ stepData, onChange }) {
 
   const updateField = (field, value) => {
     setSaved(false)
+    setDirty(true)
     setForm(current => ({ ...current, [field]: value }))
   }
 
@@ -166,18 +187,6 @@ export default function BasicConditions({ stepData, onChange }) {
             onChange={value => updateField('standard_corrente', value)}
             placeholder="Descrivi lo standard iniziale disponibile prima del ripristino"
             required
-          />
-          <TextAreaField
-            label="Condizioni originali da ripristinare"
-            value={form.condizioni_originali}
-            onChange={value => updateField('condizioni_originali', value)}
-            placeholder="Elenca le condizioni nominali, tecniche e operative da recuperare"
-          />
-          <TextAreaField
-            label="Standard di pulizia e ispezione"
-            value={form.standard_pulizia_ispezione}
-            onChange={value => updateField('standard_pulizia_ispezione', value)}
-            placeholder="Definisci frequenza, modalità, punti da controllare e responsabilità"
           />
         </div>
       </section>
@@ -306,11 +315,10 @@ export default function BasicConditions({ stepData, onChange }) {
         )}
       </section>
 
-      <div className="flex items-center justify-end gap-3">
-        {saved && <span className="text-sm text-green-700">Step salvato</span>}
-        <button type="button" onClick={save} disabled={saving} className="px-5 py-2 bg-primary text-white rounded-lg text-sm flex items-center gap-2 disabled:opacity-50">
-          <Save size={16} /> {saving ? 'Salvataggio...' : 'Salva Ripristinare'}
-        </button>
+      <div className="flex items-center justify-end">
+        <span className="text-xs text-gray-500">
+          {dirty ? 'Salvataggio in corso...' : 'Tutte le modifiche sono salvate'}
+        </span>
       </div>
     </div>
   )
@@ -320,8 +328,6 @@ function buildForm(data) {
   return {
     migliore_pratica_attuale: data.migliore_pratica_attuale || '',
     standard_corrente: data.standard_corrente || '',
-    condizioni_originali: data.condizioni_originali || '',
-    standard_pulizia_ispezione: data.standard_pulizia_ispezione || '',
     anomalie: Array.isArray(data.anomalie)
       ? data.anomalie.map(item => ({ ...EMPTY_ANOMALY, ...item, id: item.id || createId('anomaly') }))
       : [],
