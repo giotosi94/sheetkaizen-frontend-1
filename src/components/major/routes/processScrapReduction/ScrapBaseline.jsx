@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Save, Trash2 } from 'lucide-react'
+import api from '../../../../services/api'
 
 const EMPTY_ROW = {
   id: '',
@@ -10,11 +11,31 @@ const EMPTY_ROW = {
   note: '',
 }
 
+const UNITA_FALLBACK = ['%', 'kg', 'pezzi']
+const KPI_FALLBACK = ['Scarto di processo', 'Scarto di prodotto', 'Rilavorazione', 'Perdita di materiale']
+
 export default function ScrapBaseline({ stepData, onChange }) {
-  const initialData = stepData?.dati || {}
-  const [form, setForm] = useState(() => buildForm(initialData))
+  const [kpiOptions, setKpiOptions] = useState(KPI_FALLBACK)
+  const [unitaOptions, setUnitaOptions] = useState(UNITA_FALLBACK)
+  const [form, setForm] = useState(() => buildForm(stepData?.dati || {}))
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    api.get('/configurazioni/', { params: { tipo: 'kpi_major' } })
+      .then(response => {
+        const values = (response.data || []).map(item => item.label).filter(Boolean)
+        if (values.length > 0) setKpiOptions(values)
+      })
+      .catch(() => setKpiOptions(KPI_FALLBACK))
+
+    api.get('/configurazioni/', { params: { tipo: 'unita_misura' } })
+      .then(response => {
+        const values = (response.data || []).map(item => item.label).filter(Boolean)
+        if (values.length > 0) setUnitaOptions(values)
+      })
+      .catch(() => setUnitaOptions(UNITA_FALLBACK))
+  }, [])
 
   useEffect(() => {
     setForm(buildForm(stepData?.dati || {}))
@@ -97,15 +118,6 @@ export default function ScrapBaseline({ stepData, onChange }) {
   }
 
   const save = async () => {
-    if (!form.problema.trim()) return alert('Inserisci la descrizione del problema')
-    if (!form.kpi_principale.trim()) return alert('Inserisci il KPI principale')
-    if (!form.unita_misura.trim()) return alert('Inserisci l’unità di misura')
-    if (!form.fonte_dati.trim()) return alert('Inserisci la fonte dati')
-    if (!form.periodo_da || !form.periodo_a) return alert('Inserisci il periodo di analisi')
-    if (form.baseline === '') return alert('Inserisci la baseline')
-    if (form.target === '') return alert('Inserisci il target')
-    if (!form.categoria_prioritaria) return alert('Seleziona la categoria prioritaria')
-
     setSaving(true)
     try {
       await onChange({
@@ -144,7 +156,7 @@ export default function ScrapBaseline({ stepData, onChange }) {
       <section className="bg-white rounded-xl border p-4">
         <h3 className="font-bold text-gray-800 mb-4">Definizione del problema</h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <TextAreaField label="Problema" value={form.problema} onChange={value => updateField('problema', value)} placeholder="Descrivi il fenomeno osservato in modo misurabile" required />
+          <TextAreaField label="Problema" value={form.problema} onChange={value => updateField('problema', value)} placeholder="Descrivi il fenomeno osservato in modo misurabile" />
           <TextAreaField label="Perimetro" value={form.perimetro} onChange={value => updateField('perimetro', value)} placeholder="Definisci processo, prodotto, formato, linea e confini del progetto" />
         </div>
       </section>
@@ -152,14 +164,14 @@ export default function ScrapBaseline({ stepData, onChange }) {
       <section className="bg-white rounded-xl border p-4">
         <h3 className="font-bold text-gray-800 mb-4">KPI, fonte dati e periodo</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <InputField label="KPI principale" value={form.kpi_principale} onChange={value => updateField('kpi_principale', value)} placeholder="Es. Scarto di processo" required />
-          <InputField label="Unità di misura" value={form.unita_misura} onChange={value => updateField('unita_misura', value)} placeholder="%, kg, pezzi" required />
-          <InputField label="Baseline" type="number" value={form.baseline} onChange={value => updateField('baseline', value)} required />
-          <InputField label="Target" type="number" value={form.target} onChange={value => updateField('target', value)} required />
-          <InputField label="Fonte dati" value={form.fonte_dati} onChange={value => updateField('fonte_dati', value)} placeholder="MES, Excel, rilevazione manuale" required />
-          <InputField label="Periodo da" type="date" value={form.periodo_da} onChange={value => updateField('periodo_da', value)} required />
-          <InputField label="Periodo a" type="date" value={form.periodo_a} onChange={value => updateField('periodo_a', value)} required />
-          <InputField label="Note sulla fonte" value={form.note_fonte} onChange={value => updateField('note_fonte', value)} placeholder="Qualità, limiti o frequenza del dato" />
+          <SelectField label="KPI principale" value={form.kpi_principale} onChange={value => updateField('kpi_principale', value)} options={kpiOptions} />
+          <SelectField label="Unità di misura" value={form.unita_misura} onChange={value => updateField('unita_misura', value)} options={unitaOptions} />
+          <InputField label="Baseline" type="number" value={form.baseline} onChange={value => updateField('baseline', value)} />
+          <InputField label="Target" type="number" value={form.target} onChange={value => updateField('target', value)} />
+          <InputField label="Fonte dati" value={form.fonte_dati} onChange={value => updateField('fonte_dati', value)} />
+          <InputField label="Periodo da" type="date" value={form.periodo_da} onChange={value => updateField('periodo_da', value)} />
+          <InputField label="Periodo a" type="date" value={form.periodo_a} onChange={value => updateField('periodo_a', value)} />
+          <InputField label="Note sulla fonte" value={form.note_fonte} onChange={value => updateField('note_fonte', value)} />
         </div>
       </section>
 
@@ -167,7 +179,7 @@ export default function ScrapBaseline({ stepData, onChange }) {
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
             <h3 className="font-bold text-gray-800">Categorie di scarto</h3>
-            <p className="text-xs text-gray-500 mt-1">Inserimento manuale V1. Import Excel e integrazione MES saranno aggiunti successivamente.</p>
+            <p className="text-xs text-gray-500 mt-1">Inserimento manuale. Import Excel e integrazione MES saranno aggiunti successivamente.</p>
           </div>
           <button type="button" onClick={addRow} className="px-3 py-2 bg-primary text-white rounded-lg text-sm flex items-center gap-2">
             <Plus size={15} /> Aggiungi categoria
@@ -193,7 +205,7 @@ export default function ScrapBaseline({ stepData, onChange }) {
               ) : (
                 form.categorie_scarto.map(row => (
                   <tr key={row.id} className="border-t">
-                    <TableInput value={row.categoria} onChange={value => updateRow(row.id, 'categoria', value)} placeholder="Es. Start-up" />
+                    <TableInput value={row.categoria} onChange={value => updateRow(row.id, 'categoria', value)} />
                     <TableInput type="number" value={row.quantita} onChange={value => updateRow(row.id, 'quantita', value)} />
                     <TableInput type="number" value={row.frequenza} onChange={value => updateRow(row.id, 'frequenza', value)} />
                     <TableInput type="number" value={row.costo_unitario} onChange={value => updateRow(row.id, 'costo_unitario', value)} />
@@ -219,18 +231,41 @@ export default function ScrapBaseline({ stepData, onChange }) {
         {calculations.pareto.length === 0 ? (
           <div className="text-center text-sm text-gray-400 py-8">Inserisci quantità e categorie per costruire il Pareto</div>
         ) : (
-          <div className="space-y-3">
-            {calculations.pareto.map(row => (
-              <div key={row.id}>
-                <div className="flex justify-between gap-3 text-xs mb-1">
-                  <span className="font-medium text-gray-700">{row.categoria || 'Categoria senza nome'}</span>
-                  <span className="text-gray-500">{formatNumber(row.quantita_calcolata)} · {row.percentuale.toFixed(1)}% · cumulata {row.cumulata.toFixed(1)}%</span>
+          <div className="overflow-x-auto">
+            <div className="flex items-end gap-6 h-64 min-w-max px-4 pt-6 border-b border-gray-200">
+              {calculations.pareto.map(row => {
+                const maxValue = calculations.pareto[0]?.quantita_calcolata || 1
+                const heightPercent = maxValue > 0 ? (row.quantita_calcolata / maxValue) * 100 : 0
+
+                return (
+                  <div key={row.id} className="flex flex-col items-center justify-end h-full w-24">
+                    <div className="text-xs font-bold text-gray-700 mb-1">
+                      {formatNumber(row.quantita_calcolata)}
+                    </div>
+                    <div className="text-[10px] text-gray-500 mb-1">
+                      {row.percentuale.toFixed(1)}%
+                    </div>
+                    <div
+                      className="w-14 bg-primary rounded-t transition-all"
+                      style={{ height: `${Math.max(heightPercent, 2)}%` }}
+                      title={`Cumulata ${row.cumulata.toFixed(1)}%`}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+            <div className="flex gap-6 min-w-max px-4 pt-2">
+              {calculations.pareto.map(row => (
+                <div key={row.id} className="w-24 text-center">
+                  <div className="text-xs font-medium text-gray-700 break-words">
+                    {row.categoria || 'Senza nome'}
+                  </div>
+                  <div className="text-[10px] text-gray-400 mt-0.5">
+                    cum. {row.cumulata.toFixed(0)}%
+                  </div>
                 </div>
-                <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(row.percentuale, 100)}%` }} />
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
 
@@ -240,9 +275,6 @@ export default function ScrapBaseline({ stepData, onChange }) {
             <option value="">Seleziona la priorità</option>
             {categorieDisponibili.map(categoria => <option key={categoria} value={categoria}>{categoria}</option>)}
           </select>
-          {calculations.pareto[0]?.categoria && (
-            <p className="text-xs text-gray-500 mt-1">Prima categoria del Pareto: {calculations.pareto[0].categoria}. La conferma resta manuale.</p>
-          )}
         </div>
       </section>
 
@@ -268,7 +300,9 @@ function buildForm(data) {
     periodo_da: data.periodo_da || '',
     periodo_a: data.periodo_a || '',
     note_fonte: data.note_fonte || '',
-    categorie_scarto: Array.isArray(data.categorie_scarto) ? data.categorie_scarto.map(row => ({ ...EMPTY_ROW, ...row, id: row.id || createId() })) : [],
+    categorie_scarto: Array.isArray(data.categorie_scarto)
+      ? data.categorie_scarto.map(row => ({ ...EMPTY_ROW, ...row, id: row.id || createId() }))
+      : [],
     categoria_prioritaria: data.categoria_prioritaria || '',
   }
 }
@@ -291,18 +325,73 @@ function formatNumber(value) {
   return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 2 }).format(value || 0)
 }
 
-function InputField({ label, value, onChange, type = 'text', placeholder = '', required = false }) {
-  return <div><label className="block text-xs font-semibold text-gray-600 uppercase mb-1">{label}{required && <span className="text-red-500 ml-1">*</span>}</label><input type={type} value={value} onChange={event => onChange(event.target.value)} placeholder={placeholder} step={type === 'number' ? 'any' : undefined} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+function InputField({ label, value, onChange, type = 'text' }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        step={type === 'number' ? 'any' : undefined}
+        className="w-full border rounded-lg px-3 py-2 text-sm"
+      />
+    </div>
+  )
 }
 
-function TextAreaField({ label, value, onChange, placeholder, required = false }) {
-  return <div><label className="block text-xs font-semibold text-gray-600 uppercase mb-1">{label}{required && <span className="text-red-500 ml-1">*</span>}</label><textarea rows="4" value={value} onChange={event => onChange(event.target.value)} placeholder={placeholder} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+function SelectField({ label, value, onChange, options }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">{label}</label>
+      <select
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        className="w-full border rounded-lg px-3 py-2 text-sm"
+      >
+        <option value="">Seleziona</option>
+        {options.map(option => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+    </div>
+  )
 }
 
-function TableInput({ value, onChange, type = 'text', placeholder = '' }) {
-  return <td className="p-2"><input type={type} value={value} onChange={event => onChange(event.target.value)} placeholder={placeholder} step={type === 'number' ? 'any' : undefined} className="w-full border rounded px-2 py-1.5 text-sm" /></td>
+function TextAreaField({ label, value, onChange, placeholder }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">{label}</label>
+      <textarea
+        rows="4"
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="w-full border rounded-lg px-3 py-2 text-sm"
+      />
+    </div>
+  )
+}
+
+function TableInput({ value, onChange, type = 'text' }) {
+  return (
+    <td className="p-2">
+      <input
+        type={type}
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        step={type === 'number' ? 'any' : undefined}
+        className="w-full border rounded px-2 py-1.5 text-sm"
+      />
+    </td>
+  )
 }
 
 function SummaryCard({ label, value }) {
-  return <div className="bg-gray-50 rounded-lg p-3"><div className="text-xs text-gray-500 uppercase">{label}</div><div className="text-xl font-bold text-gray-800 mt-1">{value}</div></div>
+  return (
+    <div className="bg-gray-50 rounded-lg p-3">
+      <div className="text-xs text-gray-500 uppercase">{label}</div>
+      <div className="text-xl font-bold text-gray-800 mt-1">{value}</div>
+    </div>
+  )
 }
