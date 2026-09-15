@@ -1078,6 +1078,19 @@ export default function KaizenDetailPage() {
               effetto={kaizen.passo2_cause_probabili?.effetto || ''}
               rami={kaizen.passo2_cause_probabili?.rami || {}}
               onCreateActionPlan={handleCreateAPFromRootCause}
+              onValidateRootCause={(nodeId, stato) => {
+                setKaizen(prev => ({
+                  ...prev,
+                  passo2_cause_probabili: {
+                    ...prev.passo2_cause_probabili,
+                    rami: updateRootCauseStatus(
+                      prev.passo2_cause_probabili?.rami || {},
+                      nodeId,
+                      stato
+                    ),
+                  },
+                }))
+              }}
             />
           </div>
 
