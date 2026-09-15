@@ -376,6 +376,16 @@ export default function AnomalyAnalysis({ stepData, onChange, major }) {
         <FiveWhysFlowChart
           effetto={form.ishikawa.effetto}
           rami={form.ishikawa.rami}
+          onValidateRootCause={(nodeId, stato) => {
+            setSaved(false)
+            setForm(current => ({
+              ...current,
+              ishikawa: {
+                ...current.ishikawa,
+                rami: updateRootCauseStatus(current.ishikawa.rami, nodeId, stato),
+              },
+            }))
+          }}
         />
       </section>
 
@@ -585,6 +595,24 @@ function buildForm(data) {
     ),
     standard_aggiornato: data.standard_aggiornato || '',
   }
+}
+
+function updateRootCauseStatus(rami, nodeId, stato) {
+  const walk = nodes => nodes.map(node => {
+    if (node.id === nodeId) {
+      return { ...node, root_cause_stato: stato }
+    }
+    if (node.children?.length) {
+      return { ...node, children: walk(node.children) }
+    }
+    return node
+  })
+
+  const next = {}
+  Object.entries(rami || {}).forEach(([ramoId, cause]) => {
+    next[ramoId] = Array.isArray(cause) ? walk(cause) : cause
+  })
+  return next
 }
 
 function mapItems(items, template, prefix) {
