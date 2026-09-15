@@ -46,11 +46,6 @@ export default function ScrapEventRegister({ stepData, onChange, major }) {
     }
   }, [form.eventi])
 
-  const updateField = (field, value) => {
-    setSaved(false)
-    setForm(current => ({ ...current, [field]: value }))
-  }
-
   const addEvent = () => {
     setSaved(false)
     setForm(current => ({
@@ -94,12 +89,9 @@ export default function ScrapEventRegister({ stepData, onChange, major }) {
           riepilogo: summary,
         },
         output_compilati: {
-          regola_registrazione: Boolean(form.regola_registrazione.trim()),
-          responsabilita: Boolean(form.responsabilita.trim()),
           registro_eventi: form.eventi.length > 0,
           dati_scarto: summary.scarto > 0,
           registro_anomalie: summary.anomalie > 0,
-          frequenza_revisione: Boolean(form.frequenza_revisione.trim()),
           evidenza_avvio_raccolta: form.eventi.length > 0,
         },
       })
@@ -111,18 +103,6 @@ export default function ScrapEventRegister({ stepData, onChange, major }) {
 
   return (
     <div className="space-y-4">
-      <section className="bg-white rounded-xl border p-4">
-        <h3 className="font-bold text-gray-800 mb-4">Piano di raccolta dati</h3>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <TextAreaField label="Regola di registrazione" value={form.regola_registrazione} onChange={value => updateField('regola_registrazione', value)} />
-          <TextAreaField label="Responsabilità" value={form.responsabilita} onChange={value => updateField('responsabilita', value)} />
-          <TextAreaField label="Cosa misurare" value={form.cosa_misurare} onChange={value => updateField('cosa_misurare', value)} />
-          <TextAreaField label="Quando registrare" value={form.quando_registrare} onChange={value => updateField('quando_registrare', value)} />
-          <TextAreaField label="Dove registrare" value={form.dove_registrare} onChange={value => updateField('dove_registrare', value)} />
-          <TextAreaField label="Frequenza di revisione" value={form.frequenza_revisione} onChange={value => updateField('frequenza_revisione', value)} />
-        </div>
-      </section>
-
       <section className="bg-white rounded-xl border p-4">
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
@@ -196,12 +176,6 @@ export default function ScrapEventRegister({ stepData, onChange, major }) {
 
 function buildForm(data) {
   return {
-    regola_registrazione: data.regola_registrazione || '',
-    responsabilita: data.responsabilita || '',
-    cosa_misurare: data.cosa_misurare || '',
-    quando_registrare: data.quando_registrare || '',
-    dove_registrare: data.dove_registrare || '',
-    frequenza_revisione: data.frequenza_revisione || '',
     eventi: Array.isArray(data.eventi)
       ? data.eventi.map(item => ({ ...EMPTY_EVENT, ...item, id: item.id || createId() }))
       : [],
@@ -227,20 +201,6 @@ function toNumber(value) {
 
 function formatNumber(value) {
   return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 2 }).format(value || 0)
-}
-
-function TextAreaField({ label, value, onChange }) {
-  return (
-    <div>
-      <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">{label}</label>
-      <textarea
-        rows="4"
-        value={value}
-        onChange={event => onChange(event.target.value)}
-        className="w-full border rounded-lg px-3 py-2 text-sm"
-      />
-    </div>
-  )
 }
 
 function TableInput({ value, onChange, type = 'text' }) {
